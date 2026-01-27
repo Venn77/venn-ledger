@@ -56,7 +56,7 @@ class Expense(Base):
     payment_method = relationship("PaymentMethod", back_populates="expenses")
 
     @validates('fx_rate')
-    def validate_fx_rate(self, value):
+    def validate_fx_rate(self, key, value):
         if self.currency_code == "EUR":
             return None
         return value
@@ -75,6 +75,15 @@ class Expense(Base):
 if __name__ == '__main__':
     Base.metadata.create_all(engine)
     print("Database and tables created successfully!")
+    # new_currency = Currency(code="EUR", name="Euro")
+    # session.add(new_currency)
+    # new_category = Category(name="420")
+    # session.add(new_category)
+    # new_vendor = Vendor(name="Planta Santa")
+    # session.add(new_vendor)
+    # new_payment_method = PaymentMethod(name="Cash")
+    # session.add(new_payment_method)
+    # session.commit()
     cat = session.query(Category).filter_by(name="420").first()
     ven = session.query(Vendor).filter_by(name="Planta Santa").first()
     pay = session.query(PaymentMethod).filter_by(name="Cash").first()

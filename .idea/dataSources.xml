@@ -8,5 +8,12 @@
       <jdbc-url>jdbc:sqlite:C:\Users\Venn\Documents\Python\VennExpenseTracker\tracker.db</jdbc-url>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
+    <data-source source="LOCAL" name="movies.db" uuid="3cdb1944-9ee1-4c0b-8857-dab050f09f9f">
+      <driver-ref>sqlite.xerial</driver-ref>
+      <synchronize>true</synchronize>
+      <jdbc-driver>org.sqlite.JDBC</jdbc-driver>
+      <jdbc-url>jdbc:sqlite:C:\Users\Venn\Documents\Python\VennExpenseTracker\movies.db</jdbc-url>
+      <working-dir>$ProjectFileDir$</working-dir>
+    </data-source>
   </component>
 </project>

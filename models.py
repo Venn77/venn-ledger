@@ -4,7 +4,7 @@ from sqlalchemy.orm import declarative_base, relationship, validates, sessionmak
 import datetime, enum
 
 
-engine = create_engine('sqlite:///tracker.db', echo=True)
+engine = create_engine('sqlite:///tracker.db', echo=False)
 Session = sessionmaker(bind=engine)
 Base = declarative_base()
 session = Session()
@@ -14,9 +14,13 @@ class Currency(Base):
     __tablename__ = 'currencies'
     code = Column(String(3), primary_key=True, comment="The currency, e.g., EUR")
     name = Column(String(50), nullable=False, comment="e.g., Euro, United States Dollar, etc.")
+    active = Column(Boolean, default=True, comment="If the currency is active (so it is selectable in-app)")
     # Relationships
     expenses = relationship("Expense", back_populates="currency")
     exchange_rate = relationship("ExchangeRate", back_populates="currencies")
+
+    def __repr__(self):
+        return f"<Currency(code='{self.code}', name='{self.name}', active='{self.active}')>"
 
 class ExchangeRate(Base):
     __tablename__ = 'exchange_rates'
@@ -40,23 +44,35 @@ class Category(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(50), unique=True, nullable=False,
                   comment="e.g., 420, Rent, Gifts, Groceries, Transportation, Vacation, Subscription, Refreshment, or Medical")
+    active = Column(Boolean, default=True, comment="If the category is active (so it is selectable in-app)")
     # Relationships
     expenses = relationship("Expense", back_populates="category")
+
+    def __repr__(self):
+        return f"<Category(name='{self.name}', active='{self.active}')>"
 
 class Vendor(Base):
     __tablename__ = 'vendors'
     id = Column(Integer, primary_key=True)
     name = Column(String(100), unique=True, nullable=False, comment="e.g., Mercadona, Pepephone, etc.")
+    active = Column(Boolean, default=True, comment="If the vendor is active (so it is selectable in-app)")
     # Relationships
     expenses = relationship("Expense", back_populates="vendor")
+
+    def __repr__(self):
+        return f"<Vendor(name='{self.name}', active='{self.active}')>"
 
 class PaymentMethod(Base):
     __tablename__ = 'payment_methods'
     id = Column(Integer, primary_key=True)
     name = Column(String(50), unique=True, nullable=False,
                   comment="The payment method, e.g., LaLiga, Santander Debit, Wise, Revolut, or MercadoPago")
+    active = Column(Boolean, default=True, comment="If the payment method is active (so it is selectable in-app)")
     # Relationships
     expenses = relationship("Expense", back_populates="payment_method")
+
+    def __repr__(self):
+        return f"<PaymentMethod(name='{self.name}', active='{self.active}')>"
 
 class Expense(Base):
     __tablename__ = 'expenses'

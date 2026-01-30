@@ -18,7 +18,7 @@ class Currency(Base):
     # Relationships
     accounts = relationship("Account", back_populates="currency")
     expenses = relationship("Expense", back_populates="currency")
-    exchange_rate = relationship("ExchangeRate", back_populates="currencies")
+    exchange_rate = relationship("ExchangeRate", back_populates="currencies", cascade="all, delete, delete-orphan")
 
     def __repr__(self):
         return f"<Currency(code='{self.code}', name='{self.name}', active_bool='{self.active_bool}')>"

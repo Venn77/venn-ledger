@@ -74,6 +74,18 @@ class PaymentMethod(Base):
     def __repr__(self):
         return f"<PaymentMethod(name='{self.name}', active='{self.active}')>"
 
+class Project(Base):
+    __tablename__ = 'projects'
+    id = Column(Integer, primary_key=True)
+    name = Column(String(50), unique=True, nullable=False, comment="The overarching project or plan to which the expenses will be linked - good for trends analysis")
+    description = Column(String, comment="A brief summary of the project")
+    active = Column(Boolean, default=True, comment="If the project is active (so it is selectable in-app)")
+    # Relationships
+    expenses = relationship("Expense", back_populates="project")
+
+    def __repr__(self):
+        return f"<Project(name='{self.name}', active='{self.active}')>"
+
 class Expense(Base):
     __tablename__ = 'expenses'
     # Foreign Keys
@@ -81,6 +93,7 @@ class Expense(Base):
     category_id = Column(Integer, ForeignKey('categories.id'))
     vendor_id = Column(Integer, ForeignKey('vendors.id'))
     payment_method_id = Column(Integer, ForeignKey('payment_methods.id'), nullable=False)
+    project_id = Column(Integer, ForeignKey('projects.id'))
     id = Column(Integer, primary_key=True)
     amount = Column(Float, nullable=False, comment="The numerical cost, e.g., 15.50")
     fx_rate = Column(Float, comment="Conversion rate if currency is not EUR")
@@ -94,6 +107,7 @@ class Expense(Base):
     category = relationship("Category", back_populates="expenses")
     vendor = relationship("Vendor", back_populates="expenses")
     payment_method = relationship("PaymentMethod", back_populates="expenses")
+    project = relationship("Project", back_populates="expenses")
 
     def calculate_conversion(self):
         if self.currency_code == "EUR":
@@ -109,34 +123,40 @@ class Expense(Base):
 if __name__ == '__main__':
     Base.metadata.create_all(engine)
     print("Database and tables created successfully!")
-    # new_currency = Currency(code="EUR", name="Euro")
-    # session.add(new_currency)
-    # new_currency2 = Currency(code="ARS", name="Argentina Peso")
-    # session.add(new_currency2)
-    # new_fx_rate = ExchangeRate(currency_code=new_currency2.code, fx_multiplier=1850.0, timestamp=datetime.datetime.now())
-    # session.add(new_fx_rate)
-    # session.commit()
-    # new_fx_rate2 = ExchangeRate(currency_code=new_currency2.code, fx_multiplier=1750.0,
-    #                            timestamp=datetime.datetime.now())
-    # session.add(new_fx_rate2)
-    # new_category = Category(name="420")
-    # session.add(new_category)
-    # new_vendor = Vendor(name="Planta Santa")
-    # session.add(new_vendor)
-    # new_payment_method = PaymentMethod(name="Cash")
-    # session.add(new_payment_method)
-    # session.commit()
-    # cat = session.query(Category).filter_by(name="420").first()
-    # ven = session.query(Vendor).filter_by(name="Planta Santa").first()
-    # pay = session.query(PaymentMethod).filter_by(name="Cash").first()
-    # rate_entry = (
-    #     session.query(ExchangeRate).filter_by(currency_code="ARS")
-    #                                .order_by(ExchangeRate.timestamp.desc())
-    #                                .first()
-    #               )
-    # new_expense = Expense(amount=17500.00, currency_code="ARS", fx_rate=rate_entry.fx_multiplier,
-    #                       category_id=cat.id, vendor_id=ven.id,
-    #                       payment_method_id=pay.id, description="Fasito", timestamp=datetime.datetime.now())
-    # new_expense.calculate_conversion()
-    # session.add(new_expense)
-    # session.commit()
+    new_currency = Currency(code="EUR", name="Euro")
+    session.add(new_currency)
+    new_currency2 = Currency(code="ARS", name="Argentina Peso")
+    session.add(new_currency2)
+    new_fx_rate = ExchangeRate(currency_code=new_currency2.code, fx_multiplier=1850.0, timestamp=datetime.datetime.now())
+    session.add(new_fx_rate)
+    session.commit()
+    new_fx_rate2 = ExchangeRate(currency_code=new_currency2.code, fx_multiplier=1750.0,
+                               timestamp=datetime.datetime.now())
+    session.add(new_fx_rate2)
+    new_category = Category(name="420")
+    session.add(new_category)
+    new_vendor = Vendor(name="Planta Santa")
+    session.add(new_vendor)
+    new_payment_method = PaymentMethod(name="Cash")
+    session.add(new_payment_method)
+    session.commit()
+    new_projects = (
+        Project(name="Japan 2025", description="September/October trip with gf"),
+        Project(name="Italy 2025", description="December trip with gf")
+    )
+    session.add_all(new_projects)
+    session.commit()
+    cat = session.query(Category).filter_by(name="420").first()
+    ven = session.query(Vendor).filter_by(name="Planta Santa").first()
+    pay = session.query(PaymentMethod).filter_by(name="Cash").first()
+    rate_entry = (
+        session.query(ExchangeRate).filter_by(currency_code="ARS")
+                                   .order_by(ExchangeRate.timestamp.desc())
+                                   .first()
+                  )
+    new_expense = Expense(amount=17500.00, currency_code="ARS", fx_rate=rate_entry.fx_multiplier,
+                          category_id=cat.id, vendor_id=ven.id,
+                          payment_method_id=pay.id, description="Fasito", timestamp=datetime.datetime.now())
+    new_expense.calculate_conversion()
+    session.add(new_expense)
+    session.commit()

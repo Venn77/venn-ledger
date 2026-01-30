@@ -16,6 +16,7 @@ class Currency(Base):
     name = Column(String(50), nullable=False, comment="e.g., Euro, United States Dollar, etc.")
     active_bool = Column(Boolean, default=True, comment="If the currency is active (so it is selectable in-app)")
     # Relationships
+    accounts = relationship("Account", back_populates="currency")
     expenses = relationship("Expense", back_populates="currency")
     exchange_rate = relationship("ExchangeRate", back_populates="currencies")
 
@@ -38,6 +39,7 @@ class ExchangeRate(Base):
 
     def __repr__(self):
         return f"<ExchangeRate(code='{self.currency_code}', rate={self.fx_multiplier} at {self.timestamp})>"
+
 
 class Category(Base):
     __tablename__ = 'categories'
@@ -62,14 +64,33 @@ class Vendor(Base):
     def __repr__(self):
         return f"<Vendor(name='{self.name}', active_bool='{self.active_bool}')>"
 
+class Account(Base):
+    __tablename__ = 'accounts'
+    #Foreign Keys
+    currency_code = Column(String(3), ForeignKey('currencies.code'), nullable=False)
+    id = Column(Integer, primary_key=True)
+    name = Column(String(50), unique=True, nullable=False, comment="The name of the account")
+    description = Column(String, comment="A brief summary of the account's purpose")
+    balance = Column(Float, default=0, comment="The balance of the account")
+    active_bool = Column(Boolean, default=True, comment="If the account is active (so it is selectable in-app)")
+    # Relationships
+    currency = relationship("Currency", back_populates="accounts")
+    payment_methods = relationship("PaymentMethod", back_populates="account")
+
+    def __repr__(self):
+        return f"<Account(name='{self.name}', balance='{self.balance}', active_bool='{self.active_bool}')>"
+
 class PaymentMethod(Base):
     __tablename__ = 'payment_methods'
+    #Foreign Keys
+    account_id = Column(Integer, ForeignKey('accounts.id'), nullable=False)
     id = Column(Integer, primary_key=True)
     name = Column(String(50), unique=True, nullable=False,
                   comment="The payment method, e.g., LaLiga, Santander Debit, Wise, Revolut, or MercadoPago")
     active_bool = Column(Boolean, default=True, comment="If the payment method is active (so it is selectable in-app)")
     # Relationships
     expenses = relationship("Expense", back_populates="payment_method")
+    account = relationship("Account", back_populates="payment_methods")
 
     def __repr__(self):
         return f"<PaymentMethod(name='{self.name}', active_bool='{self.active_bool}')>"
@@ -137,8 +158,18 @@ if __name__ == '__main__':
     # session.add(new_category)
     # new_vendor = Vendor(name="Planta Santa")
     # session.add(new_vendor)
-    # new_payment_method = PaymentMethod(name="Cash")
-    # session.add(new_payment_method)
+    # new_accounts = (
+    #     Account(currency_code=new_currency.code, name="Santander ES", description="Main account", balance=1000),
+    #     Account(currency_code=new_currency.code, name="Cash (EUR)", description="Cash in EUR", balance=100)
+    # )
+    # session.add_all(new_accounts)
+    # session.commit()
+    # new_payment_methods = (
+    #     PaymentMethod(name="Santander Debit", account_id=new_accounts[0].id),
+    #     PaymentMethod(name="Santander Bizum", account_id=new_accounts[0].id),
+    #     PaymentMethod(name="Cash (EUR)", account_id=new_accounts[1].id)
+    # )
+    # session.add_all(new_payment_methods)
     # session.commit()
     # new_projects = (
     #     Project(name="Japan 2025", description="September/October trip with gf"),
@@ -148,7 +179,7 @@ if __name__ == '__main__':
     # session.commit()
     # cat = session.query(Category).filter_by(name="420").first()
     # ven = session.query(Vendor).filter_by(name="Planta Santa").first()
-    # pay = session.query(PaymentMethod).filter_by(name="Cash").first()
+    # pay = session.query(PaymentMethod).filter_by(name="Cash (EUR)").first()
     # rate_entry = (
     #     session.query(ExchangeRate).filter_by(currency_code="ARS")
     #                                .order_by(ExchangeRate.timestamp.desc())

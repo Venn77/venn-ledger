@@ -1,27 +1,67 @@
 from models import session
-import expense_manager
+import expense_manager, datetime
+
+
+def get_valid_float(prompt):
+    """
+    Checks if the input is a float.
+    Converts comma to dot for decimals.
+    """
+    while True:
+        value_str = input(prompt).strip()
+        value_str = value_str.replace(",",".")
+        try:
+            return float(value_str)
+        except ValueError:
+            print(f"""\n***** INPUT ERROR *****
+                    \r'{value_str}' is not a valid number. Please use digits (e.g., 15.50)
+                    \r************************""")
+
+def clean_date(date_str):
+    """
+    Makes sure the date is a valid format.
+    Ex: YYYY-MM-DD HH:MM.
+    """
+    if not date_str or date_str.strip() == "":
+        return None
+
+    try:
+        return datetime.datetime.strptime(date_str, "%Y-%m-%d %H:%M")
+    except ValueError:
+        print("""\n***** DATE ERROR *****
+                  \rFormat must be: YYYY-MM-DD HH:MM
+                  \rEx: 2003-01-01 12:23
+                  \r**********************""")
+        return "ERROR"
+
 
 manager = expense_manager.TransactionManager(session)
 
-amount_str=input("Enter amount of the expense: ")
-currency=input("Enter currency code (e.g., ARS): ")
-category=input("Enter category name: ")
-vendor=input("Enter vendor name: ")
+amount=get_valid_float("Enter amount of the expense: ")
+# Must ensure currency is selected from available ones.
+currency=input("Enter currency code (e.g., ARS): ").upper()
+category=input("Enter category name: ") or None
+vendor=input("Enter vendor name: ") or None
+# Must ensure there is a valid payment method chosen.
 payment_method=input("Enter payment method name: ")
 project=input("Enter project name: ") or None
 descr=input("Enter description: ")
-ts=input("Enter timestamp (YYYY-MM-DD HH:MM) or leave blank for Now: ")
+while True:
+    ts=input("Enter timestamp (YYYY-MM-DD HH:MM) or leave blank for Now: ")
+    ts = clean_date(ts)
+    if isinstance(ts, datetime.datetime) or ts is None:
+        break
 
 try:
     new_expense = manager.add_expense(
-        amount=float(amount_str),
+        amount=amount,
         currency_code=currency,
         category_name=category,
         vendor_name=vendor,
         payment_method_name=payment_method,
         project_name=project,
         description=descr,
-        timestamp=None
+        timestamp=ts
     )
     print(f"New expense added: {new_expense.id}")
     print(f"New account balance: {new_expense.payment_method.account.balance}")

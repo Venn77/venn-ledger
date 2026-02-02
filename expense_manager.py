@@ -13,29 +13,29 @@ class TransactionManager:
         """
         Handles the 'Master Data' lookup.
         If the item exists but is inactive, it reactivates it.
+        If it doesn't exist, it creates it.
         """
         item = self.session.query(model).filter_by(name=name).first()
         if item:
             if not item.active_bool:
-                item.active_bool = True  # Reactivate if used again
+                item.active_bool = True
             return item
 
         new_item = model(name=name)
         self.session.add(new_item)
-        self.session.flush()  # Populate the ID
+        self.session.flush()
         return new_item
 
-    def add_expense(self, amount, currency_code, category_name, vendor_name,
-                    payment_method_name, project_name=None, description=None,
+    def add_expense(self, amount, currency_code, payment_method_name, category_name=None, vendor_name=None,
+                    project_name=None, description=None,
                     timestamp=None):
 
         # 1. Resolve Master Data
-        category = self._get_or_create_dimension(Category, category_name)
-        vendor = self._get_or_create_dimension(Vendor, vendor_name)
+        category = self._get_or_create_dimension(Category, category_name) if category_name else None
+        vendor = self._get_or_create_dimension(Vendor, vendor_name) if vendor_name else None
         project = self._get_or_create_dimension(Project, project_name) if project_name else None
 
         # 2. Resolve Payment Method & Account
-        # We assume the PaymentMethod already exists for manual entry
         pm = self.session.query(PaymentMethod).filter_by(name=payment_method_name).first()
 
         if not pm:
@@ -59,8 +59,8 @@ class TransactionManager:
             amount=amount,
             currency_code=currency_code,
             fx_rate=fx_rate,
-            category_id=category.id,
-            vendor_id=vendor.id,
+            category_id=category.id if category else None,
+            vendor_id=vendor.id if vendor else None,
             payment_method_id=pm.id,
             project_id=project.id if project else None,
             description=description,
@@ -68,7 +68,6 @@ class TransactionManager:
         )
         new_expense.calculate_conversion()
 
-        # 5. THE CRITICAL STEP: Liquidity Update
         # Subtract the 'raw' amount from the account balance
         account.balance -= amount
 

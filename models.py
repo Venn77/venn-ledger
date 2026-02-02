@@ -1,4 +1,7 @@
-from sqlalchemy import create_engine, Column, Integer, Float, String, Boolean, DateTime, func, ForeignKey, UniqueConstraint
+from sqlalchemy import (
+    create_engine, Column, Integer, Float, String,
+    Boolean, DateTime, func, ForeignKey, UniqueConstraint
+)
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import declarative_base, relationship, validates, sessionmaker
 import datetime, enum
@@ -39,7 +42,6 @@ class ExchangeRate(Base):
 
     def __repr__(self):
         return f"<ExchangeRate(code='{self.currency_code}', rate={self.fx_multiplier} at {self.timestamp})>"
-
 
 class Category(Base):
     __tablename__ = 'categories'

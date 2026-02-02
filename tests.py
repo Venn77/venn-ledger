@@ -1,4 +1,4 @@
-from models import session
+from models import session, Currency, PaymentMethod
 import expense_manager, datetime
 
 
@@ -37,17 +37,48 @@ def clean_date(date_str):
 
 manager = expense_manager.TransactionManager(session)
 
-amount=get_valid_float("Enter amount of the expense: ")
+amount = get_valid_float("Enter amount of the expense: ")
+
 # Must ensure currency is selected from available ones.
-currency=input("Enter currency code (e.g., ARS): ").upper()
-category=input("Enter category name: ") or None
-vendor=input("Enter vendor name: ") or None
-# Must ensure there is a valid payment method chosen.
-payment_method=input("Enter payment method name: ")
-project=input("Enter project name: ") or None
-descr=input("Enter description: ")
+active_curs = session.query(Currency).filter_by(active_bool=True).all()
+cur_codes = [cur.code for cur in active_curs]
+print("\nAvailable Currencies:")
+for code in cur_codes:
+    print(f"- {code}")
 while True:
-    ts=input("Enter timestamp (YYYY-MM-DD HH:MM) or leave blank for Now: ")
+    currency = input("\nEnter currency code (e.g., ARS): ").upper().strip()
+    if currency in cur_codes:
+        break
+    print(f"""\n***** ERROR *****
+              \r'{currency}' is not a valid currency.
+              \rPlease choose from the list above.
+              \r**********************""")
+
+category = input("Enter category name: ").strip() or None
+
+vendor = input("Enter vendor name: ").strip() or None
+
+# Must ensure there is a valid payment method chosen.
+active_pms = session.query(PaymentMethod).filter_by(active_bool=True).all()
+pm_names = [pm.name for pm in active_pms]
+print("\nAvailable Payment Methods:")
+for name in pm_names:
+    print(f"- {name}")
+while True:
+    payment_method = input("\nEnter payment method name: ").strip()
+    if payment_method in pm_names:
+        break
+    print(f"""\n***** ERROR *****
+              \r'{payment_method}' is not a valid method.
+              \rPlease choose from the list above.
+              \r**********************""")
+
+project = input("Enter project name: ").strip() or None
+
+descr = input("Enter description: ")
+
+while True:
+    ts = input("Enter timestamp (YYYY-MM-DD HH:MM) or leave blank for Now: ")
     ts = clean_date(ts)
     if isinstance(ts, datetime.datetime) or ts is None:
         break

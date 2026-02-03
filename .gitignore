@@ -2,3 +2,5 @@
 .venv/
 __pycache__/
 .idea/
+my_expenses.txt
+my_expenses_2025.txt

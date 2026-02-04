@@ -2,6 +2,25 @@ from models import session, Currency, PaymentMethod
 import expense_manager, datetime
 
 
+def get_active_currency(prompt):
+    """
+    Checks if the input is an active currency.
+    """
+    # Must ensure currency is selected from available ones.
+    active_curs = session.query(Currency).filter_by(active_bool=True).all()
+    cur_codes = [cur.code for cur in active_curs]
+    print("\nAvailable Currencies:")
+    for code in cur_codes:
+        print(f"- {code}")
+    while True:
+        currency_str = input(prompt).upper().strip()
+        if currency_str in cur_codes:
+            return currency_str
+        print(f"""\n***** ERROR *****
+                  \r'{currency_str}' is not a valid currency.
+                  \rPlease choose from the list above.
+                  \r**********************""")
+
 def get_valid_float(prompt):
     """
     Checks if the input is a float.
@@ -35,67 +54,56 @@ def clean_date(date_str):
         return "ERROR"
 
 
-manager = expense_manager.TransactionManager(session)
+if __name__ == "__main__":
 
-amount = get_valid_float("Enter amount of the expense: ")
+    manager = expense_manager.TransactionManager(session)
 
-# Must ensure currency is selected from available ones.
-active_curs = session.query(Currency).filter_by(active_bool=True).all()
-cur_codes = [cur.code for cur in active_curs]
-print("\nAvailable Currencies:")
-for code in cur_codes:
-    print(f"- {code}")
-while True:
-    currency = input("\nEnter currency code (e.g., ARS): ").upper().strip()
-    if currency in cur_codes:
-        break
-    print(f"""\n***** ERROR *****
-              \r'{currency}' is not a valid currency.
-              \rPlease choose from the list above.
-              \r**********************""")
+    amount = get_valid_float("Enter amount of the expense: ")
 
-category = input("Enter category name: ").strip() or None
+    currency = get_active_currency("\nEnter currency code (e.g., ARS): ")
 
-vendor = input("Enter vendor name: ").strip() or None
+    category = input("Enter category name: ").strip() or None
 
-# Must ensure there is a valid payment method chosen.
-active_pms = session.query(PaymentMethod).filter_by(active_bool=True).all()
-pm_names = [pm.name for pm in active_pms]
-print("\nAvailable Payment Methods:")
-for name in pm_names:
-    print(f"- {name}")
-while True:
-    payment_method = input("\nEnter payment method name: ").strip()
-    if payment_method in pm_names:
-        break
-    print(f"""\n***** ERROR *****
-              \r'{payment_method}' is not a valid method.
-              \rPlease choose from the list above.
-              \r**********************""")
+    vendor = input("Enter vendor name: ").strip() or None
 
-project = input("Enter project name: ").strip() or None
+    # Must ensure there is a valid payment method chosen.
+    active_pms = session.query(PaymentMethod).filter_by(active_bool=True).all()
+    pm_names = [pm.name for pm in active_pms]
+    print("\nAvailable Payment Methods:")
+    for name in pm_names:
+        print(f"- {name}")
+    while True:
+        payment_method = input("\nEnter payment method name: ").strip()
+        if payment_method in pm_names:
+            break
+        print(f"""\n***** ERROR *****
+                  \r'{payment_method}' is not a valid method.
+                  \rPlease choose from the list above.
+                  \r**********************""")
 
-descr = input("Enter description: ")
+    project = input("Enter project name: ").strip() or None
 
-while True:
-    ts = input("Enter timestamp (YYYY-MM-DD HH:MM) or leave blank for Now: ")
-    ts = clean_date(ts)
-    if isinstance(ts, datetime.datetime) or ts is None:
-        break
+    descr = input("Enter description: ")
 
-try:
-    new_expense = manager.add_expense(
-        amount=amount,
-        currency_code=currency,
-        category_name=category,
-        vendor_name=vendor,
-        payment_method_name=payment_method,
-        project_name=project,
-        description=descr,
-        timestamp=ts
-    )
-    print(f"New expense added: {new_expense.id}")
-    print(f"New account balance: {new_expense.payment_method.account.balance}")
+    while True:
+        ts = input("Enter timestamp (YYYY-MM-DD HH:MM) or leave blank for Now: ")
+        ts = clean_date(ts)
+        if isinstance(ts, datetime.datetime) or ts is None:
+            break
 
-except Exception as e:
-    print(f"Error: {e}")
+    try:
+        new_expense = manager.add_expense(
+            amount=amount,
+            currency_code=currency,
+            category_name=category,
+            vendor_name=vendor,
+            payment_method_name=payment_method,
+            project_name=project,
+            description=descr,
+            timestamp=ts
+        )
+        print(f"New expense added: {new_expense.id}")
+        print(f"New account balance: {new_expense.payment_method.account.balance}")
+
+    except Exception as e:
+        print(f"Error: {e}")

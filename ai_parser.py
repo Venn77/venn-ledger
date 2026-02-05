@@ -14,27 +14,34 @@ def get_structured_data(combined_text, categories, payment_methods, default_curr
        - VENDOR: The proper name immediately following the category (e.g., 'Mercadona', 'PrimaPrix', 'Spotify').
        - AMOUNT: The first float value encountered (e.g., '13.90', '2.47').
        - PAYMENT_HINT: The word immediately following the amount (e.g., 'santander', 'mp', 'cash').
-       - DESCRIPTION: Everything remaining after the payment hint.
-    
+       - DESCRIPTION: A verbatim capture of EVERYTHING else on the line. If it's in brackets, it goes here. If it's after the payment hint, it goes here. Zero data loss permitted.
     3. BRACKET_HANDLING:
        - Text in brackets () is "metadata." 
        - If brackets are next to the Amount, they belong in the 'description'.
        - Do NOT let bracketed text count as a new column.
        - Bracketed text MUST be included in the 'description'.
-    
     4. PAYMENT_MAPPING:
        - 'santander' -> 'Santander Debit'
        - 'mp' -> 'Mercado Pago'
        - 'cash' -> 'Cash (EUR)'
        - 'laliga' -> 'Santander LaLiga'
        - 'lacaixa' -> 'LaCaixa IKEA'
-       - 'wise' -> 'Wise (USD)' or 'Wise (JPY)' (depends on the currency)
+       - 'wise' -> 'Wise (USD)' if currency is USD or 'Wise (JPY)' if currency is JPY, etc. 
        - 'wizink' -> 'Wizink' 
-       - 'revolut' -> 'Revolut (EUR)' or 'Revolut (JPY)' (depends on the currency)
+       - 'revolut' -> 'Revolut (EUR)' if currency is EUR or 'Revolut (JPY)' if currency is JPY, etc.
     5. DATE: Every object MUST have a "date" field (DD/MM) extracted from the closest preceding Header.
     6. ATOMICITY: One line in = One JSON object out. NEVER combine lines.
     7. DATE_CLEANING: Extract ONLY "DD/MM". If the header is "16/01 (Trieste):", the date is "16/01".
     8. DELIMITER_LOGIC: Use the Amount as the separator. Everything before is Category/Vendor. Everything after is Payment/Description.
+    9. DATA_PRESERVATION: 
+       - The 'description' MUST contain ALL text found after the payment hint and ALL text found in brackets.
+       - NEVER summarize or omit bracketed metadata like '(20800.04 TC 1318)'.
+       - If a line has both brackets and trailing text, combine them: "(brackets) trailing text".
+       - Ensure exchange rates in brackets are never omitted.
+    10. VERBATIM_INTEGRITY: 
+    - You are a pass-through pipe for metadata. 
+    - If the input says "(78750.00 ARS TC 1677)", the output MUST say "(78750.00 ARS TC 1677)". 
+    - You are strictly forbidden from "cleaning" or "simplifying" the description.
     </constraints>
 
     <example>
@@ -71,11 +78,17 @@ def get_structured_data(combined_text, categories, payment_methods, default_curr
     </reference_data>
 
     <output_format>
-    Return ONLY a JSON list of objects. No preamble.
+    Return ONLY ONE JSON list of objects. No preamble.
     Each object MUST contain these exact keys:
     "date" (date), "amount" (float), "currency" (string), "category" (string), "vendor" (string), "payment_method" (string), "description" (string).
-    
     Do NOT use "payment_hint" or any other variation.
+    Return EXACTLY ONE JSON list.
+    STRICT PROHIBITIONS:
+    - NO preamble like "Here is the JSON..."
+    - NO postamble or explanations.
+    - NO splitting the list into multiple blocks or headers.
+    - NO markdown formatting (no bold text, no ```json).
+    - ONLY the raw [ ... ] content.
     </output_format>
     """
 
@@ -88,16 +101,36 @@ def get_structured_data(combined_text, categories, payment_methods, default_curr
     content = response['message']['content']
 
     try:
-        start_idx = content.find('[')
-        end_idx = content.rfind(']') + 1
-        if start_idx == -1 or end_idx == 0:
-            raise ValueError("No JSON list found in response")
+        # 1. Use a robust regex to find all JSON-like objects { ... }
+        # This ignores any "Here is the JSON" text or multiple arrays
+        obj_matches = re.findall(r'\{.*?}', content, re.DOTALL)
 
-        clean_json = content[start_idx:end_idx]
-        return json.loads(clean_json)
+        refined_results = []
+        for obj_str in obj_matches:
+            try:
+                # Fix the AI's common "empty string without key" typo: , "" }
+                fixed_str = re.sub(r',\s*""\s*}', ', "description": ""}', obj_str)
+
+                item = json.loads(fixed_str)
+
+                # If the AI forgot a key, add it here with a blank value
+                expected_keys = ["date", "amount", "currency", "category", "vendor", "payment_method", "description"]
+                for key in expected_keys:
+                    if key not in item:
+                        item[key] = ""
+
+                refined_results.append(item)
+            except json.JSONDecodeError:
+                continue
+
+        if not refined_results:
+            raise ValueError("AI output contained no valid JSON objects.")
+
+        return refined_results
+
     except Exception as e:
         print(f"DEBUG: Raw AI Output was: {content}")
-        print(f"Error parsing AI response: {e}")
+        print(f"Error in Middleware Parser: {e}")
         return None
 
 def chunk_file_by_day(filepath):
@@ -165,7 +198,7 @@ if __name__ == "__main__":
 
         print(payment_methods_str)
 
-        batch_size = 10
+        batch_size = 5
 
         for idx in range(0, len(daily_chunks), batch_size):
             batch = daily_chunks[idx: idx + batch_size]

@@ -42,6 +42,11 @@ def get_structured_data(combined_text, categories, payment_methods, default_curr
     - You are a pass-through pipe for metadata. 
     - If the input says "(78750.00 ARS TC 1677)", the output MUST say "(78750.00 ARS TC 1677)". 
     - You are strictly forbidden from "cleaning" or "simplifying" the description.
+    11. REFERENCE_STRICTNESS:
+    - The 'payment_method' field MUST match one of the exact strings provided in <reference_data>.
+    - NEVER use generic names like 'Revolut' or 'Wise'. 
+    - You MUST use the mapped versions: 'Revolut (EUR)', 'Wise (USD)', etc.
+    - If a mapping depends on the currency, cross-reference the detected currency with the 'PAYMENT_MAPPING' rules.
     </constraints>
 
     <example>
@@ -52,11 +57,11 @@ def get_structured_data(combined_text, categories, payment_methods, default_curr
     Groceries Mercadona 8.80 santander
     Dates Tinder 7.26 (9971.30 ARS) mp Platinum Mayo
     Subscription Amazon 4.99 santander Prime
-    Videogames Steam 29.90 (39405 ARS TC 1318 - this time it charged me 21% VAT! In EU it costs 27.99 😡) mp Like A Dragon Infinite Wealth
+    Videogames Steam 29.90 (39405 TC 1318 - this time it charged me 21% VAT! In EU it costs 27.99 😡) mp Like A Dragon Infinite Wealth
     Subscription Spotify 2.45 (3133.47 TC 1280 -incluye 21% IVA) mp
     Lunch Five Guys 33.90 santander w/Celes
     Medical Pharmacy 8.99 santander Nasal spray
-    Gifts Agustina Rojas 46.96 (78750.00 ARS TC 1677) mp Birthday boots f/Agustina
+    Gifts Agustina Rojas 46.96 (78750.00 TC 1677) mp Birthday boots f/Agustina
     
     Output:
     [
@@ -64,11 +69,11 @@ def get_structured_data(combined_text, categories, payment_methods, default_curr
       {{"date": "31/01", "amount": 8.80, "currency": "{default_currency}", "category": "Groceries", "vendor": "Mercadona", "payment_method": "Santander Debit", "description": ""}},
       {{"date": "31/01", "amount": 7.26, "currency": "{default_currency}", "category": "Dates", "vendor": "Tinder", "payment_method": "Mercado Pago", "description": "(9971.30 ARS) Platinum Mayo"}},
       {{"date": "31/01", "amount": 4.99, "currency": "{default_currency}", "category": "Subscription", "vendor": "Amazon", "payment_method": "Santander Debit", "description": "Prime"}},
-      {{"date": "31/01", "amount": 29.90, "currency": "{default_currency}", "category": "Videogames", "vendor": "Steam", "payment_method": "Mercado Pago", "description": "(39405 ARS TC 1318 - this time it charged me 21% VAT! In EU it costs 27.99 😡) Like A Dragon Infinite Wealth"}},
+      {{"date": "31/01", "amount": 29.90, "currency": "{default_currency}", "category": "Videogames", "vendor": "Steam", "payment_method": "Mercado Pago", "description": "(39405 TC 1318 - this time it charged me 21% VAT! In EU it costs 27.99 😡) Like A Dragon Infinite Wealth"}},
       {{"date": "31/01", "amount": 2.45, "currency": "{default_currency}", "category": "Subscription", "vendor": "Spotify", "payment_method": "Mercado Pago", "description": "(3133.47 TC 1280 -incluye 21% IVA)"}},
       {{"date": "31/01", "amount": 33.90, "currency": "{default_currency}", "category": "Lunch", "vendor": "Five Guys", "payment_method": "Santander Debit", "description": "w/Celes"}},
       {{"date": "31/01", "amount": 8.99, "currency": "{default_currency}", "category": "Medical", "vendor": "Pharmacy", "payment_method": "Santander Debit", "description": "Nasal spray"}},
-      {{"date": "31/01", "amount": 46.96, "currency": "{default_currency}", "category": "Gifts", "vendor": "Agustina Rojas", "payment_method": "Mercado Pago", "description": "(78750.00 ARS TC 1677) Birthday boots f/Agustina"}}
+      {{"date": "31/01", "amount": 46.96, "currency": "{default_currency}", "category": "Gifts", "vendor": "Agustina Rojas", "payment_method": "Mercado Pago", "description": "(78750.00 TC 1677) Birthday boots f/Agustina"}}
     ]
     </example>
 

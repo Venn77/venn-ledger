@@ -1,5 +1,3 @@
-from models import session, Category, PaymentMethod, Currency
-from tests import get_active_currency
 import re, json, ollama
 
 
@@ -180,54 +178,5 @@ def chunk_file_by_day(filepath):
             pass
 
     return days
-
-
-if __name__ == "__main__":
-    filename = "my_expenses.txt"
-
-    try:
-        daily_chunks = chunk_file_by_day(filename)
-
-        print(f"Successfully identified {len(daily_chunks)} days of transactions.")
-
-        currency_str = get_active_currency("\nEnter currency code (e.g., ARS): ")
-
-        print(currency_str)
-
-        active_categories = session.query(Category).filter_by(active_bool=True).all()
-
-        categories_str = ", ".join([str(category.name) for category in active_categories])
-
-        print(categories_str)
-
-        active_payment_methods = session.query(PaymentMethod).filter_by(active_bool=True).all()
-
-        payment_methods_str = ", ".join([str(payment_method.name) for payment_method in active_payment_methods])
-
-        print(payment_methods_str)
-
-        batch_size = 5
-
-        for idx in range(0, len(daily_chunks), batch_size):
-            batch = daily_chunks[idx: idx + batch_size]
-            combined_str = ""
-            for day in batch:
-                combined_str += f"Header: {day['header']}\nData:\n{day['data']}\n\n"
-
-            print(f"\n--- Processing Batch (Days {idx+1} to {idx + len(batch)}) ---")
-
-            parsed_results = get_structured_data(combined_str, categories_str, payment_methods_str, currency_str)
-
-            if parsed_results:
-                for res in parsed_results:
-                    print(f"[{res.get('date')}] {res.get('vendor')}: {res.get('amount')} {res.get('currency')} [{res.get('category')}] [{res.get('payment_method')}] [{res.get('description')}]")
-
-            cmd = input("\nPress Enter for next batch, or 'q' to quit: ").lower()
-            if cmd == 'q':
-                break
-
-    except FileNotFoundError:
-        print(f"File not found: {filename}. Check the path!")
-
 
 

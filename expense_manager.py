@@ -26,7 +26,7 @@ class TransactionManager:
         self.session.flush()
         return new_item
 
-    def add_expense(self, amount, currency_code, payment_method_name, category_name=None, vendor_name=None,
+    def add_expense(self, amount, currency_code, payment_method_name, exchange_rate=None, category_name=None, vendor_name=None,
                     project_name=None, description=None,
                     timestamp=None):
 
@@ -44,15 +44,18 @@ class TransactionManager:
         account = pm.account
 
         # 3. Currency & FX Logic
-        fx_rate = None
-        if currency_code != "EUR":
-            rate_entry = (self.session.query(ExchangeRate)
-                          .filter_by(currency_code=currency_code)
-                          .order_by(ExchangeRate.timestamp.desc())
-                          .first())
-            if not rate_entry:
-                raise ValueError(f"No exchange rate found for {currency_code}. Please seed rates.")
-            fx_rate = rate_entry.fx_multiplier
+        if not exchange_rate:
+            fx_rate = None
+            if currency_code != "EUR":
+                rate_entry = (self.session.query(ExchangeRate)
+                              .filter_by(currency_code=currency_code)
+                              .order_by(ExchangeRate.timestamp.desc())
+                              .first())
+                if not rate_entry:
+                    raise ValueError(f"No exchange rate found for {currency_code}. Please seed rates.")
+                fx_rate = rate_entry.fx_multiplier
+        else:
+            fx_rate = exchange_rate
 
         # 4. Create Expense Object
         new_expense = Expense(

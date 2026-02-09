@@ -42,6 +42,9 @@ def get_structured_data(combined_text, categories, payment_methods, default_curr
     - You are a pass-through pipe for metadata. 
     - If the input says "(78750.00 ARS TC 1677)", the output MUST say "(78750.00 ARS TC 1677)". 
     - You are strictly forbidden from "cleaning" or "simplifying" the description.
+    - You MUST preserve all Spanish accents (á, é, í, ó, ú, ñ). 
+    - NEVER replace 'á' with '¡' or any other symbol. 
+    - If the input says 'mamá', the JSON MUST say 'mamá'.
     11. REFERENCE_STRICTNESS:
     - The 'payment_method' field MUST match one of the exact strings provided in <reference_data>.
     - NEVER use generic names like 'Revolut' or 'Wise'. 
@@ -135,7 +138,7 @@ def get_structured_data(combined_text, categories, payment_methods, default_curr
 
     except Exception as e:
         print(f"DEBUG: Raw AI Output was: {content}")
-        print(f"Error in Middleware Parser: {e}")
+        print(f"Error in AI Parser: {e}")
         return None
 
 def chunk_file_by_day(filepath):
@@ -180,7 +183,7 @@ def chunk_file_by_day(filepath):
 
 
 if __name__ == "__main__":
-    filename = "my_expenses_2025.txt"
+    filename = "my_expenses.txt"
 
     try:
         daily_chunks = chunk_file_by_day(filename)

@@ -36,6 +36,17 @@ def get_valid_float(prompt):
                     \r'{value_str}' is not a valid number. Please use digits (e.g., 15.50)
                     \r************************""")
 
+def get_valid_year(prompt):
+    """Checks if the input is a 4-digit year."""
+    while True:
+        try:
+            return datetime.datetime.strptime(input(prompt).strip(),"%Y").year
+        except ValueError:
+            print(f"""\n***** DATE ERROR *****
+                        \rFormat must be: YYYY.
+                        \nEx: 2025
+                        \r**********************""")
+
 def clean_date(date_str):
     """
     Makes sure the date is a valid format.

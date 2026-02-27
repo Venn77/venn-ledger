@@ -1,143 +1,241 @@
-import re, json, ollama
+import re, json, ollama, difflib
 
 
-def get_structured_data(combined_text, categories, payment_methods, default_currency):
-    system_prompt = f"""
-    <role>You are a literal text-to-JSON transcriber.</role>
+def get_row_prompt(default_currency):
+    """Prepares a system prompt for LLM interpretation of expense items."""
+    return f"""
+<role>You are a literal data extraction pipe. ZERO reasoning. ZERO spelling correction.</role>
 
-    <constraints>
-    1. DEFAULT_CURRENCY: {default_currency}.
-    2. ENTITY_DETECTION:
-       - CATEGORY: Usually 1-2 words at the very start (e.g., 'Groceries', 'Household Supplies', 'Internet & Mobile').
-       - VENDOR: The proper name immediately following the category (e.g., 'Mercadona', 'PrimaPrix', 'Spotify').
-       - AMOUNT: The first float value encountered (e.g., '13.90', '2.47').
-       - PAYMENT_HINT: The word immediately following the amount (e.g., 'santander', 'mp', 'cash').
-       - DESCRIPTION: A verbatim capture of EVERYTHING else on the line. If it's in brackets, it goes here. If it's after the payment hint, it goes here. Zero data loss permitted.
-    3. BRACKET_HANDLING:
-       - Text in brackets () is "metadata." 
-       - If brackets are next to the Amount, they belong in the 'description'.
-       - Do NOT let bracketed text count as a new column.
-       - Bracketed text MUST be included in the 'description'.
-    4. PAYMENT_MAPPING:
-       - 'santander' -> 'Santander Debit'
-       - 'mp' -> 'Mercado Pago'
-       - 'cash' -> 'Cash (EUR)'
-       - 'laliga' -> 'Santander LaLiga'
-       - 'lacaixa' -> 'LaCaixa IKEA'
-       - 'wise' -> 'Wise (USD)' if currency is USD or 'Wise (JPY)' if currency is JPY, etc. 
-       - 'wizink' -> 'Wizink' 
-       - 'revolut' -> 'Revolut (EUR)' if currency is EUR or 'Revolut (JPY)' if currency is JPY, etc.
-    5. DATE: Every object MUST have a "date" field (DD/MM) extracted from the closest preceding Header.
-    6. ATOMICITY: One line in = One JSON object out. NEVER combine lines.
-    7. DATE_CLEANING: Extract ONLY "DD/MM". If the header is "16/01 (Trieste):", the date is "16/01".
-    8. DELIMITER_LOGIC: Use the Amount as the separator. Everything before is Category/Vendor. Everything after is Payment/Description.
-    9. DATA_PRESERVATION: 
-       - The 'description' MUST contain ALL text found after the payment hint and ALL text found in brackets.
-       - NEVER summarize or omit bracketed metadata like '(20800.04 TC 1318)'.
-       - If a line has both brackets and trailing text, combine them: "(brackets) trailing text".
-       - Ensure exchange rates in brackets are never omitted.
-    10. VERBATIM_INTEGRITY: 
-    - You are a pass-through pipe for metadata. 
-    - If the input says "(78750.00 ARS TC 1677)", the output MUST say "(78750.00 ARS TC 1677)". 
-    - You are strictly forbidden from "cleaning" or "simplifying" the description.
-    - You MUST preserve all Spanish accents (á, é, í, ó, ú, ñ). 
-    - NEVER replace 'á' with '¡' or any other symbol. 
-    - If the input says 'mamá', the JSON MUST say 'mamá'.
-    11. REFERENCE_STRICTNESS:
-    - The 'payment_method' field MUST match one of the exact strings provided in <reference_data>.
-    - NEVER use generic names like 'Revolut' or 'Wise'. 
-    - You MUST use the mapped versions: 'Revolut (EUR)', 'Wise (USD)', etc.
-    - If a mapping depends on the currency, cross-reference the detected currency with the 'PAYMENT_MAPPING' rules.
-    </constraints>
+<mapping_table>
+- 'santander' -> 'Santander Debit'
+- 'bizum'     -> 'Santander Bizum'
+- 'mp'        -> 'Mercado Pago'
+- 'cash'      -> 'Cash (EUR)'
+- 'laliga'    -> 'Santander LaLiga'
+- 'lacaixa'   -> 'LaCaixa IKEA'
+- 'wizink'    -> 'Wizink'
+- 'wise'      -> If currency is USD: 'Wise (USD)'; if JPY: 'Wise (JPY)'; else: 'Wise ({default_currency})'
+- 'revolut'   -> If currency is EUR: 'Revolut (EUR)'; if JPY: 'Revolut (JPY)'; else: 'Revolut ({default_currency})'
+</mapping_table>
 
-    <example>
-    Input: 
-    Header: 31/01 (Home):
-    Data:
-    Groceries SuperVerd 0.51 santander
-    Groceries Mercadona 8.80 santander
-    Dates Tinder 7.26 (9971.30 ARS) mp Platinum Mayo
-    Subscription Amazon 4.99 santander Prime
-    Videogames Steam 29.90 (39405 TC 1318 - this time it charged me 21% VAT! In EU it costs 27.99 😡) mp Like A Dragon Infinite Wealth
-    Subscription Spotify 2.45 (3133.47 TC 1280 -incluye 21% IVA) mp
-    Lunch Five Guys 33.90 santander w/Celes
-    Medical Pharmacy 8.99 santander Nasal spray
-    Gifts Agustina Rojas 46.96 (78750.00 TC 1677) mp Birthday boots f/Agustina
-    
-    Output:
-    [
-      {{"date": "31/01", "amount": 0.51, "currency": "{default_currency}", "category": "Groceries", "vendor": "SuperVerd", "payment_method": "Santander Debit", "description": ""}},
-      {{"date": "31/01", "amount": 8.80, "currency": "{default_currency}", "category": "Groceries", "vendor": "Mercadona", "payment_method": "Santander Debit", "description": ""}},
-      {{"date": "31/01", "amount": 7.26, "currency": "{default_currency}", "category": "Dates", "vendor": "Tinder", "payment_method": "Mercado Pago", "description": "(9971.30 ARS) Platinum Mayo"}},
-      {{"date": "31/01", "amount": 4.99, "currency": "{default_currency}", "category": "Subscription", "vendor": "Amazon", "payment_method": "Santander Debit", "description": "Prime"}},
-      {{"date": "31/01", "amount": 29.90, "currency": "{default_currency}", "category": "Videogames", "vendor": "Steam", "payment_method": "Mercado Pago", "description": "(39405 TC 1318 - this time it charged me 21% VAT! In EU it costs 27.99 😡) Like A Dragon Infinite Wealth"}},
-      {{"date": "31/01", "amount": 2.45, "currency": "{default_currency}", "category": "Subscription", "vendor": "Spotify", "payment_method": "Mercado Pago", "description": "(3133.47 TC 1280 -incluye 21% IVA)"}},
-      {{"date": "31/01", "amount": 33.90, "currency": "{default_currency}", "category": "Lunch", "vendor": "Five Guys", "payment_method": "Santander Debit", "description": "w/Celes"}},
-      {{"date": "31/01", "amount": 8.99, "currency": "{default_currency}", "category": "Medical", "vendor": "Pharmacy", "payment_method": "Santander Debit", "description": "Nasal spray"}},
-      {{"date": "31/01", "amount": 46.96, "currency": "{default_currency}", "category": "Gifts", "vendor": "Agustina Rojas", "payment_method": "Mercado Pago", "description": "(78750.00 TC 1677) Birthday boots f/Agustina"}}
-    ]
-    </example>
+<rules>
+1. EXTRACTION ORDER: [Vendor] [Amount] [Currency (optional)] [Hint] [Description]
+    - You are provided with a FIXED CATEGORY (for your JSON) and a LINE (for extraction).
+    - VENDOR: The first entity/name in the LINE.
+    - AMOUNT: The numerical value.
+    - HINT: Follow <mapping_table>.
+    - DESCRIPTION: Everything else, except HINT, and everything AFTER the HINT.
+2. DESCRIPTION: Verbatim capture EVERYTHING after the HINT and ALL bracketed text.
+3. JSON ONLY: Output exactly one JSON object. No preamble.
+</rules>
 
-    <reference_data>
-    Categories (comma-separated): {categories}
-    Payment Methods (comma-separated): {payment_methods}
-    </reference_data>
+<examples>
+Input:
+FIXED CATEGORY: Water Service
+LINE: Aigues Sabadell 34.97 santander
 
-    <output_format>
-    Return ONLY ONE JSON list of objects. No preamble.
-    Each object MUST contain these exact keys:
-    "date" (date), "amount" (float), "currency" (string), "category" (string), "vendor" (string), "payment_method" (string), "description" (string).
-    Do NOT use "payment_hint" or any other variation.
-    Return EXACTLY ONE JSON list.
-    STRICT PROHIBITIONS:
-    - NO preamble like "Here is the JSON..."
-    - NO postamble or explanations.
-    - NO splitting the list into multiple blocks or headers.
-    - NO markdown formatting (no bold text, no ```json).
-    - ONLY the raw [ ... ] content.
-    </output_format>
+Output:
+{{"amount": 34.97, "currency": "{default_currency}", "category": "Water Service", "vendor": "Aigues Sabadell", "payment_method": "Santander Debit", "description": ""}}
+
+Input:
+FIXED CATEGORY: Vacation
+LINE: Uber 72.73 santander from Shibuya to Haneda
+
+Output:
+{{"amount": 72.73, "currency": "{default_currency}", "category": "Vacation", "vendor": "Uber", "payment_method": "Santander Debit", "description": "from Shibuya to Haneda"}}
+
+Input:
+FIXED CATEGORY: Incidental
+LINE: Castellana 200 40.00 santander corte del jamón
+
+Output:
+{{"amount": 40.0, "currency": "{default_currency}", "category": "Incidental", "vendor": "Castellana 200", "payment_method": "Santander Debit", "description": "corte del jamón"}}
+ 
+Input:
+FIXED CATEGORY: Vacation
+LINE: Saily 7.00 santander 30 days eSIM 3GB
+
+Output:
+{{"amount": 7.0, "currency": "{default_currency}", "category": "Vacation", "vendor": "Saily", "payment_method": "Santander Debit", "description": "30 days eSIM 3GB"}}
+
+Input:
+FIXED CATEGORY: Gas
+LINE: Naturgy 73.79 santander
+
+Output:
+{{"amount": 73.79, "currency": "{default_currency}", "category": "Gas", "vendor": "Naturgy", "payment_method": "Santander Debit", "description": ""}}
+
+Input:
+FIXED CATEGORY: Gifts
+LINE: LEVEL 1292.25 laliga Eze-Bcn f/Celes
+
+Output:
+{{"amount": 1292.25, "currency": "{default_currency}", "category": "Gifts", "vendor": "LEVEL", "payment_method": "Santander LaLiga", "description": "Eze-Bcn f/Celes"}}
+
+Input:
+FIXED CATEGORY: 420
+LINE: Planta Santa 100.00 cash 18.33g (5.46 each)
+
+Output:
+{{"amount": 100.0, "currency": "{default_currency}", "category": "420", "vendor": "Planta Santa", "payment_method": "Cash ({default_currency})", "description": "18.33g (5.46 each)"}}
+
+Input:
+FIXED CATEGORY: Subscription
+LINE: DistroKid 24.99 USD (21.59 TC 1.17) wise Yearly fee
+
+Output:
+{{"amount": 24.99, "currency": "USD", "category": "Subscription", "vendor": "DistroKid", "payment_method": "Wise (USD)", "description": "(21.59 TC 1.17) Yearly fee"}}
+
+Input:
+FIXED CATEGORY: Incidental
+LINE: TMB 20.65 wizink T Usual f/Celes (because 10€ cashback)
+
+Output:
+{{"amount": 20.65, "currency": "{default_currency}", "category": "Incidental", "vendor": "TMB", "payment_method": "Wizink", "description": "T Usual f/Celes (because 10€ cashback)"}}
+
+Input:
+FIXED CATEGORY: Subscription
+LINE: Spotify 3133.47 ARS (2.45 TC 1280 -incluye 21% IVA) mp
+
+Output:
+{{"amount": 3133.47, "currency": "ARS", "category": "Subscription", "vendor": "Spotify", "payment_method": "Mercado Pago", "description": "(2.45 TC 1280 -incluye 21% IVA)"}}
+
+Input:
+FIXED CATEGORY: Lunch
+LINE: Five Guys 33.90 santander w/Celes
+
+Output:
+{{"amount": 33.90, "currency": "{default_currency}", "category": "Lunch", "vendor": "Five Guys", "payment_method": "Santander Debit", "description": "w/Celes"}}
+
+Input:
+FIXED CATEGORY: Medical
+LINE: Pharmacy 8.99 santander Nasal spray
+
+Output:
+{{"amount": 8.99, "currency": "{default_currency}", "category": "Medical", "vendor": "Pharmacy", "payment_method": "Santander Debit", "description": "Nasal spray"}}
+
+Input:
+FIXED CATEGORY: Gifts
+LINE: Agustina Rojas 78750.00 ARS (46.96 TC 1677) mp Birthday boots f/Agustina
+
+Output:
+{{"amount": 78750.00, "currency": "ARS", "category": "Gifts", "vendor": "Agustina Rojas", "payment_method": "Mercado Pago", "description": "(46.96 TC 1677) Birthday boots f/Agustina"}}
+
+Input:
+FIXED CATEGORY: Household Supplies
+LINE: Amazon 13.99 santander iAmoy replacement brush & filters f/Deebot Slim2 vaccuum cleaner
+
+Output:
+{{"amount": 13.99, "currency": "{default_currency}", "category": "Household Supplies", "vendor": "Amazon", "payment_method": "Santander Debit", "description": "iAmoy replacement brush & filters f/Deebot Slim2 vaccuum cleaner"}}
+</examples>
+
+<verification_protocol>
+Before finalizing the JSON:
+1. QUANTITY CHECK: Is the 'Amount' actually a price? (e.g., Is it 40.00 or is it part of a vendor name like 'Castellana 200'?) 
+2. CURRENCY VALIDITY: If the Amount is not followed by a currency code (e.g., USD, JPY, ARS) does the currency match {default_currency}?
+3. REMAINDER CHECK: Did the input line have words after the HINT (e.g., '2TB Storage', 'May rent', 'Meeting + Negotiation with DOMO')? If yes, and your 'description' is empty, you have failed. Re-extract and include all words.
+</verification_protocol>
+"""
+
+def get_structured_data(combined_text, default_currency, categories):
     """
+    Invokes a local LLM (e.g. Mistral) to convert
+    text lines into JSON objects.
+    Returns a list of objects which are meant
+    to be validated and injected into a SQL db.
+    """
+    # 1. Clean lines
+    lines = [l.strip() for l in combined_text.split('\n') if l.strip()]
 
-    response = ollama.chat(model='llama3.1', messages=[
-        {'role': 'system', 'content': system_prompt},
-        {'role': 'user', 'content': combined_text},
-    ], options={'temperature': 0}
-    )
-    # Clean the response
-    content = response['message']['content']
+    # 2. Initialize date and prepare categories
+    current_date = "00/00"
 
-    try:
-        # 1. Use a robust regex to find all JSON-like objects { ... }
-        # This ignores any "Here is the JSON" text or multiple arrays
-        obj_matches = re.findall(r'\{.*?}', content, re.DOTALL)
+    sorted_categories = sorted([str(c.name) for c in categories], key=len, reverse=True)
 
-        refined_results = []
-        for obj_str in obj_matches:
-            try:
-                # Fix the AI's common "empty string without key" typo: , "" }
-                fixed_str = re.sub(r',\s*""\s*}', ', "description": ""}', obj_str)
+    # 3. Define the Schema (Forces the LLM to provide these keys)
+    json_schema = {
+        "type": "object",
+        "properties": {
+            "category": {"type": "string"},
+            "vendor": {"type": "string"},
+            "amount": {"type": "number"},
+            "currency": {"type": "string"},
+            "payment_method": {"type": "string"},
+            "description": {"type": "string"}
+        },
+        "required": ["category", "vendor", "amount", "currency", "payment_method", "description"]
+    }
 
-                item = json.loads(fixed_str)
+    final_results = []
 
-                # If the AI forgot a key, add it here with a blank value
-                expected_keys = ["date", "amount", "currency", "category", "vendor", "payment_method", "description"]
-                for key in expected_keys:
-                    if key not in item:
-                        item[key] = ""
+    for line in lines:
+        # 1. Update the date if the line is a header
+        date_match = re.match(r'(\d{2}/\d{2})', line)
+        if date_match and line.endswith(':'):
+            current_date = date_match.group(1)
+            continue
 
-                refined_results.append(item)
-            except json.JSONDecodeError:
+        # 2. Extract the category
+        expected_cat = None
+        line_to_process = line
+        first_word = line.split()[0]
+
+        # Try Exact Start Match
+        for cat in sorted_categories:
+            if line.lower().startswith(cat.lower()):
+                expected_cat = cat
+                line_to_process = line[len(cat):].strip()
+                break
+
+        # Fuzzy Fallback (e.g., "Internet" matching "Internet & Mobile")
+        if not expected_cat:
+            matches = difflib.get_close_matches(first_word, sorted_categories, n=1, cutoff=0.3)
+            if matches:
+                expected_cat = matches[0]
+                # Strip the word that triggered the fuzzy match (usually the first word)
+                line_to_process = line[len(first_word):].strip()
+                print(f"Fuzzy Match: '{first_word}' -> '{expected_cat}'. Processing: '{line_to_process}'")
+            else:
+                print(f"Skipping: No category match for {line}")
                 continue
 
-        if not refined_results:
-            raise ValueError("AI output contained no valid JSON objects.")
+        # 3. LLM loop.
+        try:
+            # We tell Mistral the category is already decided
+            user_content = f"FIXED CATEGORY: {expected_cat}\nLINE: {line_to_process}"
 
-        return refined_results
+            response = ollama.chat(
+                model='mistral:7b',
+                messages=[
+                    {'role': 'system',
+                     'content': get_row_prompt(default_currency)},
+                    {'role': 'user', 'content': user_content}
+                ],
+                format=json_schema,
+                options={'temperature': 0.0}
+            )
 
-    except Exception as e:
-        print(f"DEBUG: Raw AI Output was: {content}")
-        print(f"Error in AI Parser: {e}")
-        return None
+            # Parse and inject the date
+            item = json.loads(response['message']['content'])
+
+            # Force the category and inject current date
+            item['category'] = expected_cat
+            item['date'] = current_date
+            final_results.append(item)
+            print(f"LLM sees: {line_to_process}")
+            print(f"✅ {line}")
+            print(f">>> [{item['date']}] {item['vendor']}: {item['amount']} {item['currency']} [{item['category']}] [{item['payment_method']}] [{item['description']}]\n")
+
+        except Exception as e:
+            print(f"Error parsing: {e}")
+
+    # Debug
+    # print(f"--- DEBUG STATS ---")
+    # print(f"Lines sent to AI: {len(lines)}")
+    # print(f"Input lines:\n{lines}\n")
+    # print(f"combined_text: {combined_text}")
+
+    return final_results
 
 def chunk_file_by_day(filepath):
     """
@@ -165,7 +263,8 @@ def chunk_file_by_day(filepath):
                                                              "Extracción",
                                                              "Transfer",
                                                              "Mp TC",
-                                                             "MP TC")
+                                                             "MP TC",
+                                                             "Withdrawal")
                                                             )
         ]
         if filtered_lines:

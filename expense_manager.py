@@ -29,7 +29,7 @@ class TransactionManager:
     def add_expense(self, amount, currency_code, payment_method_name, exchange_rate=None, category_name=None, vendor_name=None,
                     project_name=None, description=None,
                     timestamp=None):
-
+        """Adds an expense to DB."""
         # 1. Resolve Master Data
         category = self._get_or_create_dimension(Category, category_name) if category_name else None
         vendor = self._get_or_create_dimension(Vendor, vendor_name) if vendor_name else None

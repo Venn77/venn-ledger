@@ -1,5 +1,5 @@
 from models import session, Category, PaymentMethod, Currency, Vendor
-from tests import get_active_currency, get_valid_year
+from tests import get_active_currency, get_valid_year, get_valid_float
 from ai_parser import chunk_file_by_day, get_structured_data
 import expense_manager, datetime, difflib
 
@@ -23,10 +23,49 @@ if __name__ == "__main__":
         for item in results:
             print(f"\n--- Reviewing: {item['date']} | {item['vendor']} | {item['amount']} {item['currency']} | {item['category']} | {item['payment_method']} | {item['description']} ---")
 
-            # 1. Test currency
+            # 1. Test currency and define payment method
             if item['currency'] != default_currency:
                 # Skip - here we will handle exchange rate. It will ask for manual input if currency != 'EUR'
                 print(f"   ! Notice: Item uses {item['currency']}, not default currency {default_currency}.")
+
+            pm_name = item['payment_method']
+            # Find closest pm match
+            if pm_name not in payment_methods:
+                match = get_best_match(pm_name, payment_methods)
+                if match:
+                    choice = input(f"   ? Suggestion: Map '{pm_name}' to '{match}'? (y/n): ").lower()
+                    pm_name = match if choice == 'y' else pm_name
+                # Choose from existing pms
+                if pm_name not in payment_methods:
+                    print(f"   ! '{pm_name}' is not in DB.")
+                    for i, name in enumerate(payment_methods):
+                        print(f" [{i}] {name}")
+                    index = input("   Choose number to use (or 's' to skip item): ")
+                    if index.isdigit() and int(index) < len(payment_methods):
+                        pm_name = payment_methods[int(index)]
+                    # Or skip the item
+                    else:
+                        print("   Skipping item.")
+                        continue
+
+            pm_obj = session.query(PaymentMethod).filter_by(name=pm_name).first()
+
+            if not pm_obj:
+                print(f"   ! ERROR: Payment method '{pm_name}' is invalid. Skipping item.")
+                continue
+
+            account_currency = pm_obj.account.currency_code
+            account_name = pm_obj.account.name
+            item_currency = item['currency']
+            # DEBUG
+            print(f"Account currency: '{account_currency}'")
+            print(f"Account name: '{account_name}'")
+            print(f"Item currency: '{item_currency}'")
+
+            if account_currency != item_currency:
+                print(f"   ! CURRENCY MISMATCH: Item is {item_currency}, but {pm_name} is linked to {account_name} with {account_currency}.")
+                print("   ! Skipping item to prevent balance corruption.")
+                continue
 
             # 2. Test category
             cat_name = item['category']
@@ -37,8 +76,15 @@ if __name__ == "__main__":
                     if choice == 'y':
                         cat_name = match
                 else:
-                    # TransactionManager class should be creating the category when it takes a non-existing choice.
-                    print(f"   ! Category '{cat_name}' is new. It will be created.")
+                    print(f"   ! '{cat_name}' is not in DB.")
+                    for i, name in enumerate(categories):
+                        print(f" [{i}] {name}")
+                    index = input(f"   Choose number to use (or 's' to use '{cat_name}'): ")
+                    if index.isdigit() and int(index) < len(categories):
+                        cat_name = categories[int(index)]
+                    else:
+                        # TransactionManager class should be creating the category when it takes a non-existing choice.
+                        print(f"   ! Category '{cat_name}' is new. It will be created.")
 
             # 3. Test vendor
             vendor_name = item['vendor']
@@ -49,28 +95,21 @@ if __name__ == "__main__":
                     if choice == 'y':
                         vendor_name = match
                 else:
-                    # TransactionManager class should be creating the vendor when it takes a non-existing choice.
-                    print(f"   ! Vendor '{vendor_name}' is new. It will be created.")
+                    print(f"   ! Vendor '{vendor_name}' is not in DB.")
+                    for i, name in enumerate(vendors):
+                        print(f" [{i}] {name}")
+                    index = input(f"   Choose number to use (or 's' to use '{vendor_name}'): ")
+                    if index.isdigit() and int(index) < len(vendors):
+                        vendor_name = vendors[int(index)]
+                    else:
+                        # TransactionManager class should be creating the vendor when it takes a non-existing choice.
+                        print(f"   ! Vendor '{vendor_name}' is new. It will be created.")
 
-            # 4. Test payment method
-            pm_name = item['payment_method']
-            if pm_name not in payment_methods:
-                match = get_best_match(pm_name, payment_methods)
-                if match:
-                    choice = input(f"   ? Suggestion: Map '{pm_name}' to '{match}'? (y/n): ").lower()
-                    if choice == 'y':
-                        pm_name = match
-                else:
-                    print(f"   ! ERROR: Payment method '{pm_name}' is invalid. Skipping item") # Verify it does this.
-                    # Here we should select an existing method.
-                    continue
-            # Here we should check if pm_account's currency matches item['currency']. If not, skip.
-
-            # 5. Resolve date
+            # 4. Resolve date
             day_res, month_res = map(int, item['date'].split('/'))
             dt = datetime.datetime(year, month_res, day_res)
 
-            # 6. Confirm and Save
+            # 5. Confirm and Save
             confirm = input(f"   >> Save [{dt}] {vendor_name} ({item['amount']}) to DB? (y/n/skip): ").lower()
             if confirm == 'y':
                 try:
@@ -86,6 +125,10 @@ if __name__ == "__main__":
                     print("  ✓ Saved.")
                 except Exception as e:
                     print(f"  ✗ DB Error: {e}")
+            elif confirm == 'q':
+                return
+            else:
+                print("   Skipped.")
 
     try:
         daily_chunks = chunk_file_by_day(filename)
@@ -110,7 +153,7 @@ if __name__ == "__main__":
 
         active_vendors = session.query(Vendor).filter_by(active_bool=True).all()
 
-        batch_size = 250
+        batch_size = 5
 
         for idx in range(0, len(daily_chunks), batch_size):
             batch = daily_chunks[idx: idx + batch_size]
@@ -127,11 +170,11 @@ if __name__ == "__main__":
                 print(f"Results parsed: {len(parsed_results)}")
                 for res in parsed_results:
                     print(f"[{res.get('date')}] {res.get('vendor')}: {res.get('amount')} {res.get('currency')} [{res.get('category')}] [{res.get('payment_method')}] [{res.get('description')}]")
-               # cat_names = [c.name for c in active_categories]
-               # pm_names = [p.name for p in active_payment_methods]
-               # ven_names = [v.name for v in active_vendors]
-               #
-               # validate_and_save_batch(parsed_results, currency_str, year_str, cat_names, pm_names, ven_names)
+                # Process and save to DB
+                cat_names = [c.name for c in active_categories]
+                pm_names = [p.name for p in active_payment_methods]
+                ven_names = [v.name for v in active_vendors]
+                validate_and_save_batch(parsed_results, currency_str, year_str, cat_names, pm_names, ven_names)
 
             cmd = input("\nPress Enter for next batch, or 'q' to quit: ").lower()
             if cmd == 'q':

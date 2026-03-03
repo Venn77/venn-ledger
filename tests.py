@@ -52,8 +52,8 @@ def clean_date(date_str):
     Makes sure the date is a valid format.
     Ex: YYYY-MM-DD HH:MM.
     """
-    if not date_str or date_str.strip() == "":
-        return None
+    # if not date_str or date_str.strip() == "":
+    #     return None
 
     try:
         return datetime.datetime.strptime(date_str, "%Y-%m-%d %H:%M")

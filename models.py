@@ -1,3 +1,4 @@
+from decimal import Decimal, ROUND_HALF_UP
 from sqlalchemy import (
     create_engine, Column, Integer, Float, String,
     Boolean, DateTime, func, ForeignKey, UniqueConstraint
@@ -134,13 +135,19 @@ class Expense(Base):
 
     def calculate_conversion(self):
         if self.currency_code == "EUR":
-            self.converted_amount = self.amount
+            # Convert to decimal, round, prep for DB
+            val = Decimal(str(self.amount)).quantize(Decimal("0.00"), rounding=ROUND_HALF_UP)
+            self.converted_amount = float(val)
             self.fx_rate = None
         elif self.fx_rate:
-            self.converted_amount = self.amount / self.fx_rate
+            # Divide as Decimal for precision
+            raw_val = Decimal(str(self.amount)) / Decimal(str(self.fx_rate))
+            val = raw_val.quantize(Decimal("0.00"), rounding=ROUND_HALF_UP)
+            self.converted_amount = float(val)
 
     def __repr__(self):
-        return f"<Expense(amount={self.amount}, category='{self.category_id}')>"
+        return (f"<Expense(amount={self.amount} {self.currency_code}, "
+                f"EUR={self.converted_amount:.2f}, vendor='{self.vendor_id}', category='{self.category_id}')>")
 
 
 if __name__ == '__main__':

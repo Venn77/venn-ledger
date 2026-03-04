@@ -1,13 +1,31 @@
 from models import session, Category, PaymentMethod, Currency, Vendor
 from tests import get_active_currency, get_valid_year, get_valid_float
 from ai_parser import chunk_file_by_day, get_structured_data
-import expense_manager, datetime, difflib
+import expense_manager, datetime, difflib, re
 
 
 def get_best_match(name, choices, threshold=0.6):
     """Returns the best match from choices if above threshold."""
     matches = difflib.get_close_matches(name, choices, n=1, cutoff=threshold)
     return matches[0] if matches else None
+
+def extract_exchange_rate(description):
+    """
+    Finds the pattern 'TC' followed by a number in the description.
+    Returns the float value or None.
+    """
+    if not description:
+        return None
+
+    # Pattern: 'TC' + any spaces + digits/dots
+    match = re.search(r'TC\s*([\d.]+)', description, re.IGNORECASE)
+
+    if match:
+        try:
+            return float(match.group(1))
+        except ValueError:
+            return None
+    return None
 
 
 if __name__ == "__main__":
@@ -26,7 +44,7 @@ if __name__ == "__main__":
             # 1. Test currency and define payment method
             if item['currency'] != default_currency:
                 # Skip - here we will handle exchange rate. It will ask for manual input if currency != 'EUR'
-                print(f"   ! Notice: Item uses {item['currency']}, not default currency {default_currency}.")
+                print(f"   ! Notice: Item uses '{item['currency']}', not default currency '{default_currency}'.")
 
             pm_name = item['payment_method']
             # Find closest pm match
@@ -66,6 +84,20 @@ if __name__ == "__main__":
                 print(f"   ! CURRENCY MISMATCH: Item is {item_currency}, but {pm_name} is linked to {account_name} with {account_currency}.")
                 print("   ! Skipping item to prevent balance corruption.")
                 continue
+
+            if item['currency'] != 'EUR':
+                # Get exchange rate from description
+                fx_rate = extract_exchange_rate(item['description'])
+                if fx_rate:
+                    choice = input(f"   ? Exchange rate '{fx_rate}' found in Description. Use '{fx_rate}'? (y/n): ").lower()
+                    if choice == 'y':
+                        fx_rate = fx_rate
+                    else:
+                        fx_rate = get_valid_float(f"Enter the exchange rate ('EUR' -> '{item['currency']}'): ")
+                else:
+                    fx_rate = get_valid_float(f"Enter the exchange rate ('EUR' -> '{item['currency']}'): ")
+            else:
+                fx_rate = None
 
             # 2. Test category
             cat_name = item['category']
@@ -110,12 +142,13 @@ if __name__ == "__main__":
             dt = datetime.datetime(year, month_res, day_res)
 
             # 5. Confirm and Save
-            confirm = input(f"   >> Save [{dt}] {vendor_name} ({item['amount']}) to DB? (y/n/skip): ").lower()
+            confirm = input(f"   >> Save [{dt}] {vendor_name} ({item['amount']}) {item['currency']} (FX {fx_rate}) [{item['description']}] to DB? (y/n/skip): ").lower()
             if confirm == 'y':
                 try:
                     manager.add_expense(
                         amount=item['amount'],
                         currency_code=item['currency'],
+                        exchange_rate=fx_rate,
                         category_name=cat_name,
                         vendor_name=vendor_name,
                         payment_method_name=pm_name,
@@ -123,6 +156,10 @@ if __name__ == "__main__":
                         timestamp=dt
                     )
                     print("  ✓ Saved.")
+                    ac_categories = session.query(Category).filter_by(active_bool=True).order_by(Category.id.desc()).all()
+                    ac_vendors = session.query(Vendor).filter_by(active_bool=True).all()
+                    categories = [c.name for c in ac_categories]
+                    vendors = [v.name for v in ac_vendors]
                 except Exception as e:
                     print(f"  ✗ DB Error: {e}")
             elif confirm == 'q':
@@ -151,8 +188,6 @@ if __name__ == "__main__":
 
         print(payment_methods_str)
 
-        active_vendors = session.query(Vendor).filter_by(active_bool=True).all()
-
         batch_size = 5
 
         for idx in range(0, len(daily_chunks), batch_size):
@@ -171,6 +206,8 @@ if __name__ == "__main__":
                 for res in parsed_results:
                     print(f"[{res.get('date')}] {res.get('vendor')}: {res.get('amount')} {res.get('currency')} [{res.get('category')}] [{res.get('payment_method')}] [{res.get('description')}]")
                 # Process and save to DB
+                active_categories = session.query(Category).filter_by(active_bool=True).order_by(Category.id.desc()).all()
+                active_vendors = session.query(Vendor).filter_by(active_bool=True).all()
                 cat_names = [c.name for c in active_categories]
                 pm_names = [p.name for p in active_payment_methods]
                 ven_names = [v.name for v in active_vendors]

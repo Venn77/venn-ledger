@@ -1,4 +1,4 @@
-from models import session, Currency, PaymentMethod
+from models import session, Currency, PaymentMethod, Project
 import expense_manager, datetime
 
 
@@ -18,6 +18,26 @@ def get_active_currency(prompt):
             return currency_str
         print(f"""\n***** ERROR *****
                   \r'{currency_str}' is not a valid currency.
+                  \rPlease choose from the list above.
+                  \r**********************""")
+
+def get_active_project(prompt):
+    """
+    Checks if the input is an active project.
+    """
+    active_projects = session.query(Project).filter_by(active_bool=True).all()
+    print("\nAvailable Projects:")
+    for i, n in enumerate(active_projects):
+        print(f" [{i}] {n.name}")
+    while True:
+        index = input(prompt).strip().lower()
+        if index.isdigit() and int(index) < len(active_projects):
+            project_str = active_projects[int(index)].id
+            return project_str
+        elif index == 's':
+            return None
+        print(f"""\n***** ERROR *****
+                  \r'{index}' is not a valid project.
                   \rPlease choose from the list above.
                   \r**********************""")
 

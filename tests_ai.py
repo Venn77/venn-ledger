@@ -1,5 +1,5 @@
-from models import session, Category, PaymentMethod, Currency, Vendor
-from tests import get_active_currency, get_valid_year, get_valid_float
+from models import session, Category, PaymentMethod, Currency, Vendor, Project
+from tests import get_active_currency, get_valid_year, get_valid_float, get_active_project
 from ai_parser import chunk_file_by_day, get_structured_data
 import expense_manager, datetime, difflib, re
 
@@ -33,7 +33,7 @@ if __name__ == "__main__":
 
     manager = expense_manager.TransactionManager(session)
 
-    def validate_and_save_batch(results, default_currency, year, categories, payment_methods, vendors):
+    def validate_and_save_batch(results, default_currency, year, project, categories, payment_methods, vendors):
         """
         Validates currency, exchange rate, category, vendor and payment method.
         Saves to db after user confirmation.
@@ -141,7 +141,14 @@ if __name__ == "__main__":
             day_res, month_res = map(int, item['date'].split('/'))
             dt = datetime.datetime(year, month_res, day_res)
 
-            # 5. Confirm and Save
+            # 5. Resolve project
+            project_name = session.query(Project).filter_by(id=project).first()
+            if project_name:
+                project_name = project_name.name
+            else:
+                project_name = None
+
+            # 6. Confirm and Save
             confirm = input(f"   >> Save [{dt}] {vendor_name} ({item['amount']}) {item['currency']} (FX {fx_rate}) [{item['description']}] to DB? (y/n/skip): ").lower()
             if confirm == 'y':
                 try:
@@ -151,6 +158,7 @@ if __name__ == "__main__":
                         exchange_rate=fx_rate,
                         category_name=cat_name,
                         vendor_name=vendor_name,
+                        project_name=project_name,
                         payment_method_name=pm_name,
                         description=item['description'],
                         timestamp=dt
@@ -179,6 +187,10 @@ if __name__ == "__main__":
         year_str = get_valid_year("\nEnter year (e.g., 2025): ")
 
         print(year_str)
+
+        project_str = get_active_project("\nChoose number to use (or 's' to skip item): ")
+
+        print(project_str)
 
         active_categories = session.query(Category).filter_by(active_bool=True).order_by(Category.id.desc()).all()
 
@@ -211,7 +223,7 @@ if __name__ == "__main__":
                 cat_names = [c.name for c in active_categories]
                 pm_names = [p.name for p in active_payment_methods]
                 ven_names = [v.name for v in active_vendors]
-                validate_and_save_batch(parsed_results, currency_str, year_str, cat_names, pm_names, ven_names)
+                validate_and_save_batch(parsed_results, currency_str, year_str, project_str, cat_names, pm_names, ven_names)
 
             cmd = input("\nPress Enter for next batch, or 'q' to quit: ").lower()
             if cmd == 'q':

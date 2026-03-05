@@ -15,6 +15,7 @@ class TransactionManager:
         If the item exists but is inactive, it reactivates it.
         If it doesn't exist, it creates it.
         """
+        name = name.strip()
         item = self.session.query(model).filter_by(name=name).first()
         if item:
             if not item.active_bool:

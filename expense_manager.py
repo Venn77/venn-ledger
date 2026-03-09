@@ -82,3 +82,17 @@ class TransactionManager:
         except Exception as e:
             self.session.rollback()
             raise e
+
+    def get_historical_fx_rate(self, currency_code, target_date):
+        """
+        Finds the closest exchange rate for the given currency
+        that was recorded ON or BEFORE the target_date.
+        """
+        rate_entry = (self.session.query(ExchangeRate)
+                      .filter(ExchangeRate.currency_code == currency_code)
+                      .filter(ExchangeRate.timestamp <= target_date)
+                      .order_by(ExchangeRate.timestamp.desc())
+                      .first())
+
+        return rate_entry.fx_multiplier, rate_entry.timestamp if rate_entry else None
+

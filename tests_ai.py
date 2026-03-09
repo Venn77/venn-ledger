@@ -14,7 +14,11 @@ def validate_and_save_batch(results, default_currency, year, project, categories
         print(
             f"\n--- Reviewing: {item['date']} | {item['vendor']} | {item['amount']} {item['currency']} | {item['category']} | {item['payment_method']} | {item['description']} ---")
 
-        # 1. Test currency and define payment method
+        # 1. Resolve date
+        day_res, month_res = map(int, item['date'].split('/'))
+        dt = datetime.datetime(year, month_res, day_res)
+
+        # 2. Test currency and define payment method
         if item['currency'] != default_currency:
             # Skip - here we will handle exchange rate. It will ask for manual input if currency != 'EUR'
             print(f"   ! Notice: Item uses '{item['currency']}', not default currency '{default_currency}'.")
@@ -62,18 +66,22 @@ def validate_and_save_batch(results, default_currency, year, project, categories
         if item['currency'] != 'EUR':
             # Get exchange rate from description
             fx_rate = extract_exchange_rate(item['description'])
+            if not fx_rate:
+                fx_rate, fx_rate_ts = manager.get_historical_fx_rate(item['currency'], dt)
+                if fx_rate:
+                    print(f"   ! Auto-detected historical rate from DB: {fx_rate} ({fx_rate_ts})")
+
             if fx_rate:
-                choice = input(f"   ? Exchange rate '{fx_rate}' found in Description. Use '{fx_rate}'? (y/n): ").lower()
-                if choice == 'y':
-                    fx_rate = fx_rate
-                else:
+                choice = input(f"   ? Use exchange rate '{fx_rate}'? (y/n): ").lower()
+                if choice != 'y':
                     fx_rate = get_valid_float(f"Enter the exchange rate ('EUR' -> '{item['currency']}'): ")
             else:
+                print(f"   ! No rate found in description or DB for {item['currency']}.")
                 fx_rate = get_valid_float(f"Enter the exchange rate ('EUR' -> '{item['currency']}'): ")
         else:
             fx_rate = None
 
-        # 2. Test category
+        # 3. Test category
         cat_name = item['category']
         if cat_name not in categories:
             match = get_best_match(cat_name, categories)
@@ -92,7 +100,7 @@ def validate_and_save_batch(results, default_currency, year, project, categories
                     # TransactionManager class should be creating the category when it takes a non-existing choice.
                     print(f"   ! Category '{cat_name}' is new. It will be created.")
 
-        # 3. Test vendor
+        # 4. Test vendor
         vendor_name = item['vendor']
         if vendor_name not in vendors:
             match = get_best_match(vendor_name, vendors, threshold=0.8)
@@ -110,10 +118,6 @@ def validate_and_save_batch(results, default_currency, year, project, categories
                 else:
                     # TransactionManager class should be creating the vendor when it takes a non-existing choice.
                     print(f"   ! Vendor '{vendor_name}' is new. It will be created.")
-
-        # 4. Resolve date
-        day_res, month_res = map(int, item['date'].split('/'))
-        dt = datetime.datetime(year, month_res, day_res)
 
         # 5. Resolve project
         project_name = session.query(Project).filter_by(id=project).first()
@@ -152,7 +156,7 @@ def validate_and_save_batch(results, default_currency, year, project, categories
 
 
 if __name__ == "__main__":
-    filename = "my_expenses_2025.txt"
+    filename = "my_expenses_japan_2025.txt"
 
     manager = expense_manager.TransactionManager(session)
 

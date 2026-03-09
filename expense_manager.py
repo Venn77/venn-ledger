@@ -96,3 +96,4 @@ class TransactionManager:
 
         return rate_entry.fx_multiplier, rate_entry.timestamp if rate_entry else None
 
+

@@ -33,11 +33,12 @@ def validate_and_save_batch(results, default_currency, year, project, categories
             # Choose from existing pms
             if pm_name not in payment_methods:
                 print(f"   ! '{pm_name}' is not in DB.")
-                for i, name in enumerate(payment_methods):
+                sorted_payment_methods = sorted(payment_methods)
+                for i, name in enumerate(sorted_payment_methods):
                     print(f" [{i}] {name}")
                 index = input("   Choose number to use (or 's' to skip item): ")
-                if index.isdigit() and int(index) < len(payment_methods):
-                    pm_name = payment_methods[int(index)]
+                if index.isdigit() and int(index) < len(sorted_payment_methods):
+                    pm_name = sorted_payment_methods[int(index)]
                 # Or skip the item
                 else:
                     print("   Skipping item.")
@@ -91,11 +92,12 @@ def validate_and_save_batch(results, default_currency, year, project, categories
                     cat_name = match
             else:
                 print(f"   ! '{cat_name}' is not in DB.")
-                for i, name in enumerate(categories):
+                sorted_categories = sorted(categories)
+                for i, name in enumerate(sorted_categories):
                     print(f" [{i}] {name}")
                 index = input(f"   Choose number to use (or 's' to use '{cat_name}'): ")
-                if index.isdigit() and int(index) < len(categories):
-                    cat_name = categories[int(index)]
+                if index.isdigit() and int(index) < len(sorted_categories):
+                    cat_name = sorted_categories[int(index)]
                 else:
                     # TransactionManager class should be creating the category when it takes a non-existing choice.
                     print(f"   ! Category '{cat_name}' is new. It will be created.")
@@ -110,11 +112,12 @@ def validate_and_save_batch(results, default_currency, year, project, categories
                     vendor_name = match
             else:
                 print(f"   ! Vendor '{vendor_name}' is not in DB.")
-                for i, name in enumerate(vendors):
+                sorted_vendors = sorted(vendors)
+                for i, name in enumerate(sorted_vendors):
                     print(f" [{i}] {name}")
                 index = input(f"   Choose number to use (or 's' to use '{vendor_name}'): ")
-                if index.isdigit() and int(index) < len(vendors):
-                    vendor_name = vendors[int(index)]
+                if index.isdigit() and int(index) < len(sorted_vendors):
+                    vendor_name = sorted_vendors[int(index)]
                 else:
                     # TransactionManager class should be creating the vendor when it takes a non-existing choice.
                     print(f"   ! Vendor '{vendor_name}' is new. It will be created.")

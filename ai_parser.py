@@ -1,6 +1,47 @@
 import re, json, ollama, difflib
 
 
+def chunk_file_by_day(filepath):
+    """
+    Identifies 'DD/MM (description):' or 'DD/MM:' and
+    groups the lines following it until the next date.
+    Skips days that contain no valid transactions after filtering.
+    """
+    with open(filepath, 'r', encoding="utf-8") as f:
+        content = f.read()
+
+    pattern = r'(\d{2}/\d{2}(?:\s\(.*?\))?:)'
+
+    parts = re.split(pattern, content)
+
+    days = []
+
+    for i in range(1, len(parts), 2):
+        header = parts[i]
+        raw_transactions = parts[i + 1].strip().split('\n')
+        # Only keep lines that don't start with unwanted terms
+        filtered_lines = [
+            line.strip() for line in raw_transactions
+            if line.strip() and not line.strip().startswith(("->",
+                                                             "TC",
+                                                             "Extracción",
+                                                             "Transfer",
+                                                             "Mp TC",
+                                                             "MP TC",
+                                                             "Withdrawal")
+                                                            )
+        ]
+        if filtered_lines:
+            transactions = "\n".join(filtered_lines)
+            days.append({
+                "header": header,
+                "data": transactions
+            })
+        else:
+            pass
+
+    return days
+
 def get_row_prompt(default_currency):
     """Prepares a system prompt for LLM interpretation of expense items."""
     return f"""
@@ -127,6 +168,13 @@ LINE: Amazon 13.99 santander iAmoy replacement brush & filters f/Deebot Slim2 va
 
 Output:
 {{"amount": 13.99, "currency": "{default_currency}", "category": "Household Supplies", "vendor": "Amazon", "payment_method": "Santander Debit", "description": "iAmoy replacement brush & filters f/Deebot Slim2 vaccuum cleaner"}}
+
+Input:
+FIXED CATEGORY: Breakfast
+LINE: Denny's 1430 wise w/Celes
+
+Output:
+{{"amount": 1430, "currency": "{default_currency}", "category": "Breakfast", "vendor": "Denny's", "payment_method": "Wise ({default_currency})", "description": "w/Celes"}}
 </examples>
 
 <verification_protocol>
@@ -236,46 +284,5 @@ def get_structured_data(combined_text, default_currency, categories):
     # print(f"combined_text: {combined_text}")
 
     return final_results
-
-def chunk_file_by_day(filepath):
-    """
-    Identifies 'DD/MM (description):' or 'DD/MM:' and
-    groups the lines following it until the next date.
-    Skips days that contain no valid transactions after filtering.
-    """
-    with open(filepath, 'r', encoding="utf-8") as f:
-        content = f.read()
-
-    pattern = r'(\d{2}/\d{2}(?:\s\(.*?\))?:)'
-
-    parts = re.split(pattern, content)
-
-    days = []
-
-    for i in range(1, len(parts), 2):
-        header = parts[i]
-        raw_transactions = parts[i + 1].strip().split('\n')
-        # Only keep lines that don't start with unwanted terms
-        filtered_lines = [
-            line.strip() for line in raw_transactions
-            if line.strip() and not line.strip().startswith(("->",
-                                                             "TC",
-                                                             "Extracción",
-                                                             "Transfer",
-                                                             "Mp TC",
-                                                             "MP TC",
-                                                             "Withdrawal")
-                                                            )
-        ]
-        if filtered_lines:
-            transactions = "\n".join(filtered_lines)
-            days.append({
-                "header": header,
-                "data": transactions
-            })
-        else:
-            pass
-
-    return days
 
 

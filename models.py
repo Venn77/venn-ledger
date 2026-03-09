@@ -200,3 +200,5 @@ if __name__ == '__main__':
     # new_expense.calculate_conversion()
     # session.add(new_expense)
     # session.commit()
+
+

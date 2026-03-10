@@ -66,18 +66,26 @@ def validate_and_save_batch(results, default_currency, year, project, categories
 
         if item['currency'] != 'EUR':
             # Get exchange rate from description
+            rate_source = None
             fx_rate = extract_exchange_rate(item['description'])
+            if fx_rate:
+                rate_source = 'description'
             if not fx_rate:
                 fx_rate, fx_rate_ts = manager.get_historical_fx_rate(item['currency'], dt)
                 if fx_rate:
+                    rate_source = 'db'
                     print(f"   ! Auto-detected historical rate from DB: {fx_rate} ({fx_rate_ts})")
-
-            if fx_rate:
+            # Ask for confirmation if rate extracted from description
+            if fx_rate and rate_source == 'description':
                 choice = input(f"   ? Use exchange rate '{fx_rate}'? (y/n): ").lower()
                 if choice != 'y':
                     fx_rate = get_valid_float(f"Enter the exchange rate ('EUR' -> '{item['currency']}'): ")
+            elif fx_rate and rate_source == 'db':
+                # Auto accept rate if obtained from db
+                fx_rate = fx_rate
             else:
                 print(f"   ! No rate found in description or DB for {item['currency']}.")
+                # Manual rate input if not found
                 fx_rate = get_valid_float(f"Enter the exchange rate ('EUR' -> '{item['currency']}'): ")
         else:
             fx_rate = None
@@ -130,6 +138,7 @@ def validate_and_save_batch(results, default_currency, year, project, categories
             project_name = None
 
         # 6. Confirm and Save
+        print(f"   ! LINE '{item['line']}'")
         confirm = input(
             f"   >> Save [{dt}] {vendor_name} ({item['amount']}) {item['currency']} (FX {fx_rate}) [{item['description']}] to DB? (y/n/skip): ").lower()
         if confirm == 'y':

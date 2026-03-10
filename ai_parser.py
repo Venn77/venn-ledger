@@ -269,6 +269,7 @@ def get_structured_data(combined_text, default_currency, categories):
             # Force the category and inject current date
             item['category'] = expected_cat
             item['date'] = current_date
+            item['line'] = line
             final_results.append(item)
             print(f"LLM sees: {line_to_process}")
             print(f"✅ {line}")

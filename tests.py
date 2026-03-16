@@ -1,12 +1,13 @@
 from models import session, PaymentMethod
 from io_utils import get_active_currency, get_valid_float, clean_date
-import expense_manager, datetime
+import finance_manager, datetime
 
 
 if __name__ == "__main__":
 
-    manager = expense_manager.TransactionManager(session)
+    manager = finance_manager.TransactionManager(session)
 
+    # START: Add expense
     amount = get_valid_float("Enter amount of the expense: ")
 
     currency = get_active_currency("\nEnter currency code (e.g., ARS): ")
@@ -56,5 +57,13 @@ if __name__ == "__main__":
 
     except Exception as e:
         print(f"Error: {e}")
+
+    # END: Add expense
+
+    # START: Transfer funds
+
+
+
+    # END: Transfer funds
 
 

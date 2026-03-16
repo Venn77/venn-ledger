@@ -1,7 +1,8 @@
 from models import (
     Category, Vendor, Account, PaymentMethod,
-    Project, Expense, ExchangeRate, Currency
+    Project, Expense, ExchangeRate, Currency, Transfer
 )
+from decimal import Decimal, ROUND_HALF_UP
 import datetime
 
 
@@ -73,7 +74,7 @@ class TransactionManager:
         new_expense.calculate_conversion()
 
         # Subtract the 'raw' amount from the account balance
-        account.balance -= amount
+        account.balance = float(Decimal(str(account.balance)) - Decimal(str(amount)))
 
         try:
             self.session.add(new_expense)
@@ -96,4 +97,32 @@ class TransactionManager:
 
         return rate_entry.fx_multiplier, rate_entry.timestamp if rate_entry else None
 
+    def transfer_funds(self, origin_id, destination_id, amount_orig, amount_dest, desc, ts=None):
+        """Transfers funds between two accounts."""
+        try:
+            origin = self.session.query(Account).get(origin_id)
+            destination = self.session.query(Account).get(destination_id)
+
+            prefix = f"{origin.currency_code} -> {destination.currency_code} | "
+            full_desc = prefix + desc
+
+            new_transfer = Transfer(
+                origin_account_id=origin_id,
+                destination_account_id=destination_id,
+                amount_origin=amount_orig,
+                amount_destination=amount_dest,
+                description=full_desc,
+                timestamp=ts or datetime.datetime.now()
+            )
+
+            # Update balances
+            origin.balance = float(Decimal(str(origin.balance)) - Decimal(str(amount_orig)))
+            destination.balance = float(Decimal(str(destination.balance)) + Decimal(str(amount_dest)))
+
+            self.session.add(new_transfer)
+            self.session.commit()
+            return new_transfer
+        except Exception as e:
+            self.session.rollback()
+            raise e
 

@@ -2,7 +2,7 @@ from models import session, Category, PaymentMethod, Currency, Vendor, Project
 from io_utils import (get_active_currency, get_valid_year, get_valid_float, get_active_project,
                         get_best_match, extract_exchange_rate)
 from ai_parser import chunk_file_by_day, get_structured_data
-import expense_manager, datetime
+import finance_manager, datetime
 
 
 def validate_and_save_batch(results, default_currency, year, project, categories, payment_methods, vendors):
@@ -173,7 +173,7 @@ def validate_and_save_batch(results, default_currency, year, project, categories
 if __name__ == "__main__":
     filename = "my_expenses.txt"
 
-    manager = expense_manager.TransactionManager(session)
+    manager = finance_manager.TransactionManager(session)
 
     try:
         daily_chunks = chunk_file_by_day(filename)

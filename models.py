@@ -149,6 +149,25 @@ class Expense(Base):
         return (f"<Expense(amount={self.amount} {self.currency_code}, "
                 f"EUR={self.converted_amount:.2f}, vendor='{self.vendor_id}', category='{self.category_id}')>")
 
+class Transfer(Base):
+    __tablename__ = 'transfers'
+    id = Column(Integer, primary_key=True)
+    # Accounts
+    origin_account_id = Column(Integer, ForeignKey('accounts.id'), nullable=False)
+    destination_account_id = Column(Integer, ForeignKey('accounts.id'), nullable=False)
+    # Amounts
+    amount_origin = Column(Float, nullable=False, comment="Amount leaving the origin account")
+    amount_destination = Column(Float, nullable=False, comment="Amount entering the destination account")
+
+    description = Column(String)
+    timestamp = Column(DateTime, nullable=False, server_default=func.now())
+    # Relationships
+    origin_account = relationship("Account", foreign_keys=[origin_account_id])
+    destination_account = relationship("Account", foreign_keys=[destination_account_id])
+
+    def __repr__(self):
+        return f"<Transfer({self.amount_origin} -> {self.amount_destination})>"
+
 
 if __name__ == '__main__':
     Base.metadata.create_all(engine)

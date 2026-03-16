@@ -28,7 +28,8 @@ def chunk_file_by_day(filepath):
                                                              "Transfer",
                                                              "Mp TC",
                                                              "MP TC",
-                                                             "Withdrawal")
+                                                             "Withdrawal",
+                                                             "MP:")
                                                             )
         ]
         if filtered_lines:
@@ -55,6 +56,8 @@ def get_row_prompt(default_currency):
 - 'laliga'    -> 'Santander LaLiga'
 - 'lacaixa'   -> 'LaCaixa IKEA'
 - 'wizink'    -> 'Wizink'
+- 'master'    -> 'Ciudad Master'
+- 'visa'      -> 'Ciudad Visa'
 - 'wise'      -> If currency is USD: 'Wise (USD)'; if JPY: 'Wise (JPY)'; else: 'Wise ({default_currency})'
 - 'revolut'   -> If currency is EUR: 'Revolut (EUR)'; if JPY: 'Revolut (JPY)'; else: 'Revolut ({default_currency})'
 </mapping_table>

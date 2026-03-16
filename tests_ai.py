@@ -118,6 +118,9 @@ def validate_and_save_batch(results, default_currency, year, project, categories
                 choice = input(f"   ? Vendor '{vendor_name}' looks like '{match}'. Use existing? (y/n): ").lower()
                 if choice == 'y':
                     vendor_name = match
+                else:
+                    # TransactionManager class should be creating the vendor when it takes a non-existing choice.
+                    print(f"   ! Vendor '{vendor_name}' is new. It will be created.")
             else:
                 print(f"   ! Vendor '{vendor_name}' is not in DB.")
                 sorted_vendors = sorted(vendors)
@@ -168,7 +171,7 @@ def validate_and_save_batch(results, default_currency, year, project, categories
 
 
 if __name__ == "__main__":
-    filename = "my_expenses_japan_2025.txt"
+    filename = "my_expenses.txt"
 
     manager = expense_manager.TransactionManager(session)
 
@@ -197,7 +200,7 @@ if __name__ == "__main__":
 
         print(payment_methods_str)
 
-        batch_size = 60
+        batch_size = 10
 
         for idx in range(0, len(daily_chunks), batch_size):
             batch = daily_chunks[idx: idx + batch_size]

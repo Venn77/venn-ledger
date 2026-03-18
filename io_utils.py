@@ -1,4 +1,5 @@
-from models import session, Currency, Project
+from models import session, Currency, Project, Account
+from decimal import Decimal, ROUND_HALF_UP
 import datetime, difflib, re
 
 
@@ -37,10 +38,26 @@ def extract_exchange_rate(description):
             return None
     return None
 
+def get_active_account(prompt):
+    """Returns a selected active account."""
+    active_accounts = session.query(Account).filter_by(active_bool=True).order_by(Account.name.asc()).all()
+    print("\nAvailable Accounts:\n")
+    for idx, acc in enumerate(active_accounts):
+        bal = Decimal(str(acc.balance)).quantize(Decimal("0.00"), rounding=ROUND_HALF_UP)
+        bal = float(bal)
+        print(f" [{idx}] {acc.name} ({acc.currency_code}) | {bal}")
+    while True:
+        choice = input(prompt).strip().lower()
+        if choice.isdigit() and int(choice) < len(active_accounts):
+            account = active_accounts[int(choice)]
+            return account
+        print(f"""\n***** ERROR *****
+                  \r'{choice}' is not a valid account.
+                  \rPlease choose from 0 to {len(active_accounts)-1}.
+                  \r**********************""")
+
 def get_active_currency(prompt):
-    """
-    Checks if the input is an active currency.
-    """
+    """Returns a selected active currency."""
     # Must ensure currency is selected from available ones.
     active_curs = session.query(Currency).filter_by(active_bool=True).all()
     cur_codes = [cur.code for cur in active_curs]
@@ -57,23 +74,21 @@ def get_active_currency(prompt):
                   \r**********************""")
 
 def get_active_project(prompt):
-    """
-    Checks if the input is an active project.
-    """
+    """Returns a selected active project."""
     active_projects = session.query(Project).filter_by(active_bool=True).all()
     print("\nAvailable Projects:")
-    for i, n in enumerate(active_projects):
-        print(f" [{i}] {n.name}")
+    for idx, p in enumerate(active_projects):
+        print(f" [{idx}] {p.name}")
     while True:
-        index = input(prompt).strip().lower()
-        if index.isdigit() and int(index) < len(active_projects):
-            project_str = active_projects[int(index)].id
+        choice = input(prompt).strip().lower()
+        if choice.isdigit() and int(choice) < len(active_projects):
+            project_str = active_projects[int(choice)].id
             return project_str
-        elif index == 's':
+        elif choice == 's':
             return None
         print(f"""\n***** ERROR *****
-                  \r'{index}' is not a valid project.
-                  \rPlease choose from the list above.
+                  \r'{choice}' is not a valid project.
+                  \rPlease choose from 0 to {len(active_projects)-1}.
                   \r**********************""")
 
 def get_best_match(name, choices, threshold=0.6):

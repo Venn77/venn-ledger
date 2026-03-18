@@ -1,4 +1,4 @@
-from models import session, Category, PaymentMethod, Currency, Vendor, Project
+from models import session, Category, PaymentMethod, Vendor, Project
 from io_utils import (get_active_currency, get_valid_year, get_valid_float, get_active_project,
                         get_best_match, extract_exchange_rate)
 from ai_parser import chunk_file_by_day, get_structured_data

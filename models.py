@@ -3,9 +3,7 @@ from sqlalchemy import (
     create_engine, Column, Integer, Float, String,
     Boolean, DateTime, func, ForeignKey, UniqueConstraint
 )
-from sqlalchemy import Enum as SQLEnum
-from sqlalchemy.orm import declarative_base, relationship, validates, sessionmaker
-import datetime, enum
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
 
 engine = create_engine('sqlite:///tracker.db', echo=False)

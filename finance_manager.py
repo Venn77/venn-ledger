@@ -1,8 +1,8 @@
 from models import (
     Category, Vendor, Account, PaymentMethod,
-    Project, Expense, ExchangeRate, Currency, Transfer
+    Project, Expense, ExchangeRate, Transfer
 )
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal
 import datetime
 
 
@@ -103,7 +103,7 @@ class TransactionManager:
             origin = self.session.query(Account).get(origin_id)
             destination = self.session.query(Account).get(destination_id)
 
-            prefix = f"{origin.currency_code} -> {destination.currency_code} | "
+            prefix = f"{origin.currency_code} -> {destination.currency_code}{' | ' if desc else ''}"
             full_desc = prefix + desc
 
             new_transfer = Transfer(

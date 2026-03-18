@@ -60,10 +60,4 @@ if __name__ == "__main__":
 
     # END: Add expense
 
-    # START: Transfer funds
-
-
-
-    # END: Transfer funds
-
 

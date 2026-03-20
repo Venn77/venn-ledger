@@ -13,6 +13,7 @@ session = Session()
 
 
 def calculate_conversion(item):
+    """Returns converted amount in EUR with two decimals."""
     if item.currency_code == "EUR":
         # Convert to decimal, round, prep for DB
         val = Decimal(str(item.amount)).quantize(Decimal("0.00"), rounding=ROUND_HALF_UP)

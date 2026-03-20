@@ -1,7 +1,8 @@
 from models import (
     calculate_conversion,
     Category, Vendor, Account, PaymentMethod,
-    Project, Expense, ExchangeRate, Transfer
+    Project, Expense, ExchangeRate, Transfer,
+    Stream, Payer, Gain
 )
 from decimal import Decimal
 import datetime
@@ -81,6 +82,57 @@ class TransactionManager:
             self.session.add(new_expense)
             self.session.commit()
             return new_expense
+        except Exception as e:
+            self.session.rollback()
+            raise e
+
+    def add_gain(self, amount, currency_code, account_id, exchange_rate=None, stream_name=None, payer_name=None,
+                    project_name=None, description=None,
+                    timestamp=None):
+        """Adds a gain to DB."""
+        # 1. Resolve Master Data
+        stream = self._get_or_create_dimension(Stream, stream_name) if stream_name else None
+        payer = self._get_or_create_dimension(Payer, payer_name) if payer_name else None
+        project = self._get_or_create_dimension(Project, project_name) if project_name else None
+
+        # 2. Resolve Account
+        account = self.session.query(Account).filter_by(id=account_id).first()
+
+        # 3. Currency & FX Logic
+        if not exchange_rate:
+            fx_rate = None
+            if currency_code != "EUR":
+                rate_entry = (self.session.query(ExchangeRate)
+                              .filter_by(currency_code=currency_code)
+                              .order_by(ExchangeRate.timestamp.desc())
+                              .first())
+                if not rate_entry:
+                    raise ValueError(f"No exchange rate found for {currency_code}. Please seed rates.")
+                fx_rate = rate_entry.fx_multiplier
+        else:
+            fx_rate = exchange_rate
+
+        # 4. Create Gain Object
+        new_gain = Gain(
+            amount=amount,
+            currency_code=currency_code,
+            fx_rate=fx_rate,
+            stream_id=stream.id if stream else None,
+            payer_id=payer.id if payer else None,
+            account_id=account_id,
+            project_id=project.id if project else None,
+            description=description,
+            timestamp=timestamp or datetime.datetime.now()
+        )
+        new_gain = calculate_conversion(new_gain)
+
+        # Add the 'raw' amount from the account balance
+        account.balance = float(Decimal(str(account.balance)) + Decimal(str(amount)))
+
+        try:
+            self.session.add(new_gain)
+            self.session.commit()
+            return new_gain
         except Exception as e:
             self.session.rollback()
             raise e

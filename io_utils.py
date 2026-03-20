@@ -1,4 +1,4 @@
-from models import session, Currency, Project, Account
+from models import session, Currency, Project, Account, Stream, Payer
 from decimal import Decimal, ROUND_HALF_UP
 import datetime, difflib, re
 
@@ -61,7 +61,7 @@ def get_active_currency(prompt):
     # Must ensure currency is selected from available ones.
     active_curs = session.query(Currency).filter_by(active_bool=True).all()
     cur_codes = [cur.code for cur in active_curs]
-    print("\nAvailable Currencies:")
+    print("\nAvailable Currencies:\n")
     for code in cur_codes:
         print(f"- {code}")
     while True:
@@ -73,10 +73,28 @@ def get_active_currency(prompt):
                   \rPlease choose from the list above.
                   \r**********************""")
 
+def get_active_payer(prompt):
+    """Returns a selected active payer."""
+    active_payers = session.query(Payer).filter_by(active_bool=True).all()
+    print("\nAvailable Payers:\n")
+    for idx, p in enumerate(active_payers):
+        print(f" [{idx}] {p.name}")
+    while True:
+        choice = input(prompt).strip().lower()
+        if choice.isdigit() and int(choice) < len(active_payers):
+            payer_str = active_payers[int(choice)].id
+            return payer_str
+        elif choice == 's':
+            return None
+        print(f"""\n***** ERROR *****
+                  \r'{choice}' is not a valid payer.
+                  \rPlease choose from 0 to {len(active_payers)-1}.
+                  \r**********************""")
+
 def get_active_project(prompt):
     """Returns a selected active project."""
     active_projects = session.query(Project).filter_by(active_bool=True).all()
-    print("\nAvailable Projects:")
+    print("\nAvailable Projects:\n")
     for idx, p in enumerate(active_projects):
         print(f" [{idx}] {p.name}")
     while True:
@@ -89,6 +107,24 @@ def get_active_project(prompt):
         print(f"""\n***** ERROR *****
                   \r'{choice}' is not a valid project.
                   \rPlease choose from 0 to {len(active_projects)-1}.
+                  \r**********************""")
+
+def get_active_stream(prompt):
+    """Returns a selected active stream."""
+    active_streams = session.query(Stream).filter_by(active_bool=True).all()
+    print("\nAvailable Streams:\n")
+    for idx, s in enumerate(active_streams):
+        print(f" [{idx}] {s.name}")
+    while True:
+        choice = input(prompt).strip().lower()
+        if choice.isdigit() and int(choice) < len(active_streams):
+            stream_str = active_streams[int(choice)].id
+            return stream_str
+        elif choice == 's':
+            return None
+        print(f"""\n***** ERROR *****
+                  \r'{choice}' is not a valid stream.
+                  \rPlease choose from 0 to {len(active_streams)-1}.
                   \r**********************""")
 
 def get_best_match(name, choices, threshold=0.6):

@@ -188,7 +188,7 @@ if __name__ == "__main__":
 
         print(year_str)
 
-        project_str = get_active_project("\nChoose number to use (or 's' to skip item): ")
+        project_str = get_active_project("\nChoose number to use (or 's' for None): ")
 
         print(project_str)
 

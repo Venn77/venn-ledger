@@ -115,6 +115,7 @@ class Account(Base):
     # Relationships
     currency = relationship("Currency", back_populates="accounts")
     payment_methods = relationship("PaymentMethod", back_populates="account")
+    gains = relationship("Gain", back_populates="account")
 
     def __repr__(self):
         return f"<Account(name='{self.name}', balance='{self.balance}', active_bool='{self.active_bool}')>"
@@ -142,6 +143,7 @@ class Project(Base):
     active_bool = Column(Boolean, default=True, comment="If the project is active (so it is selectable in-app)")
     # Relationships
     expenses = relationship("Expense", back_populates="project")
+    gains = relationship("Gain", back_populates="project")
 
     def __repr__(self):
         return f"<Project(name='{self.name}', active_bool='{self.active_bool}')>"

@@ -47,7 +47,7 @@ class TransactionManager:
 
         account = pm.account
 
-        # 3. Currency & FX Logic
+        # 3. FX Logic
         if not exchange_rate:
             fx_rate = None
             if currency_code != "EUR":
@@ -98,7 +98,7 @@ class TransactionManager:
         # 2. Resolve Account
         account = self.session.query(Account).filter_by(id=account_id).first()
 
-        # 3. Currency & FX Logic
+        # 3. FX Logic
         if not exchange_rate:
             fx_rate = None
             if currency_code != "EUR":

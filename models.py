@@ -12,6 +12,19 @@ Base = declarative_base()
 session = Session()
 
 
+def calculate_conversion(item):
+    if item.currency_code == "EUR":
+        # Convert to decimal, round, prep for DB
+        val = Decimal(str(item.amount)).quantize(Decimal("0.00"), rounding=ROUND_HALF_UP)
+        item.converted_amount = float(val)
+        item.fx_rate = None
+    elif item.fx_rate:
+        # Divide as Decimal for precision
+        raw_val = Decimal(str(item.amount)) / Decimal(str(item.fx_rate))
+        val = raw_val.quantize(Decimal("0.00"), rounding=ROUND_HALF_UP)
+        item.converted_amount = float(val)
+    return item
+
 class Currency(Base):
     __tablename__ = 'currencies'
     code = Column(String(3), primary_key=True, comment="The currency, e.g., EUR")
@@ -20,6 +33,7 @@ class Currency(Base):
     # Relationships
     accounts = relationship("Account", back_populates="currency")
     expenses = relationship("Expense", back_populates="currency")
+    gains = relationship("Gain", back_populates="currency")
     exchange_rate = relationship("ExchangeRate", back_populates="currencies", cascade="all, delete, delete-orphan")
 
     def __repr__(self):
@@ -54,6 +68,18 @@ class Category(Base):
     def __repr__(self):
         return f"<Category(name='{self.name}', active_bool='{self.active_bool}')>"
 
+class Stream(Base):
+    __tablename__ = 'streams'
+    id = Column(Integer, primary_key=True)
+    name = Column(String(50), unique=True, nullable=False,
+                  comment="e.g., Salary, Reimbursement or Unemployment")
+    active_bool = Column(Boolean, default=True, comment="If the category is active (so it is selectable in-app)")
+    # Relationships
+    gains = relationship("Gain", back_populates="stream")
+
+    def __repr__(self):
+        return f"<Stream(name='{self.name}', active_bool='{self.active_bool}')>"
+
 class Vendor(Base):
     __tablename__ = 'vendors'
     id = Column(Integer, primary_key=True)
@@ -64,6 +90,17 @@ class Vendor(Base):
 
     def __repr__(self):
         return f"<Vendor(name='{self.name}', active_bool='{self.active_bool}')>"
+
+class Payer(Base):
+    __tablename__ = 'payers'
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), unique=True, nullable=False, comment="e.g., DOMO, SEPE, Amazon, etc.")
+    active_bool = Column(Boolean, default=True, comment="If the payer is active (so it is selectable in-app)")
+    # Relationships
+    gains = relationship("Gain", back_populates="payer")
+
+    def __repr__(self):
+        return f"<Payer(name='{self.name}', active_bool='{self.active_bool}')>"
 
 class Account(Base):
     __tablename__ = 'accounts'
@@ -131,21 +168,36 @@ class Expense(Base):
     payment_method = relationship("PaymentMethod", back_populates="expenses")
     project = relationship("Project", back_populates="expenses")
 
-    def calculate_conversion(self):
-        if self.currency_code == "EUR":
-            # Convert to decimal, round, prep for DB
-            val = Decimal(str(self.amount)).quantize(Decimal("0.00"), rounding=ROUND_HALF_UP)
-            self.converted_amount = float(val)
-            self.fx_rate = None
-        elif self.fx_rate:
-            # Divide as Decimal for precision
-            raw_val = Decimal(str(self.amount)) / Decimal(str(self.fx_rate))
-            val = raw_val.quantize(Decimal("0.00"), rounding=ROUND_HALF_UP)
-            self.converted_amount = float(val)
-
     def __repr__(self):
         return (f"<Expense(amount={self.amount} {self.currency_code}, "
                 f"EUR={self.converted_amount:.2f}, vendor='{self.vendor_id}', category='{self.category_id}')>")
+
+class Gain(Base):
+    __tablename__ = 'gains'
+    # Foreign Keys
+    currency_code = Column(String(3), ForeignKey('currencies.code'), nullable=False)
+    stream_id = Column(Integer, ForeignKey('streams.id'))
+    payer_id = Column(Integer, ForeignKey('payers.id'))
+    account_id = Column(Integer, ForeignKey('accounts.id'), nullable=False)
+    project_id = Column(Integer, ForeignKey('projects.id'))
+    id = Column(Integer, primary_key=True)
+    amount = Column(Float, nullable=False, comment="The numerical value, e.g., 1250.66")
+    fx_rate = Column(Float, comment="Conversion rate if currency is not EUR")
+    converted_amount = Column(Float, comment="Converted amount if currency is not EUR")
+    split_bool = Column(Boolean, default=False, comment="If the gain item will be received in instalments")
+    split_num_instalments = Column(Integer, comment="The number of instalments paid if split_boolean is True")
+    description = Column(String, comment="A brief summary of what it was about")
+    timestamp = Column(DateTime, nullable=False, server_default=func.now(), comment="UTC timestamp of entry")
+    # Relationships
+    currency = relationship("Currency", back_populates="gains")
+    stream = relationship("Stream", back_populates="gains")
+    payer = relationship("Payer", back_populates="gains")
+    account = relationship("Account", back_populates="gains")
+    project = relationship("Project", back_populates="gains")
+
+    def __repr__(self):
+        return (f"<Gain(amount={self.amount} {self.currency_code}, "
+                f"EUR={self.converted_amount:.2f}, payer='{self.payer_id}', stream='{self.stream_id}')>")
 
 class Transfer(Base):
     __tablename__ = 'transfers'

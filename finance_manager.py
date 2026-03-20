@@ -1,4 +1,5 @@
 from models import (
+    calculate_conversion,
     Category, Vendor, Account, PaymentMethod,
     Project, Expense, ExchangeRate, Transfer
 )
@@ -71,7 +72,7 @@ class TransactionManager:
             description=description,
             timestamp=timestamp or datetime.datetime.now()
         )
-        new_expense.calculate_conversion()
+        new_expense = calculate_conversion(new_expense)
 
         # Subtract the 'raw' amount from the account balance
         account.balance = float(Decimal(str(account.balance)) - Decimal(str(amount)))

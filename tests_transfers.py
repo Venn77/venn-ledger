@@ -23,7 +23,7 @@ def get_account_choice(prompt, accounts):
 def run_transfer_ui():
     """Executes transfer UI for one operation."""
     manager = finance_manager.TransactionManager(session)
-    active_accounts = session.query(Account).filter_by(active_bool=True).all()
+    active_accounts = session.query(Account).filter_by(active_bool=True).order_by(Account.name.asc()).all()
 
     if len(active_accounts) < 2:
         print("   ! Error: You need at least two accounts to perform a transfer.")

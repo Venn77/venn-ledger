@@ -80,7 +80,6 @@ def run_transfer_ui():
 
 
 if __name__ == "__main__":
-
     run_transfer_ui()
 
 

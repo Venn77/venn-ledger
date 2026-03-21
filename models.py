@@ -111,6 +111,7 @@ class Account(Base):
     name = Column(String(50), unique=True, nullable=False, comment="The name of the account")
     description = Column(String, comment="A brief summary of the account's purpose")
     balance = Column(Float, default=0, comment="The balance of the account")
+    initial_balance = Column(Float, default=0, comment="The initial balance of the account")
     active_bool = Column(Boolean, default=True, comment="If the account is active (so it is selectable in-app)")
     # Relationships
     currency = relationship("Currency", back_populates="accounts")

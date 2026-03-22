@@ -42,10 +42,12 @@ def get_active_account(prompt):
     """Returns a selected active account."""
     active_accounts = session.query(Account).filter_by(active_bool=True).order_by(Account.name.asc()).all()
     print("\nAvailable Accounts:\n")
+    print(f"     {'Account Name':<20} | {'Currency':>12} | {'Balance':>12}")
+    print("-" * 60)
     for idx, acc in enumerate(active_accounts):
         bal = Decimal(str(acc.balance)).quantize(Decimal("0.00"), rounding=ROUND_HALF_UP)
         bal = float(bal)
-        print(f" [{idx}] {acc.name} ({acc.currency_code}) | {bal}")
+        print(f" [{idx}] {acc.name:<{20 if len(str(idx)) == 1 else 19}} | {acc.currency_code:>12} | {bal:>12.2f}")
     while True:
         choice = input(prompt).strip().lower()
         if choice.isdigit() and int(choice) < len(active_accounts):
@@ -59,18 +61,18 @@ def get_active_account(prompt):
 def get_active_currency(prompt):
     """Returns a selected active currency."""
     # Must ensure currency is selected from available ones.
-    active_curs = session.query(Currency).filter_by(active_bool=True).all()
-    cur_codes = [cur.code for cur in active_curs]
+    active_curs = session.query(Currency).filter_by(active_bool=True).order_by(Currency.name.asc()).all()
     print("\nAvailable Currencies:\n")
-    for code in cur_codes:
-        print(f"- {code}")
+    for idx, c in enumerate(active_curs):
+        print(f" [{idx}] {c.code}")
     while True:
-        currency_str = input(prompt).upper().strip()
-        if currency_str in cur_codes:
+        choice = input(prompt).strip().lower()
+        if choice.isdigit() and int(choice) < len(active_curs):
+            currency_str = active_curs[int(choice)].code
             return currency_str
         print(f"""\n***** ERROR *****
-                  \r'{currency_str}' is not a valid currency.
-                  \rPlease choose from the list above.
+                  \r'{choice}' is not a valid currency.
+                  \rPlease choose from the 0 to {len(active_curs)-1}.
                   \r**********************""")
 
 def get_active_payer(prompt):

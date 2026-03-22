@@ -10,7 +10,7 @@ if __name__ == "__main__":
     # START: Add expense
     amount = get_valid_float("Enter amount of the expense: ")
 
-    currency = get_active_currency("\nEnter currency code (e.g., ARS): ")
+    currency = get_active_currency("\nSelect the currency: ")
 
     category = input("Enter category name: ").strip() or None
 

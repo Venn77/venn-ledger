@@ -7,10 +7,12 @@ import finance_manager, datetime
 def get_account_choice(prompt, accounts):
     """Prints indexed accounts and returns the selected Account ID."""
     print("\nAvailable Accounts:\n")
+    print(f"     {'Account Name':<20} | {'Currency':>12} | {'Balance':>12}")
+    print("-" * 60)
     for idx, acc in enumerate(accounts):
         bal = Decimal(str(acc.balance)).quantize(Decimal("0.00"), rounding=ROUND_HALF_UP)
         bal = float(bal)
-        print(f" [{idx}] {acc.name} ({acc.currency_code}) | {bal}")
+        print(f" [{idx}] {acc.name:<{20 if len(str(idx)) == 1 else 19}} | {acc.currency_code:>12} | {bal:>12.2f}")
     while True:
         choice = input(prompt).strip().lower()
         if choice.isdigit() and int(choice) < len(accounts):
@@ -59,6 +61,7 @@ def run_transfer_ui():
     print(f" FROM: {origin.name} (-{amount_origin} {origin.currency_code})")
     print(f" TO:   {destination.name} (+{amount_destination} {destination.currency_code})")
     print(f" DESC: {origin.currency_code} -> {destination.currency_code}{' | ' + descr if descr else ''}")
+    print(f" DATE: {ts if ts else datetime.datetime.now()}")
 
     confirm = input("\nExecute transfer? (y/n): ").lower()
     if confirm == "y":

@@ -39,7 +39,7 @@ def run_gain_ui():
     print(f"   ! Item currency will be '{account.currency_code}'")
 
     # 6. Metadata
-    descr = input("\nEnter description (e.g., 'Monthly pay': ").strip()
+    descr = input("\nEnter description (e.g., 'Monthly pay'): ").strip()
     while True:
         ts_input = input("\nEnter timestamp (YYYY-MM-DD HH:MM) or leave blank for Now: ").strip()
         if not ts_input:
@@ -94,7 +94,7 @@ def run_gain_ui():
     print(f" STREAM: {stream_name}")
     print(f" AMOUNT: {amount}")
     print(f" DESC: {descr}")
-    print(f" DATE: {ts}")
+    print(f" DATE: {ts if ts else datetime.datetime.now()}")
 
     confirm = input("\nExecute gain? (y/n): ").lower()
     if confirm == "y":

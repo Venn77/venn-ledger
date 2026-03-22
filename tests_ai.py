@@ -180,7 +180,7 @@ if __name__ == "__main__":
 
         print(f"Successfully identified {len(daily_chunks)} days of transactions.")
 
-        currency_str = get_active_currency("\nEnter currency code (e.g., ARS): ")
+        currency_str = get_active_currency("\nSelect the currency: ")
 
         print(currency_str)
 

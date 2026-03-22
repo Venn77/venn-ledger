@@ -20,7 +20,6 @@ def validate_and_save_batch(results, default_currency, year, project, categories
 
         # 2. Test currency and define payment method
         if item['currency'] != default_currency:
-            # Skip - here we will handle exchange rate. It will ask for manual input if currency != 'EUR'
             print(f"   ! Notice: Item uses '{item['currency']}', not default currency '{default_currency}'.")
 
         pm_name = item['payment_method']

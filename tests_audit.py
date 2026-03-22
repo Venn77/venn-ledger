@@ -7,7 +7,7 @@ def run_global_audit():
     print(f"{'Account Name':<20} | {'Stored Bal':>12} | {'Calc Bal':>12} | {'Status':<10}")
     print("-" * 70)
 
-    accounts = session.query(Account).all()
+    accounts = session.query(Account).order_by(Account.name.asc()).all()
 
     for acc in accounts:
         # 1. Sum of Gains (Inflow)

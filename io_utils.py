@@ -77,7 +77,7 @@ def get_active_currency(prompt):
 
 def get_active_payer(prompt):
     """Returns a selected active payer."""
-    active_payers = session.query(Payer).filter_by(active_bool=True).all()
+    active_payers = session.query(Payer).filter_by(active_bool=True).order_by(Payer.name.asc()).all()
     print("\nAvailable Payers:\n")
     for idx, p in enumerate(active_payers):
         print(f" [{idx}] {p.name}")
@@ -95,7 +95,7 @@ def get_active_payer(prompt):
 
 def get_active_project(prompt):
     """Returns a selected active project."""
-    active_projects = session.query(Project).filter_by(active_bool=True).all()
+    active_projects = session.query(Project).filter_by(active_bool=True).order_by(Project.name.asc()).all()
     print("\nAvailable Projects:\n")
     for idx, p in enumerate(active_projects):
         print(f" [{idx}] {p.name}")
@@ -113,7 +113,7 @@ def get_active_project(prompt):
 
 def get_active_stream(prompt):
     """Returns a selected active stream."""
-    active_streams = session.query(Stream).filter_by(active_bool=True).all()
+    active_streams = session.query(Stream).filter_by(active_bool=True).order_by(Stream.name.asc()).all()
     print("\nAvailable Streams:\n")
     for idx, s in enumerate(active_streams):
         print(f" [{idx}] {s.name}")

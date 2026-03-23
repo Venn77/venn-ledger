@@ -147,8 +147,10 @@ class TransactionManager:
                       .filter(ExchangeRate.timestamp <= target_date)
                       .order_by(ExchangeRate.timestamp.desc())
                       .first())
+        if rate_entry:
+            return rate_entry.fx_multiplier, rate_entry.timestamp
 
-        return rate_entry.fx_multiplier, rate_entry.timestamp if rate_entry else None
+        return None
 
     def transfer_funds(self, origin_id, destination_id, amount_orig, amount_dest, desc, ts=None):
         """Transfers funds between two accounts."""

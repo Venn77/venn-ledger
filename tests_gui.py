@@ -115,6 +115,7 @@ class AddExpenseWindow(ctk.CTkToplevel):
         self.ven_placeholder = "Search or type Vendor..."
         self.amount_placeholder = "Amount (e.g. 15.50)"
         self.desc_placeholder = "Description (Optional)"
+        self.fx_placeholder = "Rate (e.g. 1.15)"
 
         # Initial values
         # 1. Amount
@@ -129,23 +130,33 @@ class AddExpenseWindow(ctk.CTkToplevel):
         self.currency_var = ctk.StringVar(value="EUR")
         self.currency_menu = ctk.CTkOptionMenu(self, values=currencies, variable=self.currency_var, command=self.update_pm_list)
 
-        # 3. Category (SearchableComboBox so we can find existing or type new ones)
+        # 3. Exchange Rate (Automatically changes based on Date and Currency)
+        self.fx_label = ctk.CTkLabel(self, text="Exchange Rate", font=("Arial", 13, "bold"), anchor="w")
+        self.fx_entry = ctk.CTkEntry(self)
+        self.fx_entry.insert(0, self.fx_placeholder)
+        self.fx_entry.configure(text_color="gray")
+        self.fx_entry.bind("<FocusIn>", lambda e: self._fx_focus_in())
+        self.fx_entry.bind("<FocusOut>", lambda e: self._entry_focus_out(self.fx_entry, self.fx_placeholder))
+        # When the user types, clear the "Suggested" tooltip because the data is now manual
+        self.fx_entry.bind("<KeyRelease>", lambda e: self._clear_fx_tooltip())
+
+        # 4. Category (SearchableComboBox so we can find existing or type new ones)
         self.all_categories = [c.name for c in session.query(Category).filter_by(active_bool=True).order_by(Category.name.asc()).all()]
         self.category_combo = SearchableComboBox(self,placeholder=self.cat_placeholder,values=self.all_categories)
 
-        # 4. Vendor (ditto)
+        # 5. Vendor (ditto)
         self.all_vendors = [v.name for v in session.query(Vendor).filter_by(active_bool=True).order_by(Vendor.name.asc()).all()]
         self.vendor_combo = SearchableComboBox(self, placeholder=self.ven_placeholder, values=self.all_vendors)
 
-        # 5. Payment Method
+        # 6. Payment Method
         self.pm_menu = ctk.CTkOptionMenu(self, values=[])
         self.update_pm_list("EUR")
 
-        # 6. Datetime
+        # 7. Datetime
         self.cal_window = None
         date_frame = ctk.CTkFrame(self, fg_color="transparent")
-        date_frame.grid(row=6, column=0, padx=20, pady=10, sticky="ew")
-        date_frame.grid(row=6, column=1, padx=(0, 20), pady=8, sticky="ew")
+        date_frame.grid(row=7, column=0, padx=20, pady=10, sticky="ew")
+        date_frame.grid(row=7, column=1, padx=(0, 20), pady=8, sticky="ew")
 
         self.date_var = ctk.StringVar(value=datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
         self.date_entry = ctk.CTkEntry(date_frame, textvariable=self.date_var, width=150)
@@ -160,14 +171,14 @@ class AddExpenseWindow(ctk.CTkToplevel):
         self.date_btn = ctk.CTkButton(date_frame, text="📅", width=40, command=self.open_calendar)
         self.date_btn.pack(side="left", padx=2)
 
-        # 7. Description
+        # 8. Description
         self.desc_entry = ctk.CTkEntry(self)
         self.desc_entry.insert(0, self.desc_placeholder)
         self.desc_entry.configure(text_color="gray")
         self.desc_entry.bind("<FocusIn>", lambda e: self._entry_focus_in(self.desc_entry, self.desc_placeholder))
         self.desc_entry.bind("<FocusOut>", lambda e: self._entry_focus_out(self.desc_entry, self.desc_placeholder))
 
-        # 8. Project
+        # 9. Project
         projects = [p.name for p in session.query(Project).filter_by(active_bool=True).order_by(Project.name.asc()).all()]
         self.project_var = ctk.StringVar(value="")
         self.project_menu = ctk.CTkOptionMenu(self, values=projects, variable=self.project_var)
@@ -180,30 +191,41 @@ class AddExpenseWindow(ctk.CTkToplevel):
 
         add_row("Amount", self.amount_entry, 1)
         add_row("Currency", self.currency_menu, 2)
-        add_row("Category", self.category_combo, 3)
-        add_row("Vendor", self.vendor_combo, 4)
-        add_row("Payment Method", self.pm_menu, 5)
+        add_row("Category", self.category_combo, 4)
+        add_row("Vendor", self.vendor_combo, 5)
+        add_row("Payment Method", self.pm_menu, 6)
 
         # Date container is special
         date_lbl = ctk.CTkLabel(self, text="Date & Time", font=("Arial", 13, "bold"), anchor="w")
-        date_lbl.grid(row=6, column=0, padx=(20, 10), pady=8, sticky="w")
+        date_lbl.grid(row=7, column=0, padx=(20, 10), pady=8, sticky="w")
 
-        add_row("Description", self.desc_entry, 7)
-        add_row("Project", self.project_menu, 8)
+        add_row("Description", self.desc_entry, 8)
+        add_row("Project", self.project_menu, 9)
 
         # Tooltips
         ToolTip(self.today_btn, "Set to Today")
         ToolTip(self.yesterday_btn, "Set to Yesterday")
         ToolTip(self.date_btn, "Open Calendar")
+        self.fx_tooltip = ToolTip(self.fx_entry, "Latest known rate will appear here")
 
         # Clear All & Save Button
         btn_frame = ctk.CTkFrame(self, fg_color="transparent")
-        btn_frame.grid(row=9, column=0, columnspan=2, pady=30)
+        btn_frame.grid(row=10, column=0, columnspan=2, pady=30)
         self.clear_btn = ctk.CTkButton(btn_frame, text="Clear All", fg_color="gray30", command=self.clear_all)
         self.clear_btn.pack(side="left", padx=10)
 
         self.save_btn = ctk.CTkButton(btn_frame, text="Save Expense", command=self.submit_data, fg_color="green")
         self.save_btn.pack(side="left", padx=10)
+
+        # Keep an eye out! These get updated fx rate as... something changes
+        # 1. Trace the Currency Variable
+        self.currency_var.trace_add("write", lambda *args: self.update_fx_list(self.currency_var.get()))
+
+        # 2. Trace the Date Variable
+        self.date_var.trace_add("write", lambda *args: self.update_fx_list(self.currency_var.get()))
+
+        # 3. Initial Trigger
+        self.update_fx_list()
 
     def _entry_focus_in(self, widget, placeholder):
         """Logic for Amount and Description placeholders on FocusIn."""
@@ -216,6 +238,17 @@ class AddExpenseWindow(ctk.CTkToplevel):
         if widget.get() == "":
             widget.insert(0, placeholder)
             widget.configure(text_color="gray")
+
+    def _fx_focus_in(self):
+        """Custom focus for FX to handle the placeholder and color."""
+        if self.fx_entry.get() == self.fx_placeholder:
+            self.fx_entry.delete(0, 'end')
+            self.fx_entry.configure(text_color="white")
+
+    def _clear_fx_tooltip(self):
+        """Clears the 'Historical' tooltip if the user starts typing a manual rate."""
+        if self.fx_entry.get() != self.fx_placeholder:
+            self.fx_tooltip.text = "Manual rate entered"
 
     def force_focus(self):
         self.focus_force()
@@ -274,6 +307,7 @@ class AddExpenseWindow(ctk.CTkToplevel):
         self.currency_var.set("EUR")
         self.update_pm_list("EUR")
         self.date_var.set(datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
+        self.update_fx_list()
 
         # Put focus back at the start
         self.force_focus()
@@ -284,6 +318,44 @@ class AddExpenseWindow(ctk.CTkToplevel):
         target_date = datetime.datetime.now() - datetime.timedelta(days=days_ago)
         formatted_date = target_date.strftime("%Y-%m-%d %H:%M")
         self.date_var.set(formatted_date)
+
+    def update_fx_list(self, *args):
+        """Refreshes FX rate based on currency and date."""
+        selected_currency = self.currency_var.get()
+        if selected_currency == "EUR":
+            self.fx_label.grid_forget()
+            self.fx_entry.grid_forget()
+            return
+
+        # 1. Show the fields
+        self.fx_label.grid(row=3, column=0, padx=(20, 10), pady=8, sticky="w")
+        self.fx_entry.grid(row=3, column=1, padx=(0, 20), pady=8, sticky="ew")
+
+        # 2. Extract Date (Handling potential empty/malformed strings)
+        try:
+            full_date = self.date_var.get()
+            if not full_date or len(full_date) < 10:
+                return
+            current_date_str = full_date.split(" ")[0]
+
+            result = self.manager.get_historical_fx_rate(
+                currency_code=selected_currency,
+                target_date=current_date_str
+            )
+
+            if result:
+                rate_val, ts = result
+                self.fx_entry.delete(0, 'end')
+                self.fx_entry.insert(0, str(rate_val))
+                self.fx_entry.configure(text_color="white")
+                self.fx_tooltip.text = f"Suggested rate from: {ts.strftime('%Y-%m-%d')}"
+            else:
+                self.fx_entry.delete(0, 'end')
+                self.fx_entry.insert(0, self.fx_placeholder)
+                self.fx_entry.configure(text_color="gray")
+                self.fx_tooltip.text = "No historical rate found."
+        except Exception as e:
+            print(f"FX Sync Error: {e}")
 
     def update_pm_list(self, selected_currency):
         """Filters Payment Methods based on the account's currency."""

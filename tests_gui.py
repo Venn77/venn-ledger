@@ -14,15 +14,18 @@ class SearchableComboBox(ctk.CTkComboBox):
         self.placeholder = placeholder
         self.all_values = kwargs.get("values", [])
 
-        # Initialize Placeholder State
-        self.set(self.placeholder)
-        self._entry.configure(foreground="gray")
-
         # Bindings
         self._entry.bind("<FocusIn>", self._on_focus_in)
         self._entry.bind("<FocusOut>", self._on_focus_out)
         self._entry.bind("<KeyRelease>", self._on_key_release)
         self._entry.bind("<Down>", self._on_down_key)
+
+        # # Initialize Placeholder State
+        self.after(300, self._force_placeholder_startup)
+
+    def _force_placeholder_startup(self):
+        self.set(self.placeholder)
+        self._entry.configure(foreground="gray")
 
     def _on_focus_in(self, _event):
         if self.get() == self.placeholder:
@@ -57,18 +60,52 @@ class SearchableComboBox(ctk.CTkComboBox):
         except Exception:
             pass
 
+class ToolTip:
+    def __init__(self, widget, text, delay=500):
+        self.widget = widget
+        self.text = text
+        self.delay = delay
+        self.tip_window = None
+        self.id = None
+        self.widget.bind("<Enter>", self._schedule)
+        self.widget.bind("<Leave>", self.hide_tip)
+
+    def _schedule(self, event=None):
+        self.id = self.widget.after(self.delay, self.show_tip)
+
+    def show_tip(self, event=None):
+        if self.tip_window or not self.text:
+            return
+        x = self.widget.winfo_rootx() + 20
+        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 10
+        self.tip_window = tw = ctk.CTkToplevel(self.widget)
+        tw.wm_overrideredirect(True)
+        tw.wm_geometry(f"+{x}+{y}")
+        label = ctk.CTkLabel(tw, text=self.text, corner_radius=5,
+                             fg_color="#333333", padx=5, pady=2)
+        label.pack()
+
+    def hide_tip(self, event=None):
+        if self.id:
+            self.widget.after_cancel(self.id)
+            self.id = None
+        if self.tip_window:
+            self.tip_window.destroy()
+            self.tip_window = None
+
 class AddExpenseWindow(ctk.CTkToplevel):
     def __init__(self, parent, manager):
         super().__init__(parent)
         self.title("Add New Expense")
-        self.geometry("400x550")
+        self.geometry("450x550")
         self.manager = manager
 
         # Ensure it stays on top and grabs focus
         self.after(100, self.force_focus)
         self.attributes('-topmost', False)
 
-        self.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=0, minsize=120)
+        self.grid_columnconfigure(1, weight=1)
 
         # UI Form label
         ctk.CTkLabel(self, text="New Expense", font=("Arial", 20, "bold")).grid(row=0, column=0, pady=20)
@@ -76,36 +113,39 @@ class AddExpenseWindow(ctk.CTkToplevel):
         # Placeholders
         self.cat_placeholder = "Search or type Category..."
         self.ven_placeholder = "Search or type Vendor..."
+        self.amount_placeholder = "Amount (e.g. 15.50)"
+        self.desc_placeholder = "Description (Optional)"
 
+        # Initial values
         # 1. Amount
-        self.amount_entry = ctk.CTkEntry(self, placeholder_text="Amount (e.g. 15.50)")
-        self.amount_entry.grid(row=1, column=0, padx=20, pady=10, sticky="ew")
+        self.amount_entry = ctk.CTkEntry(self)
+        self.amount_entry.insert(0, self.amount_placeholder)
+        self.amount_entry.configure(text_color="gray")
+        self.amount_entry.bind("<FocusIn>", lambda e: self._entry_focus_in(self.amount_entry, self.amount_placeholder))
+        self.amount_entry.bind("<FocusOut>", lambda e: self._entry_focus_out(self.amount_entry, self.amount_placeholder))
 
         # 2. Currency (Dropdown)
         currencies = [c.code for c in session.query(Currency).filter_by(active_bool=True).order_by(Currency.code.asc()).all()]
         self.currency_var = ctk.StringVar(value="EUR")
         self.currency_menu = ctk.CTkOptionMenu(self, values=currencies, variable=self.currency_var, command=self.update_pm_list)
-        self.currency_menu.grid(row=2, column=0, padx=20, pady=10, sticky="ew")
 
         # 3. Category (SearchableComboBox so we can find existing or type new ones)
         self.all_categories = [c.name for c in session.query(Category).filter_by(active_bool=True).order_by(Category.name.asc()).all()]
         self.category_combo = SearchableComboBox(self,placeholder=self.cat_placeholder,values=self.all_categories)
-        self.category_combo.grid(row=3, column=0, padx=20, pady=10, sticky="ew")
 
         # 4. Vendor (ditto)
         self.all_vendors = [v.name for v in session.query(Vendor).filter_by(active_bool=True).order_by(Vendor.name.asc()).all()]
         self.vendor_combo = SearchableComboBox(self, placeholder=self.ven_placeholder, values=self.all_vendors)
-        self.vendor_combo.grid(row=4, column=0, padx=20, pady=10, sticky="ew")
 
         # 5. Payment Method
         self.pm_menu = ctk.CTkOptionMenu(self, values=[])
-        self.pm_menu.grid(row=5, column=0, padx=20, pady=10, sticky="ew")
         self.update_pm_list("EUR")
 
         # 6. Datetime
         self.cal_window = None
         date_frame = ctk.CTkFrame(self, fg_color="transparent")
         date_frame.grid(row=6, column=0, padx=20, pady=10, sticky="ew")
+        date_frame.grid(row=6, column=1, padx=(0, 20), pady=8, sticky="ew")
 
         self.date_var = ctk.StringVar(value=datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
         self.date_entry = ctk.CTkEntry(date_frame, textvariable=self.date_var, width=150)
@@ -118,19 +158,45 @@ class AddExpenseWindow(ctk.CTkToplevel):
         self.yesterday_btn.pack(side="left", padx=2)
 
         self.date_btn = ctk.CTkButton(date_frame, text="📅", width=40, command=self.open_calendar)
-        self.date_btn.pack(side="right", padx=(5, 0))
+        self.date_btn.pack(side="left", padx=2)
 
         # 7. Description
-        self.desc_entry = ctk.CTkEntry(self, placeholder_text="Description (Optional)")
-        self.desc_entry.grid(row=7, column=0, padx=20, pady=10, sticky="ew")
+        self.desc_entry = ctk.CTkEntry(self)
+        self.desc_entry.insert(0, self.desc_placeholder)
+        self.desc_entry.configure(text_color="gray")
+        self.desc_entry.bind("<FocusIn>", lambda e: self._entry_focus_in(self.desc_entry, self.desc_placeholder))
+        self.desc_entry.bind("<FocusOut>", lambda e: self._entry_focus_out(self.desc_entry, self.desc_placeholder))
 
         # 8. Project
         projects = [p.name for p in session.query(Project).filter_by(active_bool=True).order_by(Project.name.asc()).all()]
         self.project_var = ctk.StringVar(value="")
         self.project_menu = ctk.CTkOptionMenu(self, values=projects, variable=self.project_var)
-        self.project_menu.grid(row=8, column=0, padx=20, pady=10, sticky="ew")
 
-        # 9. Clear All & Save Button
+        # Draw label + fields
+        def add_row(label_text, widget, row_idx):
+            lbl = ctk.CTkLabel(self, text=label_text, font=("Arial", 13, "bold"), anchor="w")
+            lbl.grid(row=row_idx, column=0, padx=(20, 10), pady=8, sticky="w")
+            widget.grid(row=row_idx, column=1, padx=(0, 20), pady=8, sticky="ew")
+
+        add_row("Amount", self.amount_entry, 1)
+        add_row("Currency", self.currency_menu, 2)
+        add_row("Category", self.category_combo, 3)
+        add_row("Vendor", self.vendor_combo, 4)
+        add_row("Payment Method", self.pm_menu, 5)
+
+        # Date container is special
+        date_lbl = ctk.CTkLabel(self, text="Date & Time", font=("Arial", 13, "bold"), anchor="w")
+        date_lbl.grid(row=6, column=0, padx=(20, 10), pady=8, sticky="w")
+
+        add_row("Description", self.desc_entry, 7)
+        add_row("Project", self.project_menu, 8)
+
+        # Tooltips
+        ToolTip(self.today_btn, "Set to Today")
+        ToolTip(self.yesterday_btn, "Set to Yesterday")
+        ToolTip(self.date_btn, "Open Calendar")
+
+        # Clear All & Save Button
         btn_frame = ctk.CTkFrame(self, fg_color="transparent")
         btn_frame.grid(row=9, column=0, columnspan=2, pady=30)
         self.clear_btn = ctk.CTkButton(btn_frame, text="Clear All", fg_color="gray30", command=self.clear_all)
@@ -138,6 +204,18 @@ class AddExpenseWindow(ctk.CTkToplevel):
 
         self.save_btn = ctk.CTkButton(btn_frame, text="Save Expense", command=self.submit_data, fg_color="green")
         self.save_btn.pack(side="left", padx=10)
+
+    def _entry_focus_in(self, widget, placeholder):
+        """Logic for Amount and Description placeholders on FocusIn."""
+        if widget.get() == placeholder:
+            widget.delete(0, 'end')
+            widget.configure(text_color="white")
+
+    def _entry_focus_out(self, widget, placeholder):
+        """Logic for Amount and Description placeholders on FocusOut."""
+        if widget.get() == "":
+            widget.insert(0, placeholder)
+            widget.configure(text_color="gray")
 
     def force_focus(self):
         self.focus_force()
@@ -181,14 +259,16 @@ class AddExpenseWindow(ctk.CTkToplevel):
     def clear_all(self):
         """Resets the form to default values."""
         self.amount_entry.delete(0, 'end')
+        self.amount_entry.insert(0, self.amount_placeholder)
+        self.amount_entry.configure(text_color="gray")
         self.desc_entry.delete(0, 'end')
+        self.desc_entry.insert(0, self.desc_placeholder)
+        self.desc_entry.configure(text_color="gray")
 
         # Reset SearchableComboBoxes to placeholders
-        self.category_combo.set(self.cat_placeholder)
-        self.category_combo._entry.configure(foreground="gray")
-
-        self.vendor_combo.set(self.ven_placeholder)
-        self.vendor_combo._entry.configure(foreground="gray")
+        for combo in [self.category_combo, self.vendor_combo]:
+            combo.set(combo.placeholder)
+            combo._entry.configure(foreground="gray")
 
         # Reset Menus and Date
         self.currency_var.set("EUR")
@@ -196,6 +276,7 @@ class AddExpenseWindow(ctk.CTkToplevel):
         self.date_var.set(datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
 
         # Put focus back at the start
+        self.force_focus()
         self.amount_entry.focus()
 
     def set_relative_date(self, days_ago):

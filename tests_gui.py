@@ -1,9 +1,10 @@
 import customtkinter as ctk
 from models import (
     session, Account, Expense, Gain, Category,
-    PaymentMethod, Vendor, Currency
+    PaymentMethod, Vendor, Currency, Project
 )
 from sqlalchemy import desc
+from tkcalendar import Calendar
 import finance_manager, datetime
 
 
@@ -64,8 +65,8 @@ class AddExpenseWindow(ctk.CTkToplevel):
         self.manager = manager
 
         # Ensure it stays on top and grabs focus
-        self.after(10, self.lift)
-        self.attributes('-topmost', True)
+        self.after(100, self.force_focus)
+        self.attributes('-topmost', False)
 
         self.grid_columnconfigure(0, weight=1)
 
@@ -101,13 +102,107 @@ class AddExpenseWindow(ctk.CTkToplevel):
         self.pm_menu.grid(row=5, column=0, padx=20, pady=10, sticky="ew")
         self.update_pm_list("EUR")
 
-        # 6. Description
-        self.desc_entry = ctk.CTkEntry(self, placeholder_text="Description (Optional)")
-        self.desc_entry.grid(row=6, column=0, padx=20, pady=10, sticky="ew")
+        # 6. Datetime
+        self.cal_window = None
+        date_frame = ctk.CTkFrame(self, fg_color="transparent")
+        date_frame.grid(row=6, column=0, padx=20, pady=10, sticky="ew")
 
-        # 7. Submit Button
-        self.save_btn = ctk.CTkButton(self, text="Save Expense", command=self.submit_data, fg_color="green")
-        self.save_btn.grid(row=7, column=0, padx=20, pady=30, sticky="ew")
+        self.date_var = ctk.StringVar(value=datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
+        self.date_entry = ctk.CTkEntry(date_frame, textvariable=self.date_var, width=150)
+        self.date_entry.pack(side="left", fill="x", expand=True, padx=(0, 5))
+
+        self.today_btn = ctk.CTkButton(date_frame, text="T", width=30, command=lambda: self.set_relative_date(0))
+        self.today_btn.pack(side="left", padx=2)
+
+        self.yesterday_btn = ctk.CTkButton(date_frame, text="Y", width=30, command=lambda: self.set_relative_date(1))
+        self.yesterday_btn.pack(side="left", padx=2)
+
+        self.date_btn = ctk.CTkButton(date_frame, text="📅", width=40, command=self.open_calendar)
+        self.date_btn.pack(side="right", padx=(5, 0))
+
+        # 7. Description
+        self.desc_entry = ctk.CTkEntry(self, placeholder_text="Description (Optional)")
+        self.desc_entry.grid(row=7, column=0, padx=20, pady=10, sticky="ew")
+
+        # 8. Project
+        projects = [p.name for p in session.query(Project).filter_by(active_bool=True).order_by(Project.name.asc()).all()]
+        self.project_var = ctk.StringVar(value="")
+        self.project_menu = ctk.CTkOptionMenu(self, values=projects, variable=self.project_var)
+        self.project_menu.grid(row=8, column=0, padx=20, pady=10, sticky="ew")
+
+        # 9. Clear All & Save Button
+        btn_frame = ctk.CTkFrame(self, fg_color="transparent")
+        btn_frame.grid(row=9, column=0, columnspan=2, pady=30)
+        self.clear_btn = ctk.CTkButton(btn_frame, text="Clear All", fg_color="gray30", command=self.clear_all)
+        self.clear_btn.pack(side="left", padx=10)
+
+        self.save_btn = ctk.CTkButton(btn_frame, text="Save Expense", command=self.submit_data, fg_color="green")
+        self.save_btn.pack(side="left", padx=10)
+
+    def force_focus(self):
+        self.focus_force()
+        self.lift()
+        self.amount_entry.focus()
+
+    def open_calendar(self):
+        """Pops up a calendar window to select a date."""
+        if self.cal_window is not None and self.cal_window.winfo_exists():
+            self.cal_window.deiconify()
+            self.cal_window.lift()
+            self.cal_window.focus_force()
+            return
+        self.cal_window = ctk.CTkToplevel(self)
+        self.cal_window.title("Select Date")
+        self.cal_window.attributes("-topmost", False)
+
+        self.cal_window.after(10, lambda: ctk.set_appearance_mode("dark"))
+        self.cal_window.after(90, lambda: force_focus(self.cal_window))
+
+        # Standard Tkinter Calendar
+        cal = Calendar(self.cal_window, selectmode='day',
+                       year=datetime.datetime.now().year,
+                       month=datetime.datetime.now().month,
+                       day=datetime.datetime.now().day)
+        cal.pack(pady=20, padx=10)
+
+        def force_focus(window):
+            window.focus_force()
+            window.lift()
+
+        def set_date():
+            # Get date and append current time
+            selected_date = cal.selection_get()
+            now_time = datetime.datetime.now().strftime("%H:%M")
+            self.date_var.set(f"{selected_date} {now_time}")
+            self.cal_window.destroy()
+
+        ctk.CTkButton(self.cal_window, text="Confirm", command=set_date).pack(pady=10)
+
+    def clear_all(self):
+        """Resets the form to default values."""
+        self.amount_entry.delete(0, 'end')
+        self.desc_entry.delete(0, 'end')
+
+        # Reset SearchableComboBoxes to placeholders
+        self.category_combo.set(self.cat_placeholder)
+        self.category_combo._entry.configure(foreground="gray")
+
+        self.vendor_combo.set(self.ven_placeholder)
+        self.vendor_combo._entry.configure(foreground="gray")
+
+        # Reset Menus and Date
+        self.currency_var.set("EUR")
+        self.update_pm_list("EUR")
+        self.date_var.set(datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
+
+        # Put focus back at the start
+        self.amount_entry.focus()
+
+    def set_relative_date(self, days_ago):
+        """Sets the date_var to Today (0) or Yesterday (1)."""
+        target_date = datetime.datetime.now() - datetime.timedelta(days=days_ago)
+        formatted_date = target_date.strftime("%Y-%m-%d %H:%M")
+        self.date_var.set(formatted_date)
 
     def update_pm_list(self, selected_currency):
         """Filters Payment Methods based on the account's currency."""

@@ -22,7 +22,7 @@ class SearchableComboBox(ctk.CTkComboBox):
         self._entry.bind("<Down>", self._on_down_key)
 
         # Initialize Color
-        self.after(250, self._check_and_set_color)
+        self.after(300, self._check_and_set_color)
 
     def _dropdown_callback(self, value):
         """Overrides the internal CTk hook for dropdown selections."""
@@ -184,7 +184,7 @@ class AddExpenseWindow(ctk.CTkToplevel):
         date_frame.grid(row=7, column=0, padx=20, pady=10, sticky="ew")
         date_frame.grid(row=7, column=1, padx=(0, 20), pady=8, sticky="ew")
 
-        current_time = datetime.datetime.now().strftime("%H:%M")
+        current_time = datetime.datetime.now().strftime("%H:%M:%S")
         sticky_date = f"{mem['date']} {current_time}"
         self.date_var = ctk.StringVar(value=sticky_date)
         self.date_entry = ctk.CTkEntry(date_frame, textvariable=self.date_var, width=150)
@@ -305,7 +305,7 @@ class AddExpenseWindow(ctk.CTkToplevel):
         def set_date():
             # Get date and append current time
             selected_date = cal.selection_get()
-            now_time = datetime.datetime.now().strftime("%H:%M")
+            now_time = datetime.datetime.now().strftime("%H:%M:%S")
             self.date_var.set(f"{selected_date} {now_time}")
             self.cal_window.destroy()
 
@@ -329,7 +329,7 @@ class AddExpenseWindow(ctk.CTkToplevel):
         self.currency_var.set("EUR")
         self.update_pm_list("EUR")
         self.project_var.set("")
-        self.date_var.set(datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
+        self.date_var.set(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         self.update_fx_list()
 
         # Put focus back at the start
@@ -339,7 +339,7 @@ class AddExpenseWindow(ctk.CTkToplevel):
     def set_relative_date(self, days_ago):
         """Sets the date_var to Today (0) or Yesterday (1)."""
         target_date = datetime.datetime.now() - datetime.timedelta(days=days_ago)
-        formatted_date = target_date.strftime("%Y-%m-%d %H:%M")
+        formatted_date = target_date.strftime("%Y-%m-%d %H:%M:%S")
         self.date_var.set(formatted_date)
 
     def update_fx_list(self, *args):
@@ -359,11 +359,10 @@ class AddExpenseWindow(ctk.CTkToplevel):
             full_date = self.date_var.get()
             if not full_date or len(full_date) < 10:
                 return
-            current_date_str = full_date.split(" ")[0]
 
             result = self.manager.get_historical_fx_rate(
                 currency_code=selected_currency,
-                target_date=current_date_str
+                target_date=full_date
             )
 
             if result:
@@ -413,7 +412,7 @@ class AddExpenseWindow(ctk.CTkToplevel):
     def is_valid_date(self, val):
         """Checks if the date string matches the YYYY-MM-DD HH:MM format."""
         try:
-            datetime.datetime.strptime(val, "%Y-%m-%d %H:%M")
+            datetime.datetime.strptime(val, "%Y-%m-%d %H:%M:%S")
             return True
         except ValueError:
             return False
@@ -450,7 +449,7 @@ class AddExpenseWindow(ctk.CTkToplevel):
             if not amt_ok:
                 self.error_label.configure(text="⚠ Check Amount (must be a number)")
             elif not date_ok:
-                self.error_label.configure(text="⚠ Check Date format (YYYY-MM-DD HH:MM)")
+                self.error_label.configure(text="⚠ Check Date format (YYYY-MM-DD HH:MM:SS)")
             elif not fx_ok:
                 self.error_label.configure(text="⚠ Check Exchange Rate (must be a number)")
             elif not pm_ok:
@@ -465,7 +464,7 @@ class AddExpenseWindow(ctk.CTkToplevel):
             amt = float(self.amount_entry.get().replace(",", "."))
             cur = self.currency_var.get()
             pm = self.pm_menu.get()
-            ts = datetime.datetime.strptime(self.date_var.get(), "%Y-%m-%d %H:%M")
+            ts = datetime.datetime.strptime(self.date_var.get(), "%Y-%m-%d %H:%M:%S")
 
             # 2. FX Rate Logic
             if cur == "EUR":
@@ -519,7 +518,7 @@ class FinanceApp(ctk.CTk):
         self.title("Venn Ledger 2026")
         self.geometry("1300x700")
         self.minsize(1300, 700)
-        self.maxsize(1300, 700)
+        self.maxsize(1300,980)
         ctk.set_appearance_mode("dark")
         self.manager = finance_manager.TransactionManager(session)
 
@@ -610,14 +609,14 @@ class FinanceApp(ctk.CTk):
     def load_transactions(self):
         """Fetches transactions and renders them as rows."""
         self.update_idletasks()
-        # For performance in CustomTkinter, let's start with the last 100
+        # For performance in CustomTkinter, let's start with the last 40
         # We can add 'Load More' later.
         for widget in self.scroll_frame.winfo_children():
             widget.destroy()
 
         char_limit = self.get_dynamic_char_limit()
 
-        expenses = session.query(Expense).order_by(desc(Expense.timestamp)).limit(100).all()
+        expenses = session.query(Expense).order_by(desc(Expense.timestamp)).limit(40).all()
 
         for exp in expenses:
             row = ctk.CTkFrame(self.scroll_frame, fg_color="gray15")

@@ -113,6 +113,7 @@ class AddExpenseWindow(ctk.CTkToplevel):
         self.minsize(450,585)
         self.maxsize(450,585)
         self.manager = manager
+        mem = self.manager.last_used
 
         # Ensure it stays on top and grabs focus
         self.after(100, self.force_focus)
@@ -155,7 +156,7 @@ class AddExpenseWindow(ctk.CTkToplevel):
 
         # 2. Currency (Dropdown)
         currencies = [c.code for c in session.query(Currency).filter_by(active_bool=True).order_by(Currency.code.asc()).all()]
-        self.currency_var = ctk.StringVar(value="EUR")
+        self.currency_var = ctk.StringVar(value=mem["currency"])
         self.currency_menu = ctk.CTkOptionMenu(self, values=currencies, variable=self.currency_var, command=self.update_pm_list)
 
         # 3. Exchange Rate (Automatically changes based on Date and Currency)
@@ -183,7 +184,9 @@ class AddExpenseWindow(ctk.CTkToplevel):
         date_frame.grid(row=7, column=0, padx=20, pady=10, sticky="ew")
         date_frame.grid(row=7, column=1, padx=(0, 20), pady=8, sticky="ew")
 
-        self.date_var = ctk.StringVar(value=datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
+        current_time = datetime.datetime.now().strftime("%H:%M")
+        sticky_date = f"{mem['date']} {current_time}"
+        self.date_var = ctk.StringVar(value=sticky_date)
         self.date_entry = ctk.CTkEntry(date_frame, textvariable=self.date_var, width=150)
         self.date_entry.pack(side="left", fill="x", expand=True, padx=(0, 5))
 
@@ -198,7 +201,9 @@ class AddExpenseWindow(ctk.CTkToplevel):
 
         # 7. Payment Method
         self.pm_menu = ctk.CTkOptionMenu(self, values=[])
-        self.update_pm_list("EUR")
+        self.update_pm_list(mem["currency"])
+        if mem["pm"] in self.pm_menu.cget("values"):
+            self.pm_menu.set(mem["pm"])
 
         # 8. Description
         self.desc_entry = ctk.CTkEntry(self)
@@ -209,7 +214,7 @@ class AddExpenseWindow(ctk.CTkToplevel):
 
         # 9. Project
         projects = [p.name for p in session.query(Project).filter_by(active_bool=True).order_by(Project.name.asc()).all()]
-        self.project_var = ctk.StringVar(value="")
+        self.project_var = ctk.StringVar(value=mem["project"])
         self.project_menu = ctk.CTkOptionMenu(self, values=projects, variable=self.project_var)
 
         # Draw label + fields
@@ -493,10 +498,16 @@ class AddExpenseWindow(ctk.CTkToplevel):
                 timestamp=ts
             )
 
-            # 5. Success Flash
+            # 5. Refresh data
+            if hasattr(self.master, "refresh_accounts"):
+                self.master.refresh_accounts()
+            if hasattr(self.master, "load_transactions"):
+                self.master.load_transactions()
+
+            # 6. Success Flash
             self.save_btn.configure(text="✔ Added!", fg_color="darkgreen", state="disabled")
             self.error_label.configure(text="Expense saved successfully", text_color="green")
-            self.after(1500, self.destroy)
+            self.after(1000, self.destroy)
 
         except Exception as e:
             self.error_label.configure(text=f"⚠ Database Error: {str(e)}", text_color="red")
@@ -524,6 +535,12 @@ class FinanceApp(ctk.CTk):
         self.add_btn = ctk.CTkButton(self.sidebar, text="+ Add Expense", command=self.open_add_expense)
         self.add_btn.pack(pady=20, padx=20)
 
+        self.nw_frame = ctk.CTkFrame(self.sidebar, fg_color="gray15", corner_radius=8)
+        self.nw_frame.pack(fill="x", pady=(0, 15), padx=15)
+
+        self.acc_scroll = ctk.CTkScrollableFrame(self.sidebar, fg_color="transparent", label_text="Accounts")
+        self.acc_scroll.pack(fill="both", expand=True, padx=5, pady=5)
+
         # Account List
         self.refresh_accounts()
 
@@ -541,17 +558,47 @@ class FinanceApp(ctk.CTk):
         self.load_transactions()
 
     def refresh_accounts(self):
-        """Builds the account buttons in the sidebar."""
+        """Builds the account buttons and the Net Worth summary."""
+        for widget in self.nw_frame.winfo_children():
+            if widget not in [self.logo, self.add_btn]:
+                widget.destroy()
+
+        # Net Worth
+        net_worth = self.manager.get_net_worth()
+
+        ctk.CTkLabel(self.nw_frame, text="TOTAL NET WORTH", font=("Arial", 10, "bold"), text_color="gray").pack(pady=(8, 0))
+        ctk.CTkLabel(self.nw_frame, text=f"€ {net_worth:,.2f}", font=("Arial", 18, "bold"), text_color="#4CD964").pack(
+            pady=(0, 8))
+
+        # Account cards
+        for widget in self.acc_scroll.winfo_children():
+            widget.destroy()
+
         accounts = session.query(Account).order_by(Account.name.asc()).all()
+
         for acc in accounts:
-            acc_text = f"{acc.name}\n{acc.balance:,.2f} {acc.currency_code}"
-            btn = ctk.CTkButton(self.sidebar, text=acc_text, fg_color="gray20", hover_color="gray30")
-            btn.pack(pady=5, padx=20, fill="x")
+            # Compact Card
+            acc_card = ctk.CTkFrame(self.acc_scroll, fg_color="gray20", corner_radius=4)
+            acc_card.pack(pady=2, padx=5, fill="x")
+
+            # Row 1: Name
+            ctk.CTkLabel(acc_card, text=acc.name.upper(),
+                         font=("Arial", 10),
+                         anchor="w", height=15).pack(fill="x", padx=10, pady=(5, 0))
+
+            # Row 2: Balance
+            bal_color = "#FF6B6B" if acc.balance < 0 else "white"
+            ctk.CTkLabel(acc_card, text=f"{acc.balance:,.2f} {acc.currency_code}",
+                         font=("Arial", 12, "bold"), text_color=bal_color,
+                         anchor="w", height=20).pack(fill="x", padx=10, pady=(0, 5))
 
     def load_transactions(self):
         """Fetches transactions and renders them as rows."""
         # For performance in CustomTkinter, let's start with the last 100
         # We can add 'Load More' later.
+        for widget in self.scroll_frame.winfo_children():
+            widget.destroy()
+
         expenses = session.query(Expense).order_by(desc(Expense.timestamp)).limit(100).all()
 
         for exp in expenses:

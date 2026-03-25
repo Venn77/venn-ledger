@@ -11,6 +11,12 @@ import datetime
 class TransactionManager:
     def __init__(self, session):
         self.session = session
+        self.last_used = {
+            "currency": "EUR",
+            "pm": "",
+            "project": "",
+            "date": datetime.datetime.now().strftime("%Y-%m-%d")
+        }
 
     def _get_or_create_dimension(self, model, name):
         """
@@ -81,10 +87,21 @@ class TransactionManager:
         try:
             self.session.add(new_expense)
             self.session.commit()
-            return new_expense
         except Exception as e:
             self.session.rollback()
             raise e
+
+        # Update the Memory after a successful save
+        self.last_used["currency"] = currency_code
+        self.last_used["pm"] = payment_method_name
+        self.last_used["project"] = project_name
+        # Store just the date part
+        if timestamp and hasattr(timestamp, 'strftime'):
+            self.last_used["date"] = timestamp.strftime("%Y-%m-%d")
+        else:
+            self.last_used["date"] = datetime.datetime.now().strftime("%Y-%m-%d")
+
+        return new_expense
 
     def add_gain(self, amount, currency_code, account_id, exchange_rate=None, stream_name=None, payer_name=None,
                     project_name=None, description=None,
@@ -151,6 +168,26 @@ class TransactionManager:
             return rate_entry.fx_multiplier, rate_entry.timestamp
 
         return None
+
+    def get_net_worth(self):
+        """Calculates total balance of all accounts, converted to EUR."""
+        accounts = self.session.query(Account).all()
+        total_eur = 0.0
+
+        for acc in accounts:
+            if acc.currency_code == "EUR":
+                total_eur += float(Decimal(str(acc.balance)))
+            else:
+                # Get the latest rate
+                rate = (self.session.query(ExchangeRate)
+                        .filter(ExchangeRate.currency_code == acc.currency_code)
+                        .order_by(ExchangeRate.timestamp.desc())
+                        .first())
+
+                multiplier = rate.fx_multiplier if rate else 1.0
+                total_eur += float(Decimal(str(acc.balance))) / multiplier
+
+        return total_eur
 
     def transfer_funds(self, origin_id, destination_id, amount_orig, amount_dest, desc, ts=None):
         """Transfers funds between two accounts."""

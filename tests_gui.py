@@ -517,7 +517,9 @@ class FinanceApp(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("Venn Ledger 2026")
-        self.geometry("1100x700")
+        self.geometry("1300x700")
+        self.minsize(1300, 700)
+        self.maxsize(1300, 700)
         ctk.set_appearance_mode("dark")
         self.manager = finance_manager.TransactionManager(session)
 
@@ -557,11 +559,24 @@ class FinanceApp(ctk.CTk):
 
         self.load_transactions()
 
+    def get_dynamic_char_limit(self):
+        """Calculates how many characters can fit in the Description gap."""
+        self.update_idletasks()
+        current_width = 1300
+        # Sum of static widths + sidebar:
+        static_space = 800+250
+
+        available_pixels = current_width - static_space
+
+        # Rule of thumb: Average character in Arial 11 is ~7-8 pixels
+        char_limit = int(available_pixels / 7)
+
+        return max(20, char_limit)
+
     def refresh_accounts(self):
         """Builds the account buttons and the Net Worth summary."""
         for widget in self.nw_frame.winfo_children():
-            if widget not in [self.logo, self.add_btn]:
-                widget.destroy()
+            widget.destroy()
 
         # Net Worth
         net_worth = self.manager.get_net_worth()
@@ -594,10 +609,13 @@ class FinanceApp(ctk.CTk):
 
     def load_transactions(self):
         """Fetches transactions and renders them as rows."""
+        self.update_idletasks()
         # For performance in CustomTkinter, let's start with the last 100
         # We can add 'Load More' later.
         for widget in self.scroll_frame.winfo_children():
             widget.destroy()
+
+        char_limit = self.get_dynamic_char_limit()
 
         expenses = session.query(Expense).order_by(desc(Expense.timestamp)).limit(100).all()
 
@@ -605,16 +623,55 @@ class FinanceApp(ctk.CTk):
             row = ctk.CTkFrame(self.scroll_frame, fg_color="gray15")
             row.pack(fill="x", pady=2, padx=5)
 
+            # Hover Effect
+            def on_enter(e, r=row):
+                r.configure(fg_color="gray25")
+
+            def on_leave(e, r=row):
+                r.configure(fg_color="gray15")
+
+            # Bind to the frame itself
+            row.bind("<Enter>", on_enter)
+            row.bind("<Leave>", on_leave)
+
             # Row Content
+            # Date
             date_str = exp.timestamp.strftime("%Y-%m-%d")
             ctk.CTkLabel(row, text=date_str, width=100).pack(side="left", padx=10)
-            ctk.CTkLabel(row, text=f"{exp.vendor.name}", width=150, anchor="w").pack(side="left", padx=10)
-            ctk.CTkLabel(row, text=f"{exp.category.name}", width=120).pack(side="left", padx=10)
-
-            # Highlight amount in red
+            # Vendor
+            ven_name = exp.vendor.name if exp.vendor else "Unknown"
+            ctk.CTkLabel(row, text=f"{ven_name}", width=150, anchor="w").pack(side="left", padx=10)
+            # Amount
             amt_text = f"-{exp.amount:,.2f} {exp.currency_code}"
-            ctk.CTkLabel(row, text=amt_text, text_color="#FF6B6B", font=("Arial", 12, "bold")).pack(side="right",
-                                                                                                    padx=10)
+            ctk.CTkLabel(row, text=amt_text, text_color="#FF6B6B", font=("Arial", 12, "bold"), width=100,
+                         anchor="e").pack(side="right", padx=10)
+            # Category
+            cat_name = exp.category.name if exp.category else "Uncategorized"
+            ctk.CTkLabel(row, text=f"{cat_name}", width=120).pack(side="left", padx=10)
+            # PM
+            pm_name = exp.payment_method.name if exp.payment_method else "???"
+            ctk.CTkLabel(row, text=pm_name, width=100, anchor="w", text_color="gray60").pack(side="left", padx=10)
+            # Project
+            proj_text = f"[{exp.project.name}]" if exp.project and exp.project.name else ""
+            ctk.CTkLabel(row, text=proj_text, width=100, anchor="w", text_color="#5AC8FA").pack(side="left", padx=10)
+            # Description
+            raw_desc = exp.description if exp.description else ""
+            if len(raw_desc) > char_limit:
+                display_desc = raw_desc[:char_limit].strip() + "..."
+            else:
+                display_desc = raw_desc
+            # We use a larger width or let it expand if needed
+            lbl_desc = ctk.CTkLabel(row, text=display_desc, anchor="w", font=("Arial", 11), text_color="gray50")
+            lbl_desc.pack(side="left", padx=10, fill="x", expand=True)
+
+            # Description ToolTip
+            if raw_desc:
+                ToolTip(lbl_desc, raw_desc)
+
+            # Propagate Hover
+            for child in row.winfo_children():
+                child.bind("<Enter>", on_enter)
+                child.bind("<Leave>", on_leave)
 
     def open_add_expense(self):
         AddExpenseWindow(self, self.manager)

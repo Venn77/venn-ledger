@@ -184,9 +184,9 @@ class AddExpenseWindow(ctk.CTkToplevel):
         date_frame.grid(row=7, column=0, padx=20, pady=10, sticky="ew")
         date_frame.grid(row=7, column=1, padx=(0, 20), pady=8, sticky="ew")
 
-        current_time = datetime.datetime.now().strftime("%H:%M:%S")
-        sticky_date = f"{mem['date']} {current_time}"
-        self.date_var = ctk.StringVar(value=sticky_date)
+        self.session_time = datetime.datetime.now().strftime("%H:%M:%S")
+        initial_date = f"{mem['date']} {self.session_time}"
+        self.date_var = ctk.StringVar(value=initial_date)
         self.date_entry = ctk.CTkEntry(date_frame, textvariable=self.date_var, width=150)
         self.date_entry.pack(side="left", fill="x", expand=True, padx=(0, 5))
 
@@ -277,6 +277,16 @@ class AddExpenseWindow(ctk.CTkToplevel):
         self.lift()
         self.amount_entry.focus()
 
+    def get_current_time_part(self):
+        """Extracts the HH:MM:SS part from the current entry, falling back to session_time."""
+        current_val = self.date_var.get()
+        try:
+            if " " in current_val:
+                return current_val.split(" ")[1]
+            return self.session_time
+        except:
+            return self.session_time
+
     def open_calendar(self):
         """Pops up a calendar window to select a date."""
         if self.cal_window is not None and self.cal_window.winfo_exists():
@@ -292,10 +302,15 @@ class AddExpenseWindow(ctk.CTkToplevel):
         self.cal_window.after(90, lambda: force_focus(self.cal_window))
 
         # Standard Tkinter Calendar
+        try:
+            current_val = self.date_var.get().split(" ")[0]
+            start_date = datetime.datetime.strptime(current_val, "%Y-%m-%d")
+        except:
+            start_date = datetime.datetime.now()
         cal = Calendar(self.cal_window, selectmode='day',
-                       year=datetime.datetime.now().year,
-                       month=datetime.datetime.now().month,
-                       day=datetime.datetime.now().day)
+                       year=start_date.year,
+                       month=start_date.month,
+                       day=start_date.day)
         cal.pack(pady=20, padx=10)
 
         def force_focus(window):
@@ -303,10 +318,10 @@ class AddExpenseWindow(ctk.CTkToplevel):
             window.lift()
 
         def set_date():
+            active_time = self.get_current_time_part()
             # Get date and append current time
             selected_date = cal.selection_get()
-            now_time = datetime.datetime.now().strftime("%H:%M:%S")
-            self.date_var.set(f"{selected_date} {now_time}")
+            self.date_var.set(f"{selected_date} {active_time}")
             self.cal_window.destroy()
 
         ctk.CTkButton(self.cal_window, text="Confirm", command=set_date).pack(pady=10)
@@ -337,9 +352,14 @@ class AddExpenseWindow(ctk.CTkToplevel):
         self.amount_entry.focus()
 
     def set_relative_date(self, days_ago):
-        """Sets the date_var to Today (0) or Yesterday (1)."""
+        """
+        Sets the date_var to Today (0) or Yesterday (1).
+        Keeps the time.
+        """
+        active_time = self.get_current_time_part()
         target_date = datetime.datetime.now() - datetime.timedelta(days=days_ago)
-        formatted_date = target_date.strftime("%Y-%m-%d %H:%M:%S")
+        date_part = target_date.strftime("%Y-%m-%d")
+        formatted_date = f"{date_part} {active_time}"
         self.date_var.set(formatted_date)
 
     def update_fx_list(self, *args):
@@ -497,20 +517,26 @@ class AddExpenseWindow(ctk.CTkToplevel):
                 timestamp=ts
             )
 
-            # 5. Refresh data
-            if hasattr(self.master, "refresh_accounts"):
-                self.master.refresh_accounts()
-            if hasattr(self.master, "load_transactions"):
-                self.master.load_transactions()
-
-            # 6. Success Flash
+            # 5. Success Flash
             self.save_btn.configure(text="✔ Added!", fg_color="darkgreen", state="disabled")
             self.error_label.configure(text="Expense saved successfully", text_color="green")
-            self.after(1000, self.destroy)
+
+            # 6. Wait & Refresh Main
+            self.after(1000, self.finalize_and_refresh)
 
         except Exception as e:
             self.error_label.configure(text=f"⚠ Database Error: {str(e)}", text_color="red")
             print(f"Submission Error: {e}")
+
+    def finalize_and_refresh(self):
+        """Kills the popup and triggers the main app reload."""
+        main_app = self.master
+
+        self.destroy()
+
+        if hasattr(main_app, "refresh_accounts") and hasattr(main_app, "load_transactions"):
+            main_app.after(10, main_app.refresh_accounts)
+            main_app.after(50, main_app.load_transactions)
 
 class FinanceApp(ctk.CTk):
     def __init__(self):
@@ -616,7 +642,7 @@ class FinanceApp(ctk.CTk):
 
         char_limit = self.get_dynamic_char_limit()
 
-        expenses = session.query(Expense).order_by(desc(Expense.timestamp)).limit(40).all()
+        expenses = session.query(Expense).order_by(desc(Expense.timestamp)).order_by(desc(Expense.id)).limit(40).all()
 
         for exp in expenses:
             row = ctk.CTkFrame(self.scroll_frame, fg_color="gray15")

@@ -5,7 +5,7 @@ from models import (
 )
 from sqlalchemy import desc
 from tkcalendar import Calendar
-import finance_manager, datetime
+import finance_manager, datetime, json, os
 
 
 class SearchableComboBox(ctk.CTkComboBox):
@@ -566,6 +566,10 @@ class FinanceApp(ctk.CTk):
         self.grid_rowconfigure(0, weight=1)
 
         # 2. Sidebar (Accounts & Quick Actions)
+        self.reorder_mode = False
+        self.selected_account_id = None
+        self.filter_account_id = None
+
         self.sidebar = ctk.CTkFrame(self, width=250, corner_radius=0)
         self.sidebar.grid(row=0, column=0, sticky="nsew")
 
@@ -577,6 +581,10 @@ class FinanceApp(ctk.CTk):
 
         self.nw_frame = ctk.CTkFrame(self.sidebar, fg_color="gray15", corner_radius=8)
         self.nw_frame.pack(fill="x", pady=(0, 15), padx=15)
+
+        self.reorder_btn = ctk.CTkButton(self.sidebar, text="⇅ Reorder Accounts", fg_color="transparent",
+                                         border_width=1, command=self.toggle_reorder_mode)
+        self.reorder_btn.pack(pady=(10, 20), padx=20, fill="x")
 
         self.acc_scroll = ctk.CTkScrollableFrame(self.sidebar, fg_color="transparent", label_text="Accounts")
         self.acc_scroll.pack(fill="both", expand=True, padx=5, pady=5)
@@ -594,6 +602,8 @@ class FinanceApp(ctk.CTk):
         # 4. Scrollable Table
         self.scroll_frame = ctk.CTkScrollableFrame(self.main_frame, label_text="History")
         self.scroll_frame.pack(fill="both", expand=True)
+
+        self.selected_account_id = None
 
         self.load_transactions()
 
@@ -627,12 +637,54 @@ class FinanceApp(ctk.CTk):
         for widget in self.acc_scroll.winfo_children():
             widget.destroy()
 
-        accounts = session.query(Account).order_by(Account.name.asc()).all()
+        accounts = {a.id: a for a in session.query(Account).order_by(Account.name.asc()).all()}
+        saved_order = self.load_account_order()
 
-        for acc in accounts:
+        ordered_ids = [aid for aid in saved_order if aid in accounts]
+        new_ids = [aid for aid in accounts.keys() if aid not in ordered_ids]
+        final_order = ordered_ids + new_ids
+
+        if new_ids:
+            self.save_account_order(final_order)
+
+        for acc_id in final_order:
+            acc = accounts[acc_id]
+
+            is_filtered = (not self.reorder_mode and acc.id == self.filter_account_id)
+            is_selected_swap = (self.reorder_mode and acc.id == self.selected_account_id)
+
+            # Base colors
+            if is_selected_swap:
+                base_bg = "gray25"
+                border_col = "#4CD964"  # Green
+                border_w = 2
+            elif is_filtered:
+                base_bg = "#1f538d"  # Blue
+                border_col = base_bg
+                border_w = 0
+            else:
+                base_bg = "gray20"
+                border_col = base_bg
+                border_w = 0
+
+            # Hover colors
+            hover_bg = "#2c5d8f" if is_filtered else "gray30"
+
             # Compact Card
-            acc_card = ctk.CTkFrame(self.acc_scroll, fg_color="gray20", corner_radius=4)
+            acc_card = ctk.CTkFrame(self.acc_scroll, fg_color=base_bg, border_color=border_col, border_width=border_w, corner_radius=4)
             acc_card.pack(pady=2, padx=5, fill="x")
+
+            # Hover Effect
+            def on_enter(e, card=acc_card, h_bg=hover_bg):
+                card.configure(fg_color=h_bg)
+
+            def on_leave(e, card=acc_card, b_bg=base_bg):
+                card.configure(fg_color=b_bg)
+
+            # Bind to the frame itself
+            acc_card.bind("<Enter>", on_enter)
+            acc_card.bind("<Leave>", on_leave)
+            acc_card.bind("<Button-1>", lambda e, aid=acc.id: self.handle_account_click(aid))
 
             # Row 1: Name
             ctk.CTkLabel(acc_card, text=acc.name.upper(),
@@ -645,6 +697,66 @@ class FinanceApp(ctk.CTk):
                          font=("Arial", 12, "bold"), text_color=bal_color,
                          anchor="w", height=20).pack(fill="x", padx=10, pady=(0, 5))
 
+            for child in acc_card.winfo_children():
+                child.bind("<Button-1>", lambda e, aid=acc.id: self.handle_account_click(aid))
+                child.bind("<Enter>", on_enter)
+                child.bind("<Leave>", on_leave)
+
+    def toggle_reorder_mode(self):
+        self.reorder_mode = not self.reorder_mode
+        self.selected_account_id = None
+        color = "#1f538d" if self.reorder_mode else "transparent"
+        self.reorder_btn.configure(fg_color=color)
+        self.refresh_accounts()
+
+    def load_account_order(self):
+        """Loads the account ID order from a local JSON file."""
+        try:
+            if os.path.exists("config.json"):
+                with open("config.json", "r") as f:
+                    return json.load(f).get("account_order", [])
+        except (json.decoder.JSONDecodeError, IOError):
+            return[]
+        return []
+
+    def save_account_order(self, order_list):
+        """Saves the current list of account IDs to JSON."""
+        config = {}
+        if os.path.exists("config.json"):
+            with open("config.json", "r") as f:
+                config = json.load(f)
+
+        config["account_order"] = order_list
+        with open("config.json", "w") as f:
+            json.dump(config, f)
+
+    def handle_account_click(self, account_id):
+        if self.reorder_mode:
+            # Swap
+            if self.selected_account_id is None:
+                self.selected_account_id = account_id
+                self.refresh_accounts()
+            else:
+                order = self.load_account_order()
+                if self.selected_account_id not in order: order.append(self.selected_account_id)
+                if account_id not in order: order.append(account_id)
+
+                idx1, idx2 = order.index(self.selected_account_id), order.index(account_id)
+                order[idx1], order[idx2] = order[idx2], order[idx1]
+
+                self.save_account_order(order)
+                self.selected_account_id = None
+                self.refresh_accounts()
+        else:
+            # Filter
+            if self.filter_account_id == account_id:
+                self.filter_account_id = None
+            else:
+                self.filter_account_id = account_id
+
+            self.refresh_accounts()
+            self.load_transactions()
+
     def load_transactions(self):
         """Fetches transactions and renders them as rows."""
         self.update_idletasks()
@@ -655,7 +767,10 @@ class FinanceApp(ctk.CTk):
 
         char_limit = self.get_dynamic_char_limit()
 
-        expenses = session.query(Expense).order_by(desc(Expense.timestamp)).order_by(desc(Expense.id)).limit(40).all()
+        if self.filter_account_id:
+            expenses = session.query(Expense).join(PaymentMethod).join(Account).filter(Account.id == self.filter_account_id).order_by(desc(Expense.timestamp)).order_by(desc(Expense.id)).limit(40).all()
+        else:
+            expenses = session.query(Expense).order_by(desc(Expense.timestamp)).order_by(desc(Expense.id)).limit(40).all()
 
         for exp in expenses:
             row = ctk.CTkFrame(self.scroll_frame, fg_color="gray15")

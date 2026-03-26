@@ -5,6 +5,7 @@ from models import (
     Stream, Payer, Gain
 )
 from decimal import Decimal
+from sqlalchemy import func
 import datetime
 
 
@@ -153,6 +154,18 @@ class TransactionManager:
         except Exception as e:
             self.session.rollback()
             raise e
+
+    def check_for_duplicate(self, amount, vendor_name, date_str):
+        """Returns True if an expense with same amount, vendor, and date exists."""
+        target_date = date_str.split(" ")[0]
+
+        exists = self.session.query(Expense).join(Vendor).filter(
+            Expense.amount == amount,
+            Vendor.name == vendor_name,
+            func.date(Expense.timestamp) == target_date
+        ).first()
+
+        return exists is not None
 
     def get_historical_fx_rate(self, currency_code, target_date):
         """

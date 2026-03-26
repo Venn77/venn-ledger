@@ -462,10 +462,23 @@ class AddExpenseWindow(ctk.CTkToplevel):
 
         # 4. Toggle Button State
         if amt_ok and date_ok and cur_ok and pm_ok and fx_ok:
-            self.save_btn.configure(state="normal", fg_color="green")
-            self.error_label.configure(text="")
+            try:
+                current_amt = float(self.amount_entry.get().replace(",", "."))
+                current_vendor = self.vendor_combo.get().strip()
+                current_date = self.date_var.get()
+
+                is_duplicate = self.manager.check_for_duplicate(current_amt, current_vendor, current_date)
+
+                if is_duplicate:
+                    self.save_btn.configure(state="normal", fg_color="#EBCB8B", text_color="black")
+                    self.error_label.configure(text="⚠ Potential duplicate detected!", text_color="orange")
+                else:
+                    self.save_btn.configure(state="normal", fg_color="green", text_color="white")
+                    self.error_label.configure(text="")
+            except:
+                self.save_btn.configure(state="normal", fg_color="green", text_color="white")
         else:
-            self.save_btn.configure(state="disabled", fg_color="gray30")
+            self.save_btn.configure(state="disabled", fg_color="gray30", text_color="white")
             if not amt_ok:
                 self.error_label.configure(text="⚠ Check Amount (must be a number)")
             elif not date_ok:

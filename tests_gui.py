@@ -338,6 +338,7 @@ class AddExpenseWindow(ctk.CTkToplevel):
         # Reset SearchableComboBoxes to placeholders
         for combo in [self.category_combo, self.vendor_combo]:
             combo.set(combo.placeholder)
+            # noinspection PyProtectedMember
             combo._entry.configure(foreground="gray")
 
         # Reset Menus and Date
@@ -599,15 +600,24 @@ class FinanceApp(ctk.CTk):
         self.header = ctk.CTkLabel(self.main_frame, text="Recent Transactions", font=("Arial", 22, "bold"))
         self.header.pack(anchor="w", pady=(0, 20))
 
-        # 4. Scrollable Table
+        # 4. Transaction Counter
+        self.transaction_counter_lbl = ctk.CTkLabel(
+            self.main_frame,
+            text="Showing 0 of 0 transactions",
+            font=("Arial", 11),
+            text_color="gray50"
+        )
+        self.transaction_counter_lbl.pack(pady=(0, 5), anchor="e", padx=20)
+
+        # 5. Scrollable Table
         self.scroll_frame = ctk.CTkScrollableFrame(self.main_frame, label_text="History")
         self.scroll_frame.pack(fill="both", expand=True)
 
         self.selected_account_id = None
 
-        self.current_offset = 0
+        self.current_page = 0
         self.page_size = 40
-        self.load_more_btn = None
+        self.total_pages = 0
 
         self.load_transactions()
 
@@ -757,28 +767,34 @@ class FinanceApp(ctk.CTk):
                 self.filter_account_id = None
             else:
                 self.filter_account_id = account_id
+            self.current_page = 0
+            self.update_idletasks()
+            if hasattr(self.scroll_frame, "_parent_canvas"):
+                # noinspection PyProtectedMember
+                self.scroll_frame._parent_canvas.yview_moveto(0)
 
             self.refresh_accounts()
             self.load_transactions()
 
-    def load_transactions(self, append=False):
-        """
-        Fetches transactions and renders them as rows.
-        If append is True, adds them to the bottom.
-        """
+    def load_transactions(self):
+        """Fetches a page of transactions and renders them as rows."""
         self.update_idletasks()
 
-        if not append:
-            self.current_offset = 0
-            for widget in self.scroll_frame.winfo_children():
-                widget.destroy()
+        for widget in self.scroll_frame.winfo_children():
+            widget.destroy()
 
         query = session.query(Expense)
 
         if self.filter_account_id:
             query = query.join(PaymentMethod).join(Account).filter(Account.id == self.filter_account_id)
 
-        expenses = query.order_by(desc(Expense.timestamp)).order_by(desc(Expense.id)).offset(self.current_offset).limit(self.page_size).all()
+        total_count = query.count()
+
+        self.total_pages = (total_count + self.page_size - 1) // self.page_size
+
+        offset = self.current_page * self.page_size
+
+        expenses = query.order_by(desc(Expense.timestamp)).order_by(desc(Expense.id)).offset(offset).limit(self.page_size).all()
 
         char_limit = self.get_dynamic_char_limit()
 
@@ -787,8 +803,7 @@ class FinanceApp(ctk.CTk):
         for exp in expenses:
             self.render_transaction_row(exp, char_limit, ven_char_limit)
 
-        self.current_offset += len(expenses)
-        self.render_load_more_button(len(expenses) == self.page_size)
+        self.update_pagination_ui(total_count)
 
     def render_transaction_row(self, exp, char_limit, ven_char_limit):
         """Creates row frame and labels."""
@@ -856,22 +871,54 @@ class FinanceApp(ctk.CTk):
             child.bind("<Enter>", on_enter)
             child.bind("<Leave>", on_leave)
 
-    def render_load_more_button(self, show):
-        """Adds or removes the Load More button at the end of the list."""
-        if self.load_more_btn is not None:
-            self.load_more_btn.destroy()
-            self.load_more_btn = None
+    def update_pagination_ui(self, total_count):
+        """Updates the counter and the Next/Prev buttons."""
+        start_idx = (self.current_page * self.page_size) + 1
+        end_idx = min(start_idx + self.page_size - 1, total_count)
 
-        if show:
-            self.load_more_btn = ctk.CTkButton(
-                self.scroll_frame,
-                text="Load More Transactions...",
-                fg_color="transparent",
-                text_color="gray60",
-                hover_color="gray25",
-                command=lambda: self.load_transactions(append=True)
+        if total_count == 0:
+            self.transaction_counter_lbl.configure(text="No transactions found")
+        else:
+            self.transaction_counter_lbl.configure(
+                text=f"Showing {start_idx}-{end_idx} of {total_count} transactions"
             )
-            self.load_more_btn.pack(pady=20, fill="x")
+
+        self.render_pagination_controls()
+
+    def next_page(self):
+        if self.current_page < self.total_pages - 1:
+            self.current_page += 1
+            self.load_transactions()
+
+    def prev_page(self):
+        if self.current_page > 0:
+            self.current_page -= 1
+            self.load_transactions()
+
+    def render_pagination_controls(self):
+        """Creates the Prev/Next button row at the bottom."""
+        nav_frame = ctk.CTkFrame(self.scroll_frame, fg_color="transparent")
+        nav_frame.pack(pady=20, fill="x")
+
+        # Previous Button
+        prev_state = "normal" if self.current_page > 0 else "disabled"
+        btn_prev = ctk.CTkButton(
+            nav_frame, text="← Previous", width=100, state=prev_state,
+            command=self.prev_page, fg_color="gray30"
+        )
+        btn_prev.pack(side="left", padx=20, expand=True)
+
+        # Page Indicator
+        lbl_page = ctk.CTkLabel(nav_frame, text=f"Page {self.current_page + 1} of {max(1, self.total_pages)}")
+        lbl_page.pack(side="left")
+
+        # Next Button
+        next_state = "normal" if self.current_page < self.total_pages - 1 else "disabled"
+        btn_next = ctk.CTkButton(
+            nav_frame, text="Next →", width=100, state=next_state,
+            command=self.next_page, fg_color="gray30"
+        )
+        btn_next.pack(side="left", padx=20, expand=True)
 
     def open_add_expense(self):
         AddExpenseWindow(self, self.manager)

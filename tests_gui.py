@@ -767,10 +767,14 @@ class FinanceApp(ctk.CTk):
 
         char_limit = self.get_dynamic_char_limit()
 
+        ven_char_limit = char_limit - 17
+
+        query = session.query(Expense)
+
         if self.filter_account_id:
-            expenses = session.query(Expense).join(PaymentMethod).join(Account).filter(Account.id == self.filter_account_id).order_by(desc(Expense.timestamp)).order_by(desc(Expense.id)).limit(40).all()
-        else:
-            expenses = session.query(Expense).order_by(desc(Expense.timestamp)).order_by(desc(Expense.id)).limit(40).all()
+            query = query.join(PaymentMethod).join(Account).filter(Account.id == self.filter_account_id)
+
+        expenses = query.order_by(desc(Expense.timestamp)).order_by(desc(Expense.id)).limit(40).all()
 
         for exp in expenses:
             row = ctk.CTkFrame(self.scroll_frame, fg_color="gray15")
@@ -793,11 +797,18 @@ class FinanceApp(ctk.CTk):
             ctk.CTkLabel(row, text=date_str, width=100).pack(side="left", padx=10)
             # Vendor
             ven_name = exp.vendor.name if exp.vendor else "Unknown"
-            ctk.CTkLabel(row, text=f"{ven_name}", width=150, anchor="w").pack(side="left", padx=10)
+
+            if len(ven_name) > ven_char_limit:
+                display_ven = ven_name[:ven_char_limit].strip() + "..."
+            else:
+                display_ven = ven_name
+
+            lbl_ven = ctk.CTkLabel(row, text=f"{display_ven}", width=150, anchor="w")
+            lbl_ven.pack(side="left", padx=10)
             # Amount
             amt_text = f"-{exp.amount:,.2f} {exp.currency_code}"
-            ctk.CTkLabel(row, text=amt_text, text_color="#FF6B6B", font=("Arial", 12, "bold"), width=100,
-                         anchor="e").pack(side="right", padx=10)
+            lbl_amt = ctk.CTkLabel(row, text=amt_text, text_color="#FF6B6B", font=("Arial", 12, "bold"), width=100, anchor="e")
+            lbl_amt.pack(side="right", padx=10)
             # Category
             cat_name = exp.category.name if exp.category else "Uncategorized"
             ctk.CTkLabel(row, text=f"{cat_name}", width=120).pack(side="left", padx=10)
@@ -813,13 +824,16 @@ class FinanceApp(ctk.CTk):
                 display_desc = raw_desc[:char_limit].strip() + "..."
             else:
                 display_desc = raw_desc
-            # We use a larger width or let it expand if needed
             lbl_desc = ctk.CTkLabel(row, text=display_desc, anchor="w", font=("Arial", 11), text_color="gray50")
             lbl_desc.pack(side="left", padx=10, fill="x", expand=True)
 
-            # Description ToolTip
+            # ToolTips
             if raw_desc:
                 ToolTip(lbl_desc, raw_desc)
+            if ven_name:
+                ToolTip(lbl_ven, ven_name)
+            if exp.currency_code != 'EUR':
+                ToolTip(lbl_amt, f"Converted amount: -{exp.converted_amount} EUR ({exp.fx_rate})")
 
             # Propagate Hover
             for child in row.winfo_children():

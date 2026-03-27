@@ -605,6 +605,10 @@ class FinanceApp(ctk.CTk):
 
         self.selected_account_id = None
 
+        self.current_offset = 0
+        self.page_size = 40
+        self.load_more_btn = None
+
         self.load_transactions()
 
     def get_dynamic_char_limit(self):
@@ -757,88 +761,117 @@ class FinanceApp(ctk.CTk):
             self.refresh_accounts()
             self.load_transactions()
 
-    def load_transactions(self):
-        """Fetches transactions and renders them as rows."""
+    def load_transactions(self, append=False):
+        """
+        Fetches transactions and renders them as rows.
+        If append is True, adds them to the bottom.
+        """
         self.update_idletasks()
-        # For performance in CustomTkinter, let's start with the last 40
-        # We can add 'Load More' later.
-        for widget in self.scroll_frame.winfo_children():
-            widget.destroy()
 
-        char_limit = self.get_dynamic_char_limit()
-
-        ven_char_limit = char_limit - 17
+        if not append:
+            self.current_offset = 0
+            for widget in self.scroll_frame.winfo_children():
+                widget.destroy()
 
         query = session.query(Expense)
 
         if self.filter_account_id:
             query = query.join(PaymentMethod).join(Account).filter(Account.id == self.filter_account_id)
 
-        expenses = query.order_by(desc(Expense.timestamp)).order_by(desc(Expense.id)).limit(40).all()
+        expenses = query.order_by(desc(Expense.timestamp)).order_by(desc(Expense.id)).offset(self.current_offset).limit(self.page_size).all()
+
+        char_limit = self.get_dynamic_char_limit()
+
+        ven_char_limit = char_limit - 17
 
         for exp in expenses:
-            row = ctk.CTkFrame(self.scroll_frame, fg_color="gray15")
-            row.pack(fill="x", pady=2, padx=5)
+            self.render_transaction_row(exp, char_limit, ven_char_limit)
 
-            # Hover Effect
-            def on_enter(e, r=row):
-                r.configure(fg_color="gray25")
+        self.current_offset += len(expenses)
+        self.render_load_more_button(len(expenses) == self.page_size)
 
-            def on_leave(e, r=row):
-                r.configure(fg_color="gray15")
+    def render_transaction_row(self, exp, char_limit, ven_char_limit):
+        """Creates row frame and labels."""
+        row = ctk.CTkFrame(self.scroll_frame, fg_color="gray15")
+        row.pack(fill="x", pady=2, padx=5)
 
-            # Bind to the frame itself
-            row.bind("<Enter>", on_enter)
-            row.bind("<Leave>", on_leave)
+        # Hover Effect
+        def on_enter(e, r=row):
+            r.configure(fg_color="gray25")
 
-            # Row Content
-            # Date
-            date_str = exp.timestamp.strftime("%Y-%m-%d")
-            ctk.CTkLabel(row, text=date_str, width=100).pack(side="left", padx=10)
-            # Vendor
-            ven_name = exp.vendor.name if exp.vendor else "Unknown"
+        def on_leave(e, r=row):
+            r.configure(fg_color="gray15")
 
-            if len(ven_name) > ven_char_limit:
-                display_ven = ven_name[:ven_char_limit].strip() + "..."
-            else:
-                display_ven = ven_name
+        # Bind to the frame itself
+        row.bind("<Enter>", on_enter)
+        row.bind("<Leave>", on_leave)
 
-            lbl_ven = ctk.CTkLabel(row, text=f"{display_ven}", width=150, anchor="w")
-            lbl_ven.pack(side="left", padx=10)
-            # Amount
-            amt_text = f"-{exp.amount:,.2f} {exp.currency_code}"
-            lbl_amt = ctk.CTkLabel(row, text=amt_text, text_color="#FF6B6B", font=("Arial", 12, "bold"), width=100, anchor="e")
-            lbl_amt.pack(side="right", padx=10)
-            # Category
-            cat_name = exp.category.name if exp.category else "Uncategorized"
-            ctk.CTkLabel(row, text=f"{cat_name}", width=120).pack(side="left", padx=10)
-            # PM
-            pm_name = exp.payment_method.name if exp.payment_method else "???"
-            ctk.CTkLabel(row, text=pm_name, width=100, anchor="w", text_color="gray60").pack(side="left", padx=10)
-            # Project
-            proj_text = f"[{exp.project.name}]" if exp.project and exp.project.name else ""
-            ctk.CTkLabel(row, text=proj_text, width=100, anchor="w", text_color="#5AC8FA").pack(side="left", padx=10)
-            # Description
-            raw_desc = exp.description if exp.description else ""
-            if len(raw_desc) > char_limit:
-                display_desc = raw_desc[:char_limit].strip() + "..."
-            else:
-                display_desc = raw_desc
-            lbl_desc = ctk.CTkLabel(row, text=display_desc, anchor="w", font=("Arial", 11), text_color="gray50")
-            lbl_desc.pack(side="left", padx=10, fill="x", expand=True)
+        # Row Content
+        # Date
+        date_str = exp.timestamp.strftime("%Y-%m-%d")
+        ctk.CTkLabel(row, text=date_str, width=100).pack(side="left", padx=10)
+        # Vendor
+        ven_name = exp.vendor.name if exp.vendor else "Unknown"
 
-            # ToolTips
-            if raw_desc:
-                ToolTip(lbl_desc, raw_desc)
-            if ven_name:
-                ToolTip(lbl_ven, ven_name)
-            if exp.currency_code != 'EUR':
-                ToolTip(lbl_amt, f"Converted amount: -{exp.converted_amount} EUR ({exp.fx_rate})")
+        if len(ven_name) > ven_char_limit:
+            display_ven = ven_name[:ven_char_limit].strip() + "..."
+        else:
+            display_ven = ven_name
 
-            # Propagate Hover
-            for child in row.winfo_children():
-                child.bind("<Enter>", on_enter)
-                child.bind("<Leave>", on_leave)
+        lbl_ven = ctk.CTkLabel(row, text=f"{display_ven}", width=150, anchor="w")
+        lbl_ven.pack(side="left", padx=10)
+        # Amount
+        amt_text = f"-{exp.amount:,.2f} {exp.currency_code}"
+        lbl_amt = ctk.CTkLabel(row, text=amt_text, text_color="#FF6B6B", font=("Arial", 12, "bold"), width=100,
+                               anchor="e")
+        lbl_amt.pack(side="right", padx=10)
+        # Category
+        cat_name = exp.category.name if exp.category else "Uncategorized"
+        ctk.CTkLabel(row, text=f"{cat_name}", width=120).pack(side="left", padx=10)
+        # PM
+        pm_name = exp.payment_method.name if exp.payment_method else "???"
+        ctk.CTkLabel(row, text=pm_name, width=100, anchor="w", text_color="gray60").pack(side="left", padx=10)
+        # Project
+        proj_text = f"[{exp.project.name}]" if exp.project and exp.project.name else ""
+        ctk.CTkLabel(row, text=proj_text, width=100, anchor="w", text_color="#5AC8FA").pack(side="left", padx=10)
+        # Description
+        raw_desc = exp.description if exp.description else ""
+        if len(raw_desc) > char_limit:
+            display_desc = raw_desc[:char_limit].strip() + "..."
+        else:
+            display_desc = raw_desc
+        lbl_desc = ctk.CTkLabel(row, text=display_desc, anchor="w", font=("Arial", 11), text_color="gray50")
+        lbl_desc.pack(side="left", padx=10, fill="x", expand=True)
+
+        # ToolTips
+        if raw_desc:
+            ToolTip(lbl_desc, raw_desc)
+        if ven_name:
+            ToolTip(lbl_ven, ven_name)
+        if exp.currency_code != 'EUR':
+            ToolTip(lbl_amt, f"Converted amount: -{exp.converted_amount} EUR ({exp.fx_rate})")
+
+        # Propagate Hover
+        for child in row.winfo_children():
+            child.bind("<Enter>", on_enter)
+            child.bind("<Leave>", on_leave)
+
+    def render_load_more_button(self, show):
+        """Adds or removes the Load More button at the end of the list."""
+        if self.load_more_btn is not None:
+            self.load_more_btn.destroy()
+            self.load_more_btn = None
+
+        if show:
+            self.load_more_btn = ctk.CTkButton(
+                self.scroll_frame,
+                text="Load More Transactions...",
+                fg_color="transparent",
+                text_color="gray60",
+                hover_color="gray25",
+                command=lambda: self.load_transactions(append=True)
+            )
+            self.load_more_btn.pack(pady=20, fill="x")
 
     def open_add_expense(self):
         AddExpenseWindow(self, self.manager)

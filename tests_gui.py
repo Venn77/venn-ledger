@@ -613,11 +613,16 @@ class FinanceApp(ctk.CTk):
         self.scroll_frame = ctk.CTkScrollableFrame(self.main_frame, label_text="History")
         self.scroll_frame.pack(fill="both", expand=True)
 
+        # 6. Navigation Bar
+        self.nav_bar = ctk.CTkFrame(self.main_frame, fg_color="transparent", height=50)
+        self.nav_bar.pack(fill="x", pady=10)
+
         self.selected_account_id = None
 
         self.current_page = 0
         self.page_size = 40
         self.total_pages = 0
+        self.jump_entry = None
 
         self.load_transactions()
 
@@ -768,10 +773,7 @@ class FinanceApp(ctk.CTk):
             else:
                 self.filter_account_id = account_id
             self.current_page = 0
-            self.update_idletasks()
-            if hasattr(self.scroll_frame, "_parent_canvas"):
-                # noinspection PyProtectedMember
-                self.scroll_frame._parent_canvas.yview_moveto(0)
+            self.reset_scroll_to_top()
 
             self.refresh_accounts()
             self.load_transactions()
@@ -885,40 +887,113 @@ class FinanceApp(ctk.CTk):
 
         self.render_pagination_controls()
 
+    def render_pagination_controls(self):
+        """Creates the Navigation buttons row at the bottom."""
+        for widget in self.nav_bar.winfo_children():
+            widget.destroy()
+
+        if self.total_pages <= 1:
+            return
+
+        self.nav_bar.grid_columnconfigure((0, 2), weight=1)
+        self.nav_bar.grid_columnconfigure(1, weight=0)
+
+        # First & Previous Buttons
+        left_group = ctk.CTkFrame(self.nav_bar, fg_color="transparent")
+        left_group.grid(row=0, column=0, sticky="e", padx=20)
+
+        first_state = "normal" if self.current_page > 0 else "disabled"
+        btn_first = ctk.CTkButton(left_group, text="« First", width=60, state=first_state, fg_color="gray30", command=self.go_to_first_page)
+        btn_first.pack(side="left", padx=2)
+
+        prev_state = "normal" if self.current_page > 0 else "disabled"
+        btn_prev = ctk.CTkButton(
+            left_group, text="‹ Prev", width=70, state=prev_state,
+            command=self.prev_page, fg_color="gray30"
+        )
+        btn_prev.pack(side="left", padx=2)
+
+        # Jump to Page & Page Indicator Buttons
+        center_group = ctk.CTkFrame(self.nav_bar, fg_color="transparent")
+        center_group.grid(row=0, column=1, sticky="n")
+
+        ctk.CTkLabel(center_group, text="Page").pack(side="left", padx=2)
+
+        self.jump_entry = ctk.CTkEntry(center_group, width=45, height=28, justify="center")
+        self.jump_entry.insert(0, str(self.current_page + 1))
+        self.jump_entry.pack(side="left", padx=5)
+        self.jump_entry.bind("<Return>", self.jump_to_page)
+
+        lbl_page = ctk.CTkLabel(center_group, text=f"of {self.total_pages}")
+        lbl_page.pack(side="left", padx=2)
+
+        # Next & Last Buttons
+        right_group = ctk.CTkFrame(self.nav_bar, fg_color="transparent")
+        right_group.grid(row=0, column=2, sticky="w", padx=20)
+
+        next_state = "normal" if self.current_page < self.total_pages - 1 else "disabled"
+        btn_next = ctk.CTkButton(right_group, text="Next ›", width=70, state=next_state,
+                      command=self.next_page, fg_color="gray30")
+        btn_next.pack(side="left", padx=2)
+
+        last_state = "normal" if self.current_page < self.total_pages - 1 else "disabled"
+        btn_last = ctk.CTkButton(right_group, text="Last »", width=60, state=last_state, fg_color="gray30",
+                      command=self.go_to_last_page)
+        btn_last.pack(side="left", padx=2)
+
+        # Back to Top Button
+        ctk.CTkButton(self.scroll_frame, text="▲ Back to Top", width=120, height=24,
+                      fg_color="transparent", text_color="gray60", hover_color="gray25",
+                      # command=lambda: getattr(self.scroll_frame, "_parent_canvas").yview_moveto(0)
+                      command=lambda: self.after(20,self.reset_scroll_to_top)
+                      ).pack(pady=(0, 20))
+
     def next_page(self):
         if self.current_page < self.total_pages - 1:
             self.current_page += 1
             self.load_transactions()
+            if self.current_page == self.total_pages - 1:
+                self.reset_scroll_to_top()
 
     def prev_page(self):
         if self.current_page > 0:
             self.current_page -= 1
             self.load_transactions()
 
-    def render_pagination_controls(self):
-        """Creates the Prev/Next button row at the bottom."""
-        nav_frame = ctk.CTkFrame(self.scroll_frame, fg_color="transparent")
-        nav_frame.pack(pady=20, fill="x")
+    def go_to_first_page(self):
+        if self.current_page != 0:
+            self.current_page = 0
+            self.load_transactions()
 
-        # Previous Button
-        prev_state = "normal" if self.current_page > 0 else "disabled"
-        btn_prev = ctk.CTkButton(
-            nav_frame, text="← Previous", width=100, state=prev_state,
-            command=self.prev_page, fg_color="gray30"
-        )
-        btn_prev.pack(side="left", padx=20, expand=True)
+    def go_to_last_page(self):
+        last_page = max(0, self.total_pages - 1)
+        if self.current_page != last_page:
+            self.current_page = last_page
+            self.load_transactions()
+            self.reset_scroll_to_top()
 
-        # Page Indicator
-        lbl_page = ctk.CTkLabel(nav_frame, text=f"Page {self.current_page + 1} of {max(1, self.total_pages)}")
-        lbl_page.pack(side="left")
+    def reset_scroll_to_top(self):
+        """Forces the canvas back to coordinate 0."""
+        self.update_idletasks()
+        if hasattr(self.scroll_frame, "_parent_canvas"):
+            # noinspection PyProtectedMember
+            self.scroll_frame._parent_canvas.yview_moveto(0)
 
-        # Next Button
-        next_state = "normal" if self.current_page < self.total_pages - 1 else "disabled"
-        btn_next = ctk.CTkButton(
-            nav_frame, text="Next →", width=100, state=next_state,
-            command=self.next_page, fg_color="gray30"
-        )
-        btn_next.pack(side="left", padx=20, expand=True)
+    def jump_to_page(self, event=None):
+        try:
+            target = int(self.jump_entry.get()) - 1  # UI is 1-indexed
+            if 0 <= target < self.total_pages:
+                self.current_page = target
+                self.load_transactions()
+                if self.current_page == self.total_pages - 1:
+                    self.reset_scroll_to_top()
+            else:
+                # Reset entry if number is out of bounds
+                self.jump_entry.delete(0, "end")
+                self.jump_entry.insert(0, str(self.current_page + 1))
+        except ValueError:
+            self.jump_entry.delete(0, "end")
+            self.jump_entry.insert(0, str(self.current_page + 1))
 
     def open_add_expense(self):
         AddExpenseWindow(self, self.manager)

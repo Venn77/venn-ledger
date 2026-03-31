@@ -3,7 +3,7 @@ from models import (
     session, Account, Expense, Gain, Category,
     PaymentMethod, Vendor, Currency, Project
 )
-from sqlalchemy import desc
+from sqlalchemy import desc, or_
 from tkcalendar import Calendar
 import finance_manager, datetime, json, os
 
@@ -597,12 +597,39 @@ class FinanceApp(ctk.CTk):
         self.main_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.main_frame.grid(row=0, column=1, padx=20, pady=20, sticky="nsew")
 
-        self.header = ctk.CTkLabel(self.main_frame, text="Recent Transactions", font=("Arial", 22, "bold"))
-        self.header.pack(anchor="w", pady=(0, 20))
+        self.top_bar = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        self.top_bar.pack(fill="x", pady=(0, 20))
+
+        self.header = ctk.CTkLabel(self.top_bar, text="Recent Transactions", font=("Arial", 22, "bold"))
+        self.header.pack(side="left", anchor="w")
+
+        self.search_group = ctk.CTkFrame(self.top_bar, fg_color="transparent")
+        self.search_group.pack(side="right", padx=(20, 0))
+
+        self.search_placeholder = "Search vendor, description or category..."
+        self.search_entry = ctk.CTkEntry(self.search_group, width=350, text_color="gray")
+        self.search_entry.insert(0, self.search_placeholder)
+        # self.search_entry.pack(side="right", padx=(20, 0))
+        self.search_entry.pack(side="left")
+
+        self.clear_search_btn = ctk.CTkButton(
+            self.search_group,
+            text="×",
+            width=30,
+            fg_color="transparent",
+            text_color="gray60",
+            hover_color="gray25",
+            command=self.clear_search_action
+        )
+        self.clear_search_btn.pack(side="left", padx=(5, 0))
+
+        self.search_entry.bind("<FocusIn>", lambda e: self._search_focus_in())
+        self.search_entry.bind("<FocusOut>", lambda e: self._search_focus_out())
+        self.search_entry.bind("<KeyRelease>", self.on_search_keyup)
 
         # 4. Transaction Counter
         self.transaction_counter_lbl = ctk.CTkLabel(
-            self.main_frame,
+            self.top_bar,
             text="Showing 0 of 0 transactions",
             font=("Arial", 11),
             text_color="gray50"
@@ -617,14 +644,70 @@ class FinanceApp(ctk.CTk):
         self.nav_bar = ctk.CTkFrame(self.main_frame, fg_color="transparent", height=50)
         self.nav_bar.pack(fill="x", pady=10)
 
+        ToolTip(self.search_entry,self.search_placeholder)
+
         self.selected_account_id = None
 
         self.current_page = 0
         self.page_size = 40
         self.total_pages = 0
         self.jump_entry = None
+        self.search_timer = None
+        self.current_search_text = ""
 
         self.load_transactions()
+
+    def _search_focus_in(self):
+        if self.search_entry.get() == self.search_placeholder:
+            self.search_entry.delete(0, "end")
+            self.search_entry.configure(text_color="white")
+
+    def _search_focus_out(self):
+        if not self.search_entry.get():
+            self.search_entry.insert(0, self.search_placeholder)
+            self.search_entry.configure(text_color="gray")
+
+    def on_search_keyup(self, _event):
+        val = self.search_entry.get()
+
+        if val == self.search_placeholder:
+            return
+
+        if hasattr(self, 'search_timer') and self.search_timer:
+            self.after_cancel(self.search_timer)
+
+        self.search_timer = self.after(500, self.execute_search)
+
+    def execute_search(self):
+        self.search_timer = None
+
+        current_val = self.search_entry.get()
+        if current_val == self.search_placeholder:
+            search_text = ""
+        else:
+            search_text = current_val
+
+        self.current_search_text = search_text
+        self.current_page = 0
+        self.load_transactions()
+
+    def clear_search_action(self):
+        if self.search_entry.get() == self.search_placeholder or self.search_entry.get() == "":
+            return
+
+        self.search_entry.delete(0, "end")
+        # self.search_entry.configure(text_color="white")  # Keep it 'active'
+        self.search_entry.focus_set()  # Keep cursor there for the next search
+
+        self.current_search_text = ""
+        self.current_page = 0
+
+        if hasattr(self, 'search_timer') and self.search_timer:
+            self.after_cancel(self.search_timer)
+            self.search_timer = None
+
+        self.load_transactions()
+        self.reset_scroll_to_top()
 
     def get_dynamic_char_limit(self):
         """Calculates how many characters can fit in the Description gap."""
@@ -790,6 +873,17 @@ class FinanceApp(ctk.CTk):
         if self.filter_account_id:
             query = query.join(PaymentMethod).join(Account).filter(Account.id == self.filter_account_id)
 
+        search_text = str(getattr(self, 'current_search_text', "")).strip()
+        if search_text:
+            search_pattern = f"%{search_text}%"
+            query = query.join(Vendor).join(Category).filter(
+                or_(
+                    Vendor.name.ilike(search_pattern),
+                    Expense.description.ilike(search_pattern),
+                    Category.name.ilike(search_pattern)
+                )
+            )
+
         total_count = query.count()
 
         self.total_pages = (total_count + self.page_size - 1) // self.page_size
@@ -866,7 +960,7 @@ class FinanceApp(ctk.CTk):
         if ven_name:
             ToolTip(lbl_ven, ven_name)
         if exp.currency_code != 'EUR':
-            ToolTip(lbl_amt, f"Converted amount: -{exp.converted_amount} EUR ({exp.fx_rate})")
+            ToolTip(lbl_amt, f"Converted amount: -{exp.converted_amount:.2f} EUR ({exp.fx_rate})")
 
         # Propagate Hover
         for child in row.winfo_children():
@@ -888,7 +982,7 @@ class FinanceApp(ctk.CTk):
         self.render_pagination_controls()
 
     def render_pagination_controls(self):
-        """Creates the Navigation buttons row at the bottom."""
+        """Creates the Navigation buttons bar at the bottom."""
         for widget in self.nav_bar.winfo_children():
             widget.destroy()
 
@@ -944,7 +1038,6 @@ class FinanceApp(ctk.CTk):
         # Back to Top Button
         ctk.CTkButton(self.scroll_frame, text="▲ Back to Top", width=120, height=24,
                       fg_color="transparent", text_color="gray60", hover_color="gray25",
-                      # command=lambda: getattr(self.scroll_frame, "_parent_canvas").yview_moveto(0)
                       command=lambda: self.after(20,self.reset_scroll_to_top)
                       ).pack(pady=(0, 20))
 

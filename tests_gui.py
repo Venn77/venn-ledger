@@ -158,7 +158,6 @@ class AddExpenseWindow(ctk.CTkToplevel):
         self.manager = manager
         mem = self.manager.last_used
 
-        # Ensure it stays on top and grabs focus
         self.after(100, self.force_focus)
         self.attributes('-topmost', False)
 
@@ -339,7 +338,6 @@ class AddExpenseWindow(ctk.CTkToplevel):
         self.desc_entry.insert(0, self.desc_placeholder)
         self.desc_entry.configure(text_color="gray")
 
-        # Reset SearchableComboBoxes to placeholders
         for combo in [self.category_combo, self.vendor_combo]:
             combo.set(combo.placeholder)
             # noinspection PyProtectedMember
@@ -614,7 +612,6 @@ class FinanceApp(ctk.CTk):
         self.search_placeholder = "Search vendor, description or category..."
         self.search_entry = ctk.CTkEntry(self.search_group, width=350, text_color="gray")
         self.search_entry.insert(0, self.search_placeholder)
-        # self.search_entry.pack(side="right", padx=(20, 0))
         self.search_entry.pack(side="left")
 
         self.clear_search_btn = ctk.CTkButton(
@@ -694,7 +691,7 @@ class FinanceApp(ctk.CTk):
         self.nav_bar = ctk.CTkFrame(self.main_frame, fg_color="transparent", height=50)
         self.nav_bar.pack(fill="x", pady=10)
 
-        self.totals_lbl = ctk.CTkLabel(self.main_frame, text="", font=("Arial", 12, "bold"), text_color="#4CD964")
+        self.totals_lbl = ctk.CTkLabel(self.main_frame, text="", font=("Arial", 12, "bold"), text_color="#b13e3e")
         self.totals_lbl.pack(pady=(0, 5))
 
         ToolTip(self.search_entry,self.search_placeholder)
@@ -749,8 +746,7 @@ class FinanceApp(ctk.CTk):
             return
 
         self.search_entry.delete(0, "end")
-        # self.search_entry.configure(text_color="white")  # Keep it 'active'
-        self.search_entry.focus_set()  # Keep cursor there for the next search
+        self.search_entry.focus_set()
 
         self.current_search_text = ""
         self.current_page = 0
@@ -797,7 +793,6 @@ class FinanceApp(ctk.CTk):
 
         available_pixels = current_width - static_space
 
-        # Rule of thumb: Average character in Arial 11 is ~7-8 pixels
         char_limit = int(available_pixels / 7)
 
         return max(20, char_limit)
@@ -1080,7 +1075,7 @@ class FinanceApp(ctk.CTk):
 
             breakdown = " | ".join([f"{amt:,.2f} {code}" for code, amt in currency_totals])
             self.totals_lbl.configure(
-                text=f"Sum: {breakdown}  (Combined: ≈ {total_eur:,.2f} EUR)"
+                text=f"Out: {breakdown}  (Combined: ≈ {total_eur:,.2f} EUR)"
             )
         else:
             self.totals_lbl.configure(text="")

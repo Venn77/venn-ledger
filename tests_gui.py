@@ -8,6 +8,49 @@ from tkcalendar import Calendar
 import finance_manager, datetime, json, os
 
 
+def open_calendar(parent, target_var, include_time=False):
+    """Pops up a calendar window to select a date."""
+    if hasattr(parent, 'cal_window') and parent.cal_window is not None and parent.cal_window.winfo_exists():
+        parent.cal_window.deiconify()
+        parent.cal_window.lift()
+        parent.cal_window.focus_force()
+        return
+    parent.cal_window = ctk.CTkToplevel(parent)
+    parent.cal_window.title("Select Date")
+    parent.cal_window.attributes("-topmost", True)
+
+    parent.cal_window.after(10, lambda: ctk.set_appearance_mode("dark"))
+    parent.cal_window.after(90, lambda: force_focus(parent.cal_window))
+
+    try:
+        raw_val = target_var.get().strip()
+        date_part = raw_val.split(" ")[0]
+        start_date = datetime.datetime.strptime(date_part, "%Y-%m-%d")
+    except (ValueError, IndexError, AttributeError):
+        start_date = datetime.datetime.now()
+
+    cal = Calendar(parent.cal_window, selectmode='day',
+                   year=start_date.year,
+                   month=start_date.month,
+                   day=start_date.day)
+    cal.pack(pady=20, padx=10)
+
+    def force_focus(window):
+        window.focus_force()
+        window.lift()
+
+    def set_date():
+        selected_date = cal.selection_get()
+        if include_time:
+            active_time = getattr(parent, 'session_time', datetime.datetime.now().strftime("%H:%M:%S"))
+            target_var.set(f"{selected_date} {active_time}")
+        else:
+            target_var.set(f"{selected_date}")
+
+        parent.cal_window.destroy()
+
+    ctk.CTkButton(parent.cal_window, text="Confirm", command=set_date).pack(pady=10)
+
 class SearchableComboBox(ctk.CTkComboBox):
     def __init__(self, master, placeholder="", **kwargs):
         super().__init__(master, **kwargs)
@@ -196,7 +239,7 @@ class AddExpenseWindow(ctk.CTkToplevel):
         self.yesterday_btn = ctk.CTkButton(date_frame, text="Y", width=30, command=lambda: self.set_relative_date(1))
         self.yesterday_btn.pack(side="left", padx=2)
 
-        self.date_btn = ctk.CTkButton(date_frame, text="📅", width=40, command=self.open_calendar)
+        self.date_btn = ctk.CTkButton(date_frame, text="📅", width=40, command=lambda: open_calendar(self, self.date_var, include_time=True))
         self.date_btn.pack(side="left", padx=2)
 
         # 7. Payment Method
@@ -286,45 +329,6 @@ class AddExpenseWindow(ctk.CTkToplevel):
             return self.session_time
         except:
             return self.session_time
-
-    def open_calendar(self):
-        """Pops up a calendar window to select a date."""
-        if self.cal_window is not None and self.cal_window.winfo_exists():
-            self.cal_window.deiconify()
-            self.cal_window.lift()
-            self.cal_window.focus_force()
-            return
-        self.cal_window = ctk.CTkToplevel(self)
-        self.cal_window.title("Select Date")
-        self.cal_window.attributes("-topmost", False)
-
-        self.cal_window.after(10, lambda: ctk.set_appearance_mode("dark"))
-        self.cal_window.after(90, lambda: force_focus(self.cal_window))
-
-        # Standard Tkinter Calendar
-        try:
-            current_val = self.date_var.get().split(" ")[0]
-            start_date = datetime.datetime.strptime(current_val, "%Y-%m-%d")
-        except:
-            start_date = datetime.datetime.now()
-        cal = Calendar(self.cal_window, selectmode='day',
-                       year=start_date.year,
-                       month=start_date.month,
-                       day=start_date.day)
-        cal.pack(pady=20, padx=10)
-
-        def force_focus(window):
-            window.focus_force()
-            window.lift()
-
-        def set_date():
-            active_time = self.get_current_time_part()
-            # Get date and append current time
-            selected_date = cal.selection_get()
-            self.date_var.set(f"{selected_date} {active_time}")
-            self.cal_window.destroy()
-
-        ctk.CTkButton(self.cal_window, text="Confirm", command=set_date).pack(pady=10)
 
     def clear_all(self):
         """Resets the form to default values."""
@@ -561,6 +565,7 @@ class FinanceApp(ctk.CTk):
         self.maxsize(1300,980)
         ctk.set_appearance_mode("dark")
         self.manager = finance_manager.TransactionManager(session)
+        self.cal_window = None
 
         # 1. Grid Configuration
         self.grid_columnconfigure(1, weight=1)
@@ -622,6 +627,51 @@ class FinanceApp(ctk.CTk):
             command=self.clear_search_action
         )
         self.clear_search_btn.pack(side="left", padx=(5, 0))
+
+        # 4. Filter Bar
+        self.date_filter_var = ctk.StringVar(value="All Time")
+
+        self.filter_bar = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        self.filter_bar.pack(fill="x", pady=(0, 10))
+
+        ctk.CTkLabel(self.filter_bar, text="Date Range:", font=("Arial", 12, "bold")).pack(side="left", padx=(0, 10))
+
+        self.date_menu = ctk.CTkOptionMenu(
+            self.filter_bar,
+            values=["All Time", "Today", "Last 7 Days", "This Month", "Last Month", "This Year", "Custom..."],
+            variable=self.date_filter_var,
+            command=self.on_date_filter_change,
+            width=140
+        )
+        self.date_menu.pack(side="left")
+
+        self.start_date_var = ctk.StringVar(value=(datetime.datetime.now() - datetime.timedelta(days=30)).strftime("%Y-%m-%d"))
+        self.end_date_var = ctk.StringVar(value=datetime.datetime.now().strftime("%Y-%m-%d"))
+
+        self.custom_date_frame = ctk.CTkFrame(self.filter_bar, fg_color="transparent")
+
+        ctk.CTkLabel(self.custom_date_frame, text="From:").pack(side="left", padx=2)
+        self.start_entry = ctk.CTkEntry(self.custom_date_frame, textvariable=self.start_date_var, width=90)
+        self.start_entry.pack(side="left", padx=2)
+
+        self.start_cal_btn = ctk.CTkButton(
+            self.custom_date_frame, text="📅", width=30,
+            command=lambda: open_calendar(self, self.start_date_var, include_time=False)
+        )
+        self.start_cal_btn.pack(side="left", padx=(0, 10))
+
+        ctk.CTkLabel(self.custom_date_frame, text="To:").pack(side="left", padx=2)
+        self.end_entry = ctk.CTkEntry(self.custom_date_frame, textvariable=self.end_date_var, width=90)
+        self.end_entry.pack(side="left", padx=2)
+
+        self.end_cal_btn = ctk.CTkButton(
+            self.custom_date_frame, text="📅", width=30,
+            command=lambda: open_calendar(self, self.end_date_var, include_time=False)
+        )
+        self.end_cal_btn.pack(side="left", padx=(0, 10))
+
+        self.apply_date_btn = ctk.CTkButton(self.custom_date_frame, text="Apply", width=60, command=self.load_transactions)
+        self.apply_date_btn.pack(side="left", padx=5)
 
         self.search_entry.bind("<FocusIn>", lambda e: self._search_focus_in())
         self.search_entry.bind("<FocusOut>", lambda e: self._search_focus_out())
@@ -711,6 +761,32 @@ class FinanceApp(ctk.CTk):
 
         self.load_transactions()
         self.reset_scroll_to_top()
+
+    def on_date_filter_change(self, selection):
+        if selection == "Custom...":
+            self.custom_date_frame.pack(side="left", padx=20)
+        else:
+            self.custom_date_frame.pack_forget()
+            self.current_page = 0
+            self.load_transactions()
+            self.reset_scroll_to_top()
+
+    def get_date_limit(self, selection):
+        """Calculates the 'start' date for the SQL query."""
+        now = datetime.datetime.now()
+        if selection == "Today":
+            return now.replace(hour=0, minute=0, second=0, microsecond=0)
+        elif selection == "Last 7 Days":
+            return now - datetime.timedelta(days=7)
+        elif selection == "This Month":
+            return now.replace(day=1, hour=0, minute=0, second=0)
+        elif selection == "Last Month":
+            first_of_this = now.replace(day=1)
+            last_of_prev = first_of_this - datetime.timedelta(days=1)
+            return last_of_prev.replace(day=1, hour=0, minute=0, second=0)
+        elif selection == "This Year":
+            return now.replace(month=1, day=1, hour=0, minute=0, second=0)
+        return None
 
     def get_dynamic_char_limit(self):
         """Calculates how many characters can fit in the Description gap."""
@@ -872,6 +948,24 @@ class FinanceApp(ctk.CTk):
             widget.destroy()
 
         query = session.query(Expense)
+
+        selection = self.date_filter_var.get()
+
+        if selection == "Custom...":
+            try:
+                start = datetime.datetime.strptime(self.start_date_var.get(), "%Y-%m-%d").replace(hour=0, minute=0)
+                end = datetime.datetime.strptime(self.end_date_var.get(), "%Y-%m-%d").replace(hour=23, minute=59)
+                query = query.filter(Expense.timestamp.between(start, end))
+            except ValueError:
+                pass
+        else:
+            date_limit = self.get_date_limit(selection)
+            if date_limit:
+                query = query.filter(Expense.timestamp >= date_limit)
+
+        date_limit = self.get_date_limit(self.date_filter_var.get())
+        if date_limit:
+            query = query.filter(Expense.timestamp >= date_limit)
 
         if self.filter_account_id:
             query = query.join(PaymentMethod).join(Account).filter(Account.id == self.filter_account_id)

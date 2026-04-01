@@ -3,7 +3,7 @@ from models import (
     session, Account, Expense, Gain, Category,
     PaymentMethod, Vendor, Currency, Project
 )
-from sqlalchemy import desc, or_
+from sqlalchemy import desc, or_, func
 from tkcalendar import Calendar
 import finance_manager, datetime, json, os
 
@@ -600,7 +600,7 @@ class FinanceApp(ctk.CTk):
         self.top_bar = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.top_bar.pack(fill="x", pady=(0, 20))
 
-        self.header = ctk.CTkLabel(self.top_bar, text="Recent Transactions", font=("Arial", 22, "bold"))
+        self.header = ctk.CTkLabel(self.top_bar, text="Transactions", font=("Arial", 22, "bold"))
         self.header.pack(side="left", anchor="w")
 
         self.search_group = ctk.CTkFrame(self.top_bar, fg_color="transparent")
@@ -643,6 +643,9 @@ class FinanceApp(ctk.CTk):
         # 6. Navigation Bar
         self.nav_bar = ctk.CTkFrame(self.main_frame, fg_color="transparent", height=50)
         self.nav_bar.pack(fill="x", pady=10)
+
+        self.totals_lbl = ctk.CTkLabel(self.main_frame, text="", font=("Arial", 12, "bold"), text_color="#4CD964")
+        self.totals_lbl.pack(pady=(0, 5))
 
         ToolTip(self.search_entry,self.search_placeholder)
 
@@ -899,7 +902,7 @@ class FinanceApp(ctk.CTk):
         for exp in expenses:
             self.render_transaction_row(exp, char_limit, ven_char_limit)
 
-        self.update_pagination_ui(total_count)
+        self.update_pagination_ui(total_count, query)
 
     def render_transaction_row(self, exp, char_limit, ven_char_limit):
         """Creates row frame and labels."""
@@ -967,19 +970,40 @@ class FinanceApp(ctk.CTk):
             child.bind("<Enter>", on_enter)
             child.bind("<Leave>", on_leave)
 
-    def update_pagination_ui(self, total_count):
-        """Updates the counter and the Next/Prev buttons."""
+    def update_pagination_ui(self, total_count, current_query):
+        """Updates the counter and the footer totals."""
         start_idx = (self.current_page * self.page_size) + 1
         end_idx = min(start_idx + self.page_size - 1, total_count)
 
+        count_text = f"Showing {start_idx}-{end_idx} of {total_count} transactions"
+
         if total_count == 0:
-            self.transaction_counter_lbl.configure(text="No transactions found")
-        else:
-            self.transaction_counter_lbl.configure(
-                text=f"Showing {start_idx}-{end_idx} of {total_count} transactions"
+            count_text = "No transactions found"
+        self.transaction_counter_lbl.configure(text=count_text)
+
+        if total_count > 0:
+            total_eur, currency_totals = self.calculate_totals(current_query)
+
+            breakdown = " | ".join([f"{amt:,.2f} {code}" for code, amt in currency_totals])
+            self.totals_lbl.configure(
+                text=f"Sum: {breakdown}  (Combined: ≈ {total_eur:,.2f} EUR)"
             )
+        else:
+            self.totals_lbl.configure(text="")
 
         self.render_pagination_controls()
+
+    def calculate_totals(self, base_query):
+        """Uses the filtered query to run aggregate sums in the DB."""
+        subquery = base_query.with_entities(Expense.id)
+
+        total_eur = session.query(func.sum(Expense.converted_amount)).filter(Expense.id.in_(subquery)).scalar() or 0
+
+        currency_totals = (session.query(Expense.currency_code, func.sum(Expense.amount))
+                           .filter(Expense.id.in_(subquery))
+                           .group_by(Expense.currency_code).all())
+
+        return total_eur, currency_totals
 
     def render_pagination_controls(self):
         """Creates the Navigation buttons bar at the bottom."""

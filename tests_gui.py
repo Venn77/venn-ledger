@@ -4,7 +4,7 @@ from models import (
     PaymentMethod, Vendor, Currency, Project,
     Transfer, Payer, Stream
 )
-from sqlalchemy import desc, or_, func, column, literal_column, union_all, asc
+from sqlalchemy import desc, or_, func, column, literal_column, union_all, asc, case
 from sqlalchemy.orm import aliased
 from tkcalendar import Calendar
 import finance_manager, datetime, json, os
@@ -734,7 +734,7 @@ class FinanceApp(ctk.CTk):
 
         self.search_entry.bind("<FocusIn>", lambda e: self._search_focus_in())
         self.search_entry.bind("<FocusOut>", lambda e: self._search_focus_out())
-        self.search_entry.bind("<KeyRelease>", self.on_search_keyup)
+        self.search_entry.bind("<KeyRelease>", self.on_search_key_release)
 
         # 4. Transaction Counter
         self.transaction_counter_lbl = ctk.CTkLabel(
@@ -751,10 +751,19 @@ class FinanceApp(ctk.CTk):
 
         # 6. Navigation Bar
         self.nav_bar = ctk.CTkFrame(self.main_frame, fg_color="transparent", height=50)
-        self.nav_bar.pack(fill="x", pady=10)
+        self.nav_bar.pack(fill="x", pady=5)
 
-        self.totals_lbl = ctk.CTkLabel(self.main_frame, text="", font=("Arial", 12, "bold"), text_color="#b13e3e")
-        self.totals_lbl.pack(pady=(0, 5))
+        self.totals_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        self.totals_frame.pack(pady=(0, 10), padx=20, side="right")
+
+        self.in_lbl = ctk.CTkLabel(self.totals_frame, text="", font=("Arial", 12, "bold"), text_color="#4CD964", anchor="e")
+        self.in_lbl.pack(fill="x")
+
+        self.out_lbl = ctk.CTkLabel(self.totals_frame, text="", font=("Arial", 12, "bold"), text_color="#b13e3e", anchor="e")
+        self.out_lbl.pack(fill="x")
+
+        self.balance_lbl = ctk.CTkLabel(self.totals_frame, text="", font=("Arial", 13, "bold"), anchor="e")
+        self.balance_lbl.pack(fill="x")
 
         ToolTip(self.search_entry,self.search_placeholder)
 
@@ -779,7 +788,7 @@ class FinanceApp(ctk.CTk):
             self.search_entry.insert(0, self.search_placeholder)
             self.search_entry.configure(text_color="gray")
 
-    def on_search_keyup(self, _event):
+    def on_search_key_release(self, _event):
         val = self.search_entry.get()
 
         if val == self.search_placeholder:
@@ -1146,30 +1155,57 @@ class FinanceApp(ctk.CTk):
         self.transaction_counter_lbl.configure(text=count_text)
 
         if total_count > 0:
-            total_eur, currency_totals = self.calculate_totals(current_query)
+            (in_eur, in_dict), (out_eur, out_dict), net_bal = self.calculate_totals(current_query)
 
-            breakdown = " | ".join([f"{amt:,.2f} {code}" for code, amt in currency_totals])
-            self.totals_lbl.configure(
-                text=f"Out: {breakdown}  (Combined: ≈ {total_eur:,.2f} EUR)"
-            )
+            in_brk = " | ".join([f"{amt:,.2f} {c}" for c, amt in in_dict.items()]) or "0.00 EUR"
+            self.in_lbl.configure(text=f"In: {in_brk}  (Combined: ≈ {in_eur:,.2f} EUR)")
+
+            out_brk = " | ".join([f"{amt:,.2f} {c}" for c, amt in out_dict.items()]) or "0.00 EUR"
+            self.out_lbl.configure(text=f"Out: {out_brk}  (Combined: ≈ {out_eur:,.2f} EUR)")
+
+            self.balance_lbl.configure(text=f"Balance: (≈ {net_bal:,.2f} EUR)")
+
+            bal_color = "#4CD964" if net_bal >= 0 else "#b13e3e"
+            self.balance_lbl.configure(text_color=bal_color)
         else:
-            self.totals_lbl.configure(text="")
+            for lbl in [self.in_lbl, self.out_lbl, self.balance_lbl]:
+                lbl.configure(text="")
 
         self.render_pagination_controls()
 
     def calculate_totals(self, base_query):
-        """Uses the filtered query to run aggregate sums in the DB."""
+        """
+        Calculates In, Out, and Balance.
+        Ignores Transfers.
+        """
         sub = base_query.subquery()
 
-        total_eur = session.query(func.sum(sub.c.eur_val)).scalar() or 0
+        totals_eur = session.query(
+            func.sum(case((sub.c.type == 'gain', sub.c.eur_val), else_=0)).label("in_eur"),
+            func.sum(case((sub.c.type == 'expense', sub.c.eur_val), else_=0)).label("out_eur")
+        ).one()
 
-        currency_totals = (session.query(
-                                sub.c.currency,
-                                func.sum(sub.c.amount)
-                           )
-                           .group_by(sub.c.currency).all())
+        in_eur = totals_eur[0] or 0
+        out_eur = totals_eur[1] or 0
+        net_balance = in_eur - out_eur
 
-        return total_eur, currency_totals
+        raw_breakdown = (session.query(
+            sub.c.type,
+            sub.c.currency,
+            func.sum(sub.c.amount)
+        )
+                    .filter(sub.c.type.in_(['gain', 'expense']))
+                    .group_by(sub.c.type, sub.c.currency).all())
+
+        in_dict = {}
+        out_dict = {}
+        for r_type, curr, amt in raw_breakdown:
+            if r_type == 'gain':
+                in_dict[curr] = amt
+            else:
+                out_dict[curr] = amt
+
+        return (in_eur, in_dict), (out_eur, out_dict), net_balance
 
     def render_pagination_controls(self):
         """Creates the Navigation buttons bar at the bottom."""

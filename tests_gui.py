@@ -1,9 +1,11 @@
 import customtkinter as ctk
 from models import (
     session, Account, Expense, Gain, Category,
-    PaymentMethod, Vendor, Currency, Project
+    PaymentMethod, Vendor, Currency, Project,
+    Transfer, Payer, Stream
 )
-from sqlalchemy import desc, or_, func
+from sqlalchemy import desc, or_, func, column, literal_column, union_all, asc
+from sqlalchemy.orm import aliased
 from tkcalendar import Calendar
 import finance_manager, datetime, json, os
 
@@ -147,6 +149,66 @@ class ToolTip:
         if self.tip_window:
             self.tip_window.destroy()
             self.tip_window = None
+
+
+class TransactionRow(ctk.CTkFrame):
+    def __init__(self, master, data, char_limit, ent_char_limit):
+        super().__init__(master, fg_color="gray15")
+        self.data = data
+        self.pack(fill="x", pady=2, padx=5)
+
+        colors = {
+            "expense": {"text": "#FF6B6B", "prefix": "-"},
+            "gain": {"text": "#4CD964", "prefix": "+"},
+            "transfer_out": {"text": "#5AC8FA", "prefix": "-"},
+            "transfer_in":  {"text": "#5AC8FA", "prefix": "+"}
+        }
+        style = colors.get(data.type, {"text": "white", "prefix": ""})
+
+        # Render Columns
+        # Date
+        self._add_lbl(data.ts.strftime("%Y-%m-%d"), width=100)
+        # Vendor or Stream
+        if len(data.entity) > ent_char_limit:
+            display_ent = data.entity[:ent_char_limit].strip() + "..."
+        else:
+            display_ent = data.entity
+        lbl_ent = self._add_lbl(display_ent or "Unknown", width=150, anchor="w", bold=True)
+        if data.entity: ToolTip(lbl_ent, data.entity)
+        # Category
+        self._add_lbl(data.category, width=120)
+        # Account or PM
+        self._add_lbl(data.pm_or_acc or "???", width=100, anchor="w", color="gray60")
+        # Project
+        self._add_lbl(data.proj_name or "", width=100, anchor="w", color="#5AC8FA")
+        # Description
+        display_desc = (data.desc[:char_limit] + "...") if data.desc and len(data.desc) > char_limit else data.desc
+        lbl_desc = self._add_lbl(display_desc or "", anchor="w", expand=True, color="gray50")
+        if data.desc: ToolTip(lbl_desc, data.desc)
+        # Amount
+        amt_str = f"{style['prefix']}{data.amount:,.2f} {data.currency}"
+        lbl_amt = self._add_lbl(amt_str, width=150, anchor="e", color=style['text'], bold=True)
+        if data.currency != 'EUR': ToolTip(lbl_amt, f"Converted: {style['prefix']}{data.eur_val:,.2f} EUR (Rate: {data.fx_rate})")
+        # Hover Effect
+        def on_enter(e, r=self):
+            r.configure(fg_color="gray25")
+
+        def on_leave(e, r=self):
+            r.configure(fg_color="gray15")
+
+        self.bind("<Enter>", on_enter)
+        self.bind("<Leave>", on_leave)
+
+        # Propagate Hover
+        for child in self.winfo_children():
+            child.bind("<Enter>", on_enter)
+            child.bind("<Leave>", on_leave)
+
+    def _add_lbl(self, text, width=0, anchor="center", expand=False, color="white", bold=False):
+        font = ("Arial", 11, "bold") if bold else ("Arial", 11)
+        lbl = ctk.CTkLabel(self, text=text, width=width, anchor=anchor, text_color=color, font=font)
+        lbl.pack(side="left", padx=10, fill="x" if expand else None, expand=expand)
+        return lbl
 
 class AddExpenseWindow(ctk.CTkToplevel):
     def __init__(self, parent, manager):
@@ -609,7 +671,7 @@ class FinanceApp(ctk.CTk):
         self.search_group = ctk.CTkFrame(self.top_bar, fg_color="transparent")
         self.search_group.pack(side="right", padx=(20, 0))
 
-        self.search_placeholder = "Search vendor, description or category..."
+        self.search_placeholder = "Search vendor, payer, description, category or stream..."
         self.search_entry = ctk.CTkEntry(self.search_group, width=350, text_color="gray")
         self.search_entry.insert(0, self.search_placeholder)
         self.search_entry.pack(side="left")
@@ -942,7 +1004,7 @@ class FinanceApp(ctk.CTk):
         for widget in self.scroll_frame.winfo_children():
             widget.destroy()
 
-        query = session.query(Expense)
+        query = self.get_unified_transaction_query(session)
 
         selection = self.date_filter_var.get()
 
@@ -950,29 +1012,29 @@ class FinanceApp(ctk.CTk):
             try:
                 start = datetime.datetime.strptime(self.start_date_var.get(), "%Y-%m-%d").replace(hour=0, minute=0)
                 end = datetime.datetime.strptime(self.end_date_var.get(), "%Y-%m-%d").replace(hour=23, minute=59)
-                query = query.filter(Expense.timestamp.between(start, end))
+                query = query.filter(column("ts").between(start, end))
             except ValueError:
                 pass
         else:
             date_limit = self.get_date_limit(selection)
             if date_limit:
-                query = query.filter(Expense.timestamp >= date_limit)
+                query = query.filter(column("ts") >= date_limit)
 
         date_limit = self.get_date_limit(self.date_filter_var.get())
         if date_limit:
-            query = query.filter(Expense.timestamp >= date_limit)
+            query = query.filter(column("ts") >= date_limit)
 
         if self.filter_account_id:
-            query = query.join(PaymentMethod).join(Account).filter(Account.id == self.filter_account_id)
+            query = query.filter(column("acc_id") == self.filter_account_id)
 
         search_text = str(getattr(self, 'current_search_text', "")).strip()
         if search_text:
             search_pattern = f"%{search_text}%"
-            query = query.join(Vendor).join(Category).filter(
+            query = query.filter(
                 or_(
-                    Vendor.name.ilike(search_pattern),
-                    Expense.description.ilike(search_pattern),
-                    Category.name.ilike(search_pattern)
+                    column("entity").ilike(search_pattern),
+                    column("desc").ilike(search_pattern),
+                    column("category").ilike(search_pattern)
                 )
             )
 
@@ -982,82 +1044,95 @@ class FinanceApp(ctk.CTk):
 
         offset = self.current_page * self.page_size
 
-        expenses = query.order_by(desc(Expense.timestamp)).order_by(desc(Expense.id)).offset(offset).limit(self.page_size).all()
+        results = query.order_by(desc(column("ts")),asc(column("type")),desc(column("id"))).offset(offset).limit(self.page_size).all()
 
         char_limit = self.get_dynamic_char_limit()
 
-        ven_char_limit = char_limit - 17
+        ent_char_limit = char_limit - 17
 
-        for exp in expenses:
-            self.render_transaction_row(exp, char_limit, ven_char_limit)
+        for row_data in results:
+            TransactionRow(self.scroll_frame, row_data, char_limit, ent_char_limit)
 
         self.update_pagination_ui(total_count, query)
 
-    def render_transaction_row(self, exp, char_limit, ven_char_limit):
-        """Creates row frame and labels."""
-        row = ctk.CTkFrame(self.scroll_frame, fg_color="gray15")
-        row.pack(fill="x", pady=2, padx=5)
+    def get_unified_transaction_query(self, current_session):
+        # 1. EXPENSES
+        q1 = current_session.query(
+            Expense.id.label("id"),
+            Expense.timestamp.label("ts"),
+            Expense.amount.label("amount"),
+            Expense.currency_code.label("currency"),
+            Expense.converted_amount.label("eur_val"),
+            Expense.fx_rate.label("fx_rate"),
+            Expense.description.label("desc"),
+            literal_column("'expense'").label("type"),
+            Vendor.name.label("entity"),
+            Category.name.label("category"),
+            PaymentMethod.account_id.label("acc_id"),
+            PaymentMethod.name.label("pm_or_acc"),
+            Project.name.label("proj_name")
+        ).outerjoin(Vendor).outerjoin(Category).join(PaymentMethod).outerjoin(Project)
 
-        # Hover Effect
-        def on_enter(e, r=row):
-            r.configure(fg_color="gray25")
+        # 2. GAINS
+        q2 = current_session.query(
+            Gain.id.label("id"),
+            Gain.timestamp.label("ts"),
+            Gain.amount.label("amount"),
+            Gain.currency_code.label("currency"),
+            Gain.converted_amount.label("eur_val"),
+            Gain.fx_rate.label("fx_rate"),
+            Gain.description.label("desc"),
+            literal_column("'gain'").label("type"),
+            Payer.name.label("entity"),
+            Stream.name.label("category"),
+            Gain.account_id.label("acc_id"),
+            Account.name.label("pm_or_acc"),
+            Project.name.label("proj_name")
+        ).outerjoin(Payer).outerjoin(Stream).join(Account).outerjoin(Project)
 
-        def on_leave(e, r=row):
-            r.configure(fg_color="gray15")
+        # 3a. TRANSFERS (Outbound)
+        origin_account = aliased(Account)
+        q3_out = (session.query(
+            Transfer.id.label("id"),
+            Transfer.timestamp.label("ts"),
+            Transfer.amount_origin.label("amount"),
+            origin_account.currency_code.label("currency"),
+            Transfer.amount_destination.label("eur_val"),
+            literal_column("NULL").label("fx_rate"),
+            Transfer.description.label("desc"),
+            literal_column("'transfer_out'").label("type"),
+            (literal_column("'To: '") + Account.name).label("entity"),
+            literal_column("'Transfer Out'").label("category"),
+            Transfer.origin_account_id.label("acc_id"),
+            origin_account.name.label("pm_or_acc"),
+            literal_column("''").label("proj_name")
+        ).join(Account, Transfer.destination_account_id == Account.id)
+        .join(origin_account, Transfer.origin_account_id == origin_account.id))
 
-        # Bind to the frame itself
-        row.bind("<Enter>", on_enter)
-        row.bind("<Leave>", on_leave)
+        # 3b. TRANSFERS (Inbound)
+        dest_account = aliased(Account)
+        q3_in = (session.query(
+            Transfer.id.label("id"),
+            Transfer.timestamp.label("ts"),
+            Transfer.amount_destination.label("amount"),
+            dest_account.currency_code.label("currency"),
+            Transfer.amount_origin.label("eur_val"),
+            literal_column("NULL").label("fx_rate"),
+            Transfer.description.label("desc"),
+            literal_column("'transfer_in'").label("type"),
+            (literal_column("'From: '") + Account.name).label("entity"),
+            literal_column("'Transfer In'").label("category"),
+            Transfer.destination_account_id.label("acc_id"),
+            dest_account.name.label("pm_or_acc"),
+            literal_column("''").label("proj_name")
+        ).join(Account, Transfer.origin_account_id == Account.id)
+                 .join(dest_account, Transfer.destination_account_id == dest_account.id))
 
-        # Row Content
-        # Date
-        date_str = exp.timestamp.strftime("%Y-%m-%d")
-        ctk.CTkLabel(row, text=date_str, width=100).pack(side="left", padx=10)
-        # Vendor
-        ven_name = exp.vendor.name if exp.vendor else "Unknown"
+        unified_stmt = union_all(q1, q2, q3_out, q3_in).alias("unified")
 
-        if len(ven_name) > ven_char_limit:
-            display_ven = ven_name[:ven_char_limit].strip() + "..."
-        else:
-            display_ven = ven_name
+        final_query = current_session.query(unified_stmt)
 
-        lbl_ven = ctk.CTkLabel(row, text=f"{display_ven}", width=150, anchor="w")
-        lbl_ven.pack(side="left", padx=10)
-        # Amount
-        amt_text = f"-{exp.amount:,.2f} {exp.currency_code}"
-        lbl_amt = ctk.CTkLabel(row, text=amt_text, text_color="#FF6B6B", font=("Arial", 12, "bold"), width=100,
-                               anchor="e")
-        lbl_amt.pack(side="right", padx=10)
-        # Category
-        cat_name = exp.category.name if exp.category else "Uncategorized"
-        ctk.CTkLabel(row, text=f"{cat_name}", width=120).pack(side="left", padx=10)
-        # PM
-        pm_name = exp.payment_method.name if exp.payment_method else "???"
-        ctk.CTkLabel(row, text=pm_name, width=100, anchor="w", text_color="gray60").pack(side="left", padx=10)
-        # Project
-        proj_text = f"[{exp.project.name}]" if exp.project and exp.project.name else ""
-        ctk.CTkLabel(row, text=proj_text, width=100, anchor="w", text_color="#5AC8FA").pack(side="left", padx=10)
-        # Description
-        raw_desc = exp.description if exp.description else ""
-        if len(raw_desc) > char_limit:
-            display_desc = raw_desc[:char_limit].strip() + "..."
-        else:
-            display_desc = raw_desc
-        lbl_desc = ctk.CTkLabel(row, text=display_desc, anchor="w", font=("Arial", 11), text_color="gray50")
-        lbl_desc.pack(side="left", padx=10, fill="x", expand=True)
-
-        # ToolTips
-        if raw_desc:
-            ToolTip(lbl_desc, raw_desc)
-        if ven_name:
-            ToolTip(lbl_ven, ven_name)
-        if exp.currency_code != 'EUR':
-            ToolTip(lbl_amt, f"Converted amount: -{exp.converted_amount:.2f} EUR ({exp.fx_rate})")
-
-        # Propagate Hover
-        for child in row.winfo_children():
-            child.bind("<Enter>", on_enter)
-            child.bind("<Leave>", on_leave)
+        return final_query
 
     def update_pagination_ui(self, total_count, current_query):
         """Updates the counter and the footer totals."""
@@ -1084,13 +1159,15 @@ class FinanceApp(ctk.CTk):
 
     def calculate_totals(self, base_query):
         """Uses the filtered query to run aggregate sums in the DB."""
-        subquery = base_query.with_entities(Expense.id)
+        sub = base_query.subquery()
 
-        total_eur = session.query(func.sum(Expense.converted_amount)).filter(Expense.id.in_(subquery)).scalar() or 0
+        total_eur = session.query(func.sum(sub.c.eur_val)).scalar() or 0
 
-        currency_totals = (session.query(Expense.currency_code, func.sum(Expense.amount))
-                           .filter(Expense.id.in_(subquery))
-                           .group_by(Expense.currency_code).all())
+        currency_totals = (session.query(
+                                sub.c.currency,
+                                func.sum(sub.c.amount)
+                           )
+                           .group_by(sub.c.currency).all())
 
         return total_eur, currency_totals
 

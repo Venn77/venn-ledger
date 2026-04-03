@@ -121,10 +121,11 @@ class SearchableComboBox(ctk.CTkComboBox):
             pass
 
 class ToolTip:
-    def __init__(self, widget, text, delay=500):
+    def __init__(self, widget, text, delay=500, max_width=400):
         self.widget = widget
         self.text = text
         self.delay = delay
+        self.max_width = max_width
         self.tip_window = None
         self.id = None
         self.widget.bind("<Enter>", self._schedule)
@@ -134,16 +135,53 @@ class ToolTip:
         self.id = self.widget.after(self.delay, self.show_tip)
 
     def show_tip(self, _event=None):
+        # if self.tip_window or not self.text:
+        #     return
+        # x = self.widget.winfo_rootx() + 20
+        # y = self.widget.winfo_rooty() + self.widget.winfo_height() + 10
+        # self.tip_window = tw = ctk.CTkToplevel(self.widget)
+        # tw.wm_overrideredirect(True)
+        # tw.wm_geometry(f"+{x}+{y}")
+        # label = ctk.CTkLabel(tw, text=self.text, corner_radius=5,
+        #                      fg_color="#333333", padx=5, pady=2)
+        # label.pack()
         if self.tip_window or not self.text:
             return
-        x = self.widget.winfo_rootx() + 20
-        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 10
-        self.tip_window = tw = ctk.CTkToplevel(self.widget)
-        tw.wm_overrideredirect(True)
-        tw.wm_geometry(f"+{x}+{y}")
-        label = ctk.CTkLabel(tw, text=self.text, corner_radius=5,
-                             fg_color="#333333", padx=5, pady=2)
+
+        self.tip_window = ctk.CTkToplevel(self.widget)
+        self.tip_window.wm_overrideredirect(True)
+        self.tip_window.attributes("-topmost", True)
+
+        label = ctk.CTkLabel(
+            self.tip_window, text=self.text, corner_radius=5,
+                            fg_color="#333333", padx=5, pady=2,
+                            wraplength=self.max_width
+        )
         label.pack()
+
+        self.tip_window.update_idletasks()
+
+        tip_w = self.tip_window.winfo_width()
+        tip_h = self.tip_window.winfo_height()
+
+        mouse_x = self.widget.winfo_pointerx()
+        mouse_y = self.widget.winfo_pointery()
+
+        screen_w = self.widget.winfo_screenwidth()
+        screen_h = self.widget.winfo_screenheight()
+
+        pos_x = mouse_x + 15
+        pos_y = mouse_y + 10
+
+        # SCREEN BOUNDARY CHECK (Right edge)
+        if pos_x + tip_w > screen_w:
+            pos_x = mouse_x - tip_w - 5  # Flip to left of cursor
+
+        # SCREEN BOUNDARY CHECK (Bottom edge)
+        if pos_y + tip_h > screen_h:
+            pos_y = mouse_y - tip_h - 5  # Flip to top of cursor
+
+        self.tip_window.wm_geometry(f"+{pos_x}+{pos_y}")
 
     def hide_tip(self, _event=None):
         if self.id:
@@ -665,6 +703,7 @@ class FinanceApp(ctk.CTk):
         ctk.set_appearance_mode("dark")
         self.manager = finance_manager.TransactionManager(session)
         self.cal_window = None
+        self.current_view_date = datetime.datetime.now().replace(day=1)
 
         # 1. Grid Configuration
         self.grid_columnconfigure(1, weight=1)
@@ -742,6 +781,17 @@ class FinanceApp(ctk.CTk):
             width=140
         )
         self.date_menu.pack(side="left")
+
+        self.month_nav_frame = ctk.CTkFrame(self.filter_bar, fg_color="gray20", height=28, corner_radius=8)
+
+        self.btn_prev_month = ctk.CTkButton(self.month_nav_frame, text="‹", width=30, height=28, command=self.go_prev_month)
+        self.btn_prev_month.pack(side="left", padx=2)
+
+        self.month_display_lbl = ctk.CTkLabel(self.month_nav_frame, text="", font=("JetBrains Mono", 12, "bold"), width=110, height=28, fg_color="#1f538d", corner_radius=0)
+        self.month_display_lbl.pack(side="left")
+
+        self.btn_next_month = ctk.CTkButton(self.month_nav_frame, text="›", width=30, height=28, command=self.go_next_month)
+        self.btn_next_month.pack(side="left", padx=2)
 
         self.start_date_var = ctk.StringVar(value=(datetime.datetime.now() - datetime.timedelta(days=30)).strftime("%Y-%m-%d"))
         self.end_date_var = ctk.StringVar(value=datetime.datetime.now().strftime("%Y-%m-%d"))
@@ -869,13 +919,38 @@ class FinanceApp(ctk.CTk):
         self.reset_scroll_to_top()
 
     def on_date_filter_change(self, selection):
-        if selection == "Custom...":
-            self.custom_date_frame.pack(side="left", padx=20)
-        else:
+        if selection == "This Month":
+            self.current_view_date = datetime.datetime.now().replace(day=1)
             self.custom_date_frame.pack_forget()
+            self.month_nav_frame.pack(side="left", padx=20)
+            self.update_month_display()
             self.current_page = 0
             self.load_transactions()
             self.reset_scroll_to_top()
+        else:
+            self.month_nav_frame.pack_forget()
+            if selection == "Custom...":
+                self.custom_date_frame.pack(side="left", padx=20)
+            else:
+                self.custom_date_frame.pack_forget()
+                self.current_page = 0
+                self.load_transactions()
+                self.reset_scroll_to_top()
+
+    def update_month_display(self):
+        self.month_display_lbl.configure(text=self.current_view_date.strftime("%B %Y"))
+
+    def go_prev_month(self):
+        last_month = self.current_view_date - datetime.timedelta(days=1)
+        self.current_view_date = last_month.replace(day=1)
+        self.update_month_display()
+        self.load_transactions()
+
+    def go_next_month(self):
+        next_month = self.current_view_date + datetime.timedelta(days=32)
+        self.current_view_date = next_month.replace(day=1)
+        self.update_month_display()
+        self.load_transactions()
 
     def get_date_limit(self, selection):
         """Calculates the 'start' and 'end' dates for the SQL query."""
@@ -891,8 +966,10 @@ class FinanceApp(ctk.CTk):
             return start, end_of_now
 
         elif selection == "This Month":
-            start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            return start, end_of_now
+            start = self.current_view_date.replace(hour=0, minute=0, second=0, microsecond=0)
+            next_month = start + datetime.timedelta(days=32)
+            end = next_month.replace(day=1) - datetime.timedelta(microseconds=1)
+            return start, end
 
         elif selection == "Last Month":
             first_of_this_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)

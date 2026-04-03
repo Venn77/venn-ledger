@@ -4,7 +4,10 @@ from models import (
     PaymentMethod, Vendor, Currency, Project,
     Transfer, Payer, Stream
 )
-from sqlalchemy import desc, or_, func, column, literal_column, union_all, asc, case
+from sqlalchemy import (
+    desc, or_, func, column, literal_column,
+    union_all, asc, case
+)
 from sqlalchemy.orm import aliased
 from tkcalendar import Calendar
 import finance_manager, datetime, json, os
@@ -205,7 +208,7 @@ class TransactionRow(ctk.CTkFrame):
             child.bind("<Leave>", on_leave)
 
     def _add_lbl(self, text, width=0, anchor="center", expand=False, color="white", bold=False):
-        font = ("Arial", 11, "bold") if bold else ("Arial", 11)
+        font = ("JetBrains Mono", 11, "bold") if bold else ("JetBrains Mono", 11)
         lbl = ctk.CTkLabel(self, text=text, width=width, anchor=anchor, text_color=color, font=font)
         lbl.pack(side="left", padx=10, fill="x" if expand else None, expand=expand)
         return lbl
@@ -227,7 +230,7 @@ class AddExpenseWindow(ctk.CTkToplevel):
         self.grid_columnconfigure(1, weight=1)
 
         # UI Form label
-        ctk.CTkLabel(self, text="New Expense", font=("Arial", 20, "bold")).grid(row=0, column=0, padx=20, pady=20)
+        ctk.CTkLabel(self, text="New Expense", font=("JetBrains Mono", 20, "bold")).grid(row=0, column=0, padx=20, pady=20)
 
         # Placeholders
         self.cat_placeholder = "Search or type Category..."
@@ -237,7 +240,7 @@ class AddExpenseWindow(ctk.CTkToplevel):
         self.fx_placeholder = "Rate (e.g. 1.15)"
 
         # Error label
-        self.error_label = ctk.CTkLabel(self, text="", text_color="orange", font=("Arial", 12))
+        self.error_label = ctk.CTkLabel(self, text="", text_color="orange", font=("JetBrains Mono", 12))
         self.error_label.grid(row=10, column=0, columnspan=2, pady=(10, 5))
 
         # Clear All & Save Button
@@ -264,7 +267,7 @@ class AddExpenseWindow(ctk.CTkToplevel):
         self.currency_menu = ctk.CTkOptionMenu(self, values=currencies, variable=self.currency_var, command=self.update_pm_list)
 
         # 3. Exchange Rate (Automatically changes based on Date and Currency)
-        self.fx_label = ctk.CTkLabel(self, text="Exchange Rate", font=("Arial", 13, "bold"), anchor="w")
+        self.fx_label = ctk.CTkLabel(self, text="Exchange Rate", font=("JetBrains Mono", 13, "bold"), anchor="w")
         self.fx_entry = ctk.CTkEntry(self)
         self.fx_entry.insert(0, self.fx_placeholder)
         self.fx_entry.configure(text_color="gray")
@@ -276,11 +279,15 @@ class AddExpenseWindow(ctk.CTkToplevel):
 
         # 4. Category (SearchableComboBox so we can find existing or type new ones)
         self.all_categories = [c.name for c in session.query(Category).filter_by(active_bool=True).order_by(Category.name.asc()).all()]
-        self.category_combo = SearchableComboBox(self,placeholder=self.cat_placeholder,values=self.all_categories)
+        self.category_combo = SearchableComboBox(self, placeholder=self.cat_placeholder, values=self.all_categories, command=lambda _: self.validate_form())
+        # noinspection PyProtectedMember
+        self.category_combo._entry.bind("<KeyRelease>", self.validate_form, add="+")
 
         # 5. Vendor (ditto)
         self.all_vendors = [v.name for v in session.query(Vendor).filter_by(active_bool=True).order_by(Vendor.name.asc()).all()]
-        self.vendor_combo = SearchableComboBox(self, placeholder=self.ven_placeholder, values=self.all_vendors)
+        self.vendor_combo = SearchableComboBox(self, placeholder=self.ven_placeholder, values=self.all_vendors, command=lambda _: self.validate_form())
+        # noinspection PyProtectedMember
+        self.vendor_combo._entry.bind("<KeyRelease>", self.validate_form, add="+")
 
         # 6. Datetime
         self.cal_window = None
@@ -323,7 +330,7 @@ class AddExpenseWindow(ctk.CTkToplevel):
 
         # Draw label + fields
         def add_row(label_text, widget, row_idx):
-            lbl = ctk.CTkLabel(self, text=label_text, font=("Arial", 13, "bold"), anchor="w")
+            lbl = ctk.CTkLabel(self, text=label_text, font=("JetBrains Mono", 13, "bold"), anchor="w")
             lbl.grid(row=row_idx, column=0, padx=(20, 10), pady=8, sticky="w")
             widget.grid(row=row_idx, column=1, padx=(0, 20), pady=8, sticky="ew")
 
@@ -334,7 +341,7 @@ class AddExpenseWindow(ctk.CTkToplevel):
         add_row("Payment Method", self.pm_menu, 6)
 
         # Date container is special
-        date_lbl = ctk.CTkLabel(self, text="Date & Time", font=("Arial", 13, "bold"), anchor="w")
+        date_lbl = ctk.CTkLabel(self, text="Date & Time", font=("JetBrains Mono", 13, "bold"), anchor="w")
         date_lbl.grid(row=7, column=0, padx=(20, 10), pady=8, sticky="w")
 
         add_row("Description", self.desc_entry, 8)
@@ -504,6 +511,9 @@ class AddExpenseWindow(ctk.CTkToplevel):
 
     def validate_form(self, *args):
         """Checks if all required fields are filled to enable the Save button."""
+        # 0. Reset
+        self.error_label.configure(text="", text_color="orange")
+        self.save_btn.configure(state="normal", fg_color="green", text_color="white")
         # 1. Required: Amount (Must not be placeholder or empty)
         amt_val = self.amount_entry.get()
         amt_ok = (amt_val != self.amount_placeholder and
@@ -523,20 +533,49 @@ class AddExpenseWindow(ctk.CTkToplevel):
             fx_val = self.fx_entry.get()
             fx_ok = (fx_val != self.fx_placeholder and fx_val.strip() != "" and self.is_float(fx_val))
         else:
-            fx_ok = True  # Not required for EUR
+            fx_ok = True
 
         # 4. Toggle Button State
+        error_text = {
+            "duplicate": "⚠ Potential duplicate detected!",
+            "amount": "⚠ Check Amount (must be a number)",
+            "date": "⚠ Check Date format (YYYY-MM-DD HH:MM:SS)",
+            "fx_rate": "⚠ Check Exchange Rate (must be a number)",
+            "pm": "⚠ Select a valid Payment Method",
+            "currency": "⚠ Select a valid Currency"
+        }
+
         if amt_ok and date_ok and cur_ok and pm_ok and fx_ok:
             try:
                 current_amt = float(self.amount_entry.get().replace(",", "."))
+                current_category = self.category_combo.get().strip()
                 current_vendor = self.vendor_combo.get().strip()
                 current_date = self.date_var.get()
 
+                is_new_vendor = (current_vendor not in self.all_vendors and
+                                 current_vendor != self.ven_placeholder and
+                                 current_vendor != "")
+
+                is_new_category = (current_category not in self.all_categories and
+                                   current_category != self.cat_placeholder and
+                                   current_category != "")
+
                 is_duplicate = self.manager.check_for_duplicate(current_amt, current_vendor, current_date)
 
+                self.save_btn.configure(state="normal", fg_color="#EBCB8B", text_color="black")
+
                 if is_duplicate:
-                    self.save_btn.configure(state="normal", fg_color="#EBCB8B", text_color="black")
-                    self.error_label.configure(text="⚠ Potential duplicate detected!", text_color="orange")
+                    self.error_label.configure(text=error_text.get("duplicate", ""), text_color="orange")
+                elif is_new_vendor or is_new_category:
+                    msg = "Notice: "
+                    if is_new_vendor and is_new_category:
+                        msg += "New Vendor & Category will be created."
+                    elif is_new_vendor:
+                        msg += f"New Vendor '{current_vendor}' will be created."
+                    else:
+                        msg += f"New Category '{current_category}' will be created."
+
+                    self.error_label.configure(text=msg, text_color="#EBCB8B")
                 else:
                     self.save_btn.configure(state="normal", fg_color="green", text_color="white")
                     self.error_label.configure(text="")
@@ -545,15 +584,15 @@ class AddExpenseWindow(ctk.CTkToplevel):
         else:
             self.save_btn.configure(state="disabled", fg_color="gray30", text_color="white")
             if not amt_ok:
-                self.error_label.configure(text="⚠ Check Amount (must be a number)")
+                self.error_label.configure(text=error_text.get("amount", ""))
             elif not date_ok:
-                self.error_label.configure(text="⚠ Check Date format (YYYY-MM-DD HH:MM:SS)")
+                self.error_label.configure(text=error_text.get("date", ""))
             elif not fx_ok:
-                self.error_label.configure(text="⚠ Check Exchange Rate (must be a number)")
+                self.error_label.configure(text=error_text.get("fx_rate", ""))
             elif not pm_ok:
-                self.error_label.configure(text="⚠ Select a valid Payment Method")
+                self.error_label.configure(text=error_text.get("pm", ""))
             elif not cur_ok:
-                self.error_label.configure(text="⚠ Select a valid Currency")
+                self.error_label.configure(text=error_text.get("currency", ""))
 
     def submit_data(self):
         """Invokes the finance manager to submit to DB."""
@@ -639,7 +678,7 @@ class FinanceApp(ctk.CTk):
         self.sidebar = ctk.CTkFrame(self, width=250, corner_radius=0)
         self.sidebar.grid(row=0, column=0, sticky="nsew")
 
-        self.logo = ctk.CTkLabel(self.sidebar, text="FINANCE", font=("Arial", 24, "bold"))
+        self.logo = ctk.CTkLabel(self.sidebar, text="FINANCE", font=("JetBrains Mono", 24, "bold"))
         self.logo.pack(pady=30, padx=20)
 
         self.add_btn = ctk.CTkButton(self.sidebar, text="+ Add Expense", command=self.open_add_expense)
@@ -665,7 +704,7 @@ class FinanceApp(ctk.CTk):
         self.top_bar = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.top_bar.pack(fill="x", pady=(0, 20))
 
-        self.header = ctk.CTkLabel(self.top_bar, text="Transactions", font=("Arial", 22, "bold"))
+        self.header = ctk.CTkLabel(self.top_bar, text="Transactions", font=("JetBrains Mono", 22, "bold"))
         self.header.pack(side="left", anchor="w")
 
         self.search_group = ctk.CTkFrame(self.top_bar, fg_color="transparent")
@@ -693,7 +732,7 @@ class FinanceApp(ctk.CTk):
         self.filter_bar = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.filter_bar.pack(fill="x", pady=(0, 10))
 
-        ctk.CTkLabel(self.filter_bar, text="Date Range:", font=("Arial", 12, "bold")).pack(side="left", padx=(0, 10))
+        ctk.CTkLabel(self.filter_bar, text="Date Range:", font=("JetBrains Mono", 12, "bold")).pack(side="left", padx=(0, 10))
 
         self.date_menu = ctk.CTkOptionMenu(
             self.filter_bar,
@@ -740,7 +779,7 @@ class FinanceApp(ctk.CTk):
         self.transaction_counter_lbl = ctk.CTkLabel(
             self.top_bar,
             text="Showing 0 of 0 transactions",
-            font=("Arial", 11),
+            font=("JetBrains Mono", 11),
             text_color="gray50"
         )
         self.transaction_counter_lbl.pack(pady=(0, 5), anchor="e", padx=20)
@@ -756,13 +795,13 @@ class FinanceApp(ctk.CTk):
         self.totals_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.totals_frame.pack(pady=(0, 10), padx=20, side="right")
 
-        self.in_lbl = ctk.CTkLabel(self.totals_frame, text="", font=("Arial", 12, "bold"), text_color="#4CD964", anchor="e")
+        self.in_lbl = ctk.CTkLabel(self.totals_frame, text="", font=("JetBrains Mono", 12, "bold"), text_color="#4CD964", anchor="e")
         self.in_lbl.pack(fill="x")
 
-        self.out_lbl = ctk.CTkLabel(self.totals_frame, text="", font=("Arial", 12, "bold"), text_color="#b13e3e", anchor="e")
+        self.out_lbl = ctk.CTkLabel(self.totals_frame, text="", font=("JetBrains Mono", 12, "bold"), text_color="#b13e3e", anchor="e")
         self.out_lbl.pack(fill="x")
 
-        self.balance_lbl = ctk.CTkLabel(self.totals_frame, text="", font=("Arial", 13, "bold"), anchor="e")
+        self.balance_lbl = ctk.CTkLabel(self.totals_frame, text="", font=("JetBrains Mono", 13, "bold"), anchor="e")
         self.balance_lbl.pack(fill="x")
 
         ToolTip(self.search_entry,self.search_placeholder)
@@ -839,21 +878,34 @@ class FinanceApp(ctk.CTk):
             self.reset_scroll_to_top()
 
     def get_date_limit(self, selection):
-        """Calculates the 'start' date for the SQL query."""
+        """Calculates the 'start' and 'end' dates for the SQL query."""
         now = datetime.datetime.now()
+        end_of_now = now.replace(microsecond=999999)
+
         if selection == "Today":
-            return now.replace(hour=0, minute=0, second=0, microsecond=0)
+            start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            return start, end_of_now
+
         elif selection == "Last 7 Days":
-            return now - datetime.timedelta(days=7)
+            start = now - datetime.timedelta(days=7)
+            return start, end_of_now
+
         elif selection == "This Month":
-            return now.replace(day=1, hour=0, minute=0, second=0)
+            start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            return start, end_of_now
+
         elif selection == "Last Month":
-            first_of_this = now.replace(day=1)
-            last_of_prev = first_of_this - datetime.timedelta(days=1)
-            return last_of_prev.replace(day=1, hour=0, minute=0, second=0)
+            first_of_this_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            last_of_last_month = first_of_this_month - datetime.timedelta(microseconds=1)
+            first_of_last_month = last_of_last_month.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+            return first_of_last_month, last_of_last_month
+
         elif selection == "This Year":
-            return now.replace(month=1, day=1, hour=0, minute=0, second=0)
-        return None
+            start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+            return start, end_of_now
+
+        return None, None
 
     def get_dynamic_char_limit(self):
         """Calculates how many characters can fit in the Description gap."""
@@ -876,8 +928,8 @@ class FinanceApp(ctk.CTk):
         # Net Worth
         net_worth = self.manager.get_net_worth()
 
-        ctk.CTkLabel(self.nw_frame, text="TOTAL NET WORTH", font=("Arial", 10, "bold"), text_color="gray").pack(pady=(8, 0))
-        ctk.CTkLabel(self.nw_frame, text=f"€ {net_worth:,.2f}", font=("Arial", 18, "bold"), text_color="#4CD964").pack(
+        ctk.CTkLabel(self.nw_frame, text="TOTAL NET WORTH", font=("JetBrains Mono", 10, "bold"), text_color="gray").pack(pady=(8, 0))
+        ctk.CTkLabel(self.nw_frame, text=f"€ {net_worth:,.2f}", font=("JetBrains Mono", 18, "bold"), text_color="#4CD964").pack(
             pady=(0, 8))
 
         # Account cards
@@ -935,13 +987,13 @@ class FinanceApp(ctk.CTk):
 
             # Row 1: Name
             ctk.CTkLabel(acc_card, text=acc.name.upper(),
-                         font=("Arial", 10),
+                         font=("JetBrains Mono", 10),
                          anchor="w", height=15).pack(fill="x", padx=10, pady=(5, 0))
 
             # Row 2: Balance
             bal_color = "#FF6B6B" if acc.balance < 0 else "white"
             ctk.CTkLabel(acc_card, text=f"{acc.balance:,.2f} {acc.currency_code}",
-                         font=("Arial", 12, "bold"), text_color=bal_color,
+                         font=("JetBrains Mono", 12, "bold"), text_color=bal_color,
                          anchor="w", height=20).pack(fill="x", padx=10, pady=(0, 5))
 
             for child in acc_card.winfo_children():
@@ -1020,18 +1072,17 @@ class FinanceApp(ctk.CTk):
         if selection == "Custom...":
             try:
                 start = datetime.datetime.strptime(self.start_date_var.get(), "%Y-%m-%d").replace(hour=0, minute=0)
-                end = datetime.datetime.strptime(self.end_date_var.get(), "%Y-%m-%d").replace(hour=23, minute=59)
+                end = datetime.datetime.strptime(self.end_date_var.get(), "%Y-%m-%d").replace(hour=23, minute=59, second=59)
                 query = query.filter(column("ts").between(start, end))
             except ValueError:
                 pass
         else:
-            date_limit = self.get_date_limit(selection)
-            if date_limit:
-                query = query.filter(column("ts") >= date_limit)
+            start_limit, end_limit = self.get_date_limit(selection)
 
-        date_limit = self.get_date_limit(self.date_filter_var.get())
-        if date_limit:
-            query = query.filter(column("ts") >= date_limit)
+            if start_limit and end_limit:
+                query = query.filter(column("ts").between(start_limit, end_limit))
+            elif selection == "All Time":
+                pass
 
         if self.filter_account_id:
             query = query.filter(column("acc_id") == self.filter_account_id)

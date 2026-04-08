@@ -135,16 +135,6 @@ class ToolTip:
         self.id = self.widget.after(self.delay, self.show_tip)
 
     def show_tip(self, _event=None):
-        # if self.tip_window or not self.text:
-        #     return
-        # x = self.widget.winfo_rootx() + 20
-        # y = self.widget.winfo_rooty() + self.widget.winfo_height() + 10
-        # self.tip_window = tw = ctk.CTkToplevel(self.widget)
-        # tw.wm_overrideredirect(True)
-        # tw.wm_geometry(f"+{x}+{y}")
-        # label = ctk.CTkLabel(tw, text=self.text, corner_radius=5,
-        #                      fg_color="#333333", padx=5, pady=2)
-        # label.pack()
         if self.tip_window or not self.text:
             return
 
@@ -231,10 +221,10 @@ class TransactionRow(ctk.CTkFrame):
         lbl_amt = self._add_lbl(amt_str, width=150, anchor="e", color=style['text'], bold=True)
         if data.currency != 'EUR': ToolTip(lbl_amt, f"Converted: {style['prefix']}{data.eur_val:,.2f} EUR (Rate: {data.fx_rate})")
         # Hover Effect
-        def on_enter(e, r=self):
+        def on_enter(_e, r=self):
             r.configure(fg_color="gray25")
 
-        def on_leave(e, r=self):
+        def on_leave(_e, r=self):
             r.configure(fg_color="gray15")
 
         self.bind("<Enter>", on_enter)
@@ -251,15 +241,16 @@ class TransactionRow(ctk.CTkFrame):
         lbl.pack(side="left", padx=10, fill="x" if expand else None, expand=expand)
         return lbl
 
-class AddExpenseWindow(ctk.CTkToplevel):
-    def __init__(self, parent, manager):
+class BaseTransactionWindow(ctk.CTkToplevel):
+    def __init__(self, parent, manager, title):
         super().__init__(parent)
-        self.title("Add New Expense")
-        self.geometry("450x585")
-        self.minsize(450,585)
-        self.maxsize(450,585)
+        self.title(title)
+        self.center_relative_to_parent(width=450, height=585)
+
+        self.minsize(450, 585)
+        self.maxsize(450, 585)
         self.manager = manager
-        mem = self.manager.last_used
+        self.mem = self.manager.last_used
 
         self.after(100, self.force_focus)
         self.attributes('-topmost', False)
@@ -267,150 +258,151 @@ class AddExpenseWindow(ctk.CTkToplevel):
         self.grid_columnconfigure(0, weight=0, minsize=120)
         self.grid_columnconfigure(1, weight=1)
 
-        # UI Form label
-        ctk.CTkLabel(self, text="New Expense", font=("JetBrains Mono", 20, "bold")).grid(row=0, column=0, padx=20, pady=20)
-
-        # Placeholders
-        self.cat_placeholder = "Search or type Category..."
-        self.ven_placeholder = "Search or type Vendor..."
+        # 1. Variables & Placeholders
         self.amount_placeholder = "Amount (e.g. 15.50)"
         self.desc_placeholder = "Description (Optional)"
         self.fx_placeholder = "Rate (e.g. 1.15)"
+        self.session_time = datetime.datetime.now().strftime("%H:%M:%S")
 
-        # Error label
-        self.error_label = ctk.CTkLabel(self, text="", text_color="orange", font=("JetBrains Mono", 12))
-        self.error_label.grid(row=10, column=0, columnspan=2, pady=(10, 5))
+        self.currency_var = ctk.StringVar(value=self.mem["currency"])
+        self.date_var = ctk.StringVar(value=f"{self.mem['date']} {self.session_time}")
+        self.project_var = ctk.StringVar(value=self.mem["project"])
 
-        # Clear All & Save Button
-        btn_frame = ctk.CTkFrame(self, fg_color="transparent")
-        btn_frame.grid(row=11, column=0, columnspan=2, pady=30)
-        self.clear_btn = ctk.CTkButton(btn_frame, text="Clear All", fg_color="gray30", command=self.clear_all)
-        self.clear_btn.pack(side="left", padx=10)
+        self.cal_window = None
+        self.fx_tooltip = None
 
-        self.save_btn = ctk.CTkButton(btn_frame, text="Save Expense", command=self.submit_data, fg_color="green")
-        self.save_btn.pack(side="left", padx=10)
+        # 2. Create Shared Widgets (Top & Bottom)
+        self.title_lbl = ctk.CTkLabel(self, text=title, font=("JetBrains Mono", 20, "bold"))
 
-        # Initial values
-        # 1. Amount
+        self.lbl_amount = ctk.CTkLabel(self, text="Amount", font=("JetBrains Mono", 13, "bold"), anchor="w")
         self.amount_entry = ctk.CTkEntry(self)
+
+        currencies = [c.code for c in
+                      session.query(Currency).filter_by(active_bool=True).order_by(Currency.code.asc()).all()]
+        self.lbl_currency = ctk.CTkLabel(self, text="Currency", font=("JetBrains Mono", 13, "bold"), anchor="w")
+        self.currency_menu = ctk.CTkOptionMenu(self, values=currencies, variable=self.currency_var,
+                                               command=self.on_currency_change)
+
+        self.lbl_fx = ctk.CTkLabel(self, text="Exchange Rate", font=("JetBrains Mono", 13, "bold"), anchor="w")
+        self.fx_entry = ctk.CTkEntry(self)
+
+        self.lbl_date = ctk.CTkLabel(self, text="Date & Time", font=("JetBrains Mono", 13, "bold"), anchor="w")
+        self.date_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.date_entry = ctk.CTkEntry(self.date_frame, textvariable=self.date_var, width=150)
+        self.today_btn = ctk.CTkButton(self.date_frame, text="T", width=30, command=lambda: self.set_relative_date(0))
+        self.yesterday_btn = ctk.CTkButton(self.date_frame, text="Y", width=30, command=lambda: self.set_relative_date(1))
+        self.date_btn = ctk.CTkButton(self.date_frame, text="📅", width=40, command=lambda: open_calendar(self, self.date_var, include_time=True))
+
+        self.lbl_desc = ctk.CTkLabel(self, text="Description", font=("JetBrains Mono", 13, "bold"), anchor="w")
+        self.desc_entry = ctk.CTkEntry(self)
+
+        projects = [p.name for p in session.query(Project).filter_by(active_bool=True).order_by(Project.name.asc()).all()]
+        self.lbl_project = ctk.CTkLabel(self, text="Project", font=("JetBrains Mono", 13, "bold"), anchor="w")
+        self.project_menu = ctk.CTkOptionMenu(self, values=projects, variable=self.project_var)
+
+        self.error_label = ctk.CTkLabel(self, text="", text_color="orange", font=("JetBrains Mono", 12))
+        self.btn_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.clear_btn = ctk.CTkButton(self.btn_frame, text="Clear All", fg_color="gray30", command=self.clear_all)
+        self.save_btn = ctk.CTkButton(self.btn_frame, text="Save", command=self.submit_data, fg_color="green")
+
+    def center_relative_to_parent(self, width, height):
+        """Calculates coordinates to center this window over its parent."""
+        self.master.update_idletasks()
+
+        p_width = self.master.winfo_width()
+        p_height = self.master.winfo_height()
+        p_x = self.master.winfo_rootx()
+        p_y = self.master.winfo_rooty()
+
+        center_x = p_x + (p_width // 2) - (width // 2)
+        center_y = p_y + (p_height // 2) - (height // 2)
+
+        self.geometry(f"{width}x{height}+{center_x}+{center_y}")
+
+    def finalize_initialization(self):
+        """Subclasses call it after creating their specific widgets."""
+        self.layout_shared_top()
+        self.layout_specific_widgets()
+        self.layout_shared_bottom()
+        self.setup_bindings()
+
+        self.update_fx_list()
+        self.validate_form()
+
+    # Layout Methods
+    def layout_shared_top(self):
+        self.title_lbl.grid(row=0, column=0, padx=20, pady=20)
+
+        # Amount (Row 1)
+        self.lbl_amount.grid(row=1, column=0, padx=(20, 10), pady=8, sticky="w")
+        self.amount_entry.grid(row=1, column=1, padx=(0, 20), pady=8, sticky="ew")
         self.amount_entry.insert(0, self.amount_placeholder)
         self.amount_entry.configure(text_color="gray")
+
+        # Currency (Row 2)
+        self.lbl_currency.grid(row=2, column=0, padx=(20, 10), pady=8, sticky="w")
+        self.currency_menu.grid(row=2, column=1, padx=(0, 20), pady=8, sticky="ew")
+
+        # FX Rate (Row 3)
+        self.fx_entry.insert(0, self.fx_placeholder)
+        self.fx_entry.configure(text_color="gray")
+        self.fx_tooltip = ToolTip(self.fx_entry, "Latest known rate will appear here")
+
+    def layout_shared_bottom(self):
+        # Date (Row 7)
+        self.lbl_date.grid(row=7, column=0, padx=(20, 10), pady=8, sticky="w")
+        self.date_frame.grid(row=7, column=1, padx=(0, 20), pady=8, sticky="ew")
+        self.date_entry.pack(side="left", fill="x", expand=True, padx=(0, 5))
+        self.today_btn.pack(side="left", padx=2)
+        self.yesterday_btn.pack(side="left", padx=2)
+        self.date_btn.pack(side="left", padx=2)
+
+        ToolTip(self.today_btn, "Set to Today")
+        ToolTip(self.yesterday_btn, "Set to Yesterday")
+        ToolTip(self.date_btn, "Open Calendar")
+
+        # Description (Row 8)
+        self.lbl_desc.grid(row=8, column=0, padx=(20, 10), pady=8, sticky="w")
+        self.desc_entry.grid(row=8, column=1, padx=(0, 20), pady=8, sticky="ew")
+        self.desc_entry.insert(0, self.desc_placeholder)
+        self.desc_entry.configure(text_color="gray")
+
+        # Project (Row 9)
+        self.lbl_project.grid(row=9, column=0, padx=(20, 10), pady=8, sticky="w")
+        self.project_menu.grid(row=9, column=1, padx=(0, 20), pady=8, sticky="ew")
+
+        # Footer (Row 10 & 11)
+        self.error_label.grid(row=10, column=0, columnspan=2, pady=(10, 5))
+        self.btn_frame.grid(row=11, column=0, columnspan=2, pady=10)
+        self.clear_btn.pack(side="left", padx=10)
+        self.save_btn.pack(side="left", padx=10)
+
+    def setup_bindings(self):
         self.amount_entry.bind("<FocusIn>", lambda e: self._entry_focus_in(self.amount_entry, self.amount_placeholder))
         self.amount_entry.bind("<FocusOut>", lambda e: self._entry_focus_out(self.amount_entry, self.amount_placeholder))
         self.amount_entry.bind("<KeyRelease>", self.validate_form)
 
-        # 2. Currency (Dropdown)
-        currencies = [c.code for c in session.query(Currency).filter_by(active_bool=True).order_by(Currency.code.asc()).all()]
-        self.currency_var = ctk.StringVar(value=mem["currency"])
-        self.currency_menu = ctk.CTkOptionMenu(self, values=currencies, variable=self.currency_var, command=self.update_pm_list)
-
-        # 3. Exchange Rate (Automatically changes based on Date and Currency)
-        self.fx_label = ctk.CTkLabel(self, text="Exchange Rate", font=("JetBrains Mono", 13, "bold"), anchor="w")
-        self.fx_entry = ctk.CTkEntry(self)
-        self.fx_entry.insert(0, self.fx_placeholder)
-        self.fx_entry.configure(text_color="gray")
         self.fx_entry.bind("<FocusIn>", lambda e: self._entry_focus_in(self.fx_entry, self.fx_placeholder))
         self.fx_entry.bind("<FocusOut>", lambda e: self._entry_focus_out(self.fx_entry, self.fx_placeholder))
-        # When the user types, clear the "Suggested" tooltip because the data is now manual
         self.fx_entry.bind("<KeyRelease>", lambda e: self._clear_fx_tooltip())
-        self.fx_entry.bind("<KeyRelease>", self.validate_form)
+        self.fx_entry.bind("<KeyRelease>", self.validate_form, add="+")
 
-        # 4. Category (SearchableComboBox so we can find existing or type new ones)
-        self.all_categories = [c.name for c in session.query(Category).filter_by(active_bool=True).order_by(Category.name.asc()).all()]
-        self.category_combo = SearchableComboBox(self, placeholder=self.cat_placeholder, values=self.all_categories, command=lambda _: self.validate_form())
-        # noinspection PyProtectedMember
-        self.category_combo._entry.bind("<KeyRelease>", self.validate_form, add="+")
-
-        # 5. Vendor (ditto)
-        self.all_vendors = [v.name for v in session.query(Vendor).filter_by(active_bool=True).order_by(Vendor.name.asc()).all()]
-        self.vendor_combo = SearchableComboBox(self, placeholder=self.ven_placeholder, values=self.all_vendors, command=lambda _: self.validate_form())
-        # noinspection PyProtectedMember
-        self.vendor_combo._entry.bind("<KeyRelease>", self.validate_form, add="+")
-
-        # 6. Datetime
-        self.cal_window = None
-        date_frame = ctk.CTkFrame(self, fg_color="transparent")
-        date_frame.grid(row=7, column=0, padx=20, pady=10, sticky="ew")
-        date_frame.grid(row=7, column=1, padx=(0, 20), pady=8, sticky="ew")
-
-        self.session_time = datetime.datetime.now().strftime("%H:%M:%S")
-        initial_date = f"{mem['date']} {self.session_time}"
-        self.date_var = ctk.StringVar(value=initial_date)
-        self.date_entry = ctk.CTkEntry(date_frame, textvariable=self.date_var, width=150)
-        self.date_entry.pack(side="left", fill="x", expand=True, padx=(0, 5))
-
-        self.today_btn = ctk.CTkButton(date_frame, text="T", width=30, command=lambda: self.set_relative_date(0))
-        self.today_btn.pack(side="left", padx=2)
-
-        self.yesterday_btn = ctk.CTkButton(date_frame, text="Y", width=30, command=lambda: self.set_relative_date(1))
-        self.yesterday_btn.pack(side="left", padx=2)
-
-        self.date_btn = ctk.CTkButton(date_frame, text="📅", width=40, command=lambda: open_calendar(self, self.date_var, include_time=True))
-        self.date_btn.pack(side="left", padx=2)
-
-        # 7. Payment Method
-        self.pm_menu = ctk.CTkOptionMenu(self, values=[])
-        self.update_pm_list(mem["currency"])
-        if mem["pm"] in self.pm_menu.cget("values"):
-            self.pm_menu.set(mem["pm"])
-
-        # 8. Description
-        self.desc_entry = ctk.CTkEntry(self)
-        self.desc_entry.insert(0, self.desc_placeholder)
-        self.desc_entry.configure(text_color="gray")
         self.desc_entry.bind("<FocusIn>", lambda e: self._entry_focus_in(self.desc_entry, self.desc_placeholder))
         self.desc_entry.bind("<FocusOut>", lambda e: self._entry_focus_out(self.desc_entry, self.desc_placeholder))
 
-        # 9. Project
-        projects = [p.name for p in session.query(Project).filter_by(active_bool=True).order_by(Project.name.asc()).all()]
-        self.project_var = ctk.StringVar(value=mem["project"])
-        self.project_menu = ctk.CTkOptionMenu(self, values=projects, variable=self.project_var)
+        self.currency_var.trace_add("write", self._handle_currency_change)
+        self.date_var.trace_add("write", self._handle_date_change)
 
-        # Draw label + fields
-        def add_row(label_text, widget, row_idx):
-            lbl = ctk.CTkLabel(self, text=label_text, font=("JetBrains Mono", 13, "bold"), anchor="w")
-            lbl.grid(row=row_idx, column=0, padx=(20, 10), pady=8, sticky="w")
-            widget.grid(row=row_idx, column=1, padx=(0, 20), pady=8, sticky="ew")
-
-        add_row("Amount", self.amount_entry, 1)
-        add_row("Currency", self.currency_menu, 2)
-        add_row("Category", self.category_combo, 4)
-        add_row("Vendor", self.vendor_combo, 5)
-        add_row("Payment Method", self.pm_menu, 6)
-
-        # Date container is special
-        date_lbl = ctk.CTkLabel(self, text="Date & Time", font=("JetBrains Mono", 13, "bold"), anchor="w")
-        date_lbl.grid(row=7, column=0, padx=(20, 10), pady=8, sticky="w")
-
-        add_row("Description", self.desc_entry, 8)
-        add_row("Project", self.project_menu, 9)
-
-        # Tooltips
-        ToolTip(self.today_btn, "Set to Today")
-        ToolTip(self.yesterday_btn, "Set to Yesterday")
-        ToolTip(self.date_btn, "Open Calendar")
-        self.fx_tooltip = ToolTip(self.fx_entry, "Latest known rate will appear here")
-
-        # Keep an eye out! These get updated fx rate as... something changes
-        # 1. Trace the Currency Variable
-        self.currency_var.trace_add("write", lambda *args: self.update_fx_list(self.currency_var.get()))
-        self.currency_var.trace_add("write", self.validate_form)
-
-        # 2. Trace the Date Variable
-        self.date_var.trace_add("write", lambda *args: self.update_fx_list(self.currency_var.get()))
-        self.date_var.trace_add("write", self.validate_form)
-
-        # 3. Initial Trigger
-        self.update_fx_list()
-        self.validate_form()
-
-    def _entry_focus_in(self, widget, placeholder):
+    # Shared Methods
+    @staticmethod
+    def _entry_focus_in(widget, placeholder):
         """Clears the placeholder and sets value color."""
         if widget.get() == placeholder:
             widget.delete(0, 'end')
             widget.configure(text_color="white")
 
-    def _entry_focus_out(self, widget, placeholder):
+    @staticmethod
+    def _entry_focus_out(widget, placeholder):
         """Sets the placeholder and its color."""
         if widget.get() == "":
             widget.insert(0, placeholder)
@@ -421,6 +413,19 @@ class AddExpenseWindow(ctk.CTkToplevel):
         if self.fx_entry.get() != self.fx_placeholder:
             self.fx_tooltip.text = "Manual rate entered"
 
+    def _handle_date_change(self, *args):
+        """Ensures correct execution sequence when the user changes the Date."""
+        self.update_fx_list()
+        if hasattr(self, 'error_label'):
+            self.validate_form()
+
+    def _handle_currency_change(self, *args):
+        """Ensures correct execution sequence when the user changes the Currency."""
+        self.update_fx_list()
+        self.on_currency_change(self.currency_var.get())
+        if hasattr(self, 'error_label'):
+            self.validate_form()
+
     def force_focus(self):
         self.focus_force()
         self.lift()
@@ -428,13 +433,65 @@ class AddExpenseWindow(ctk.CTkToplevel):
 
     def get_current_time_part(self):
         """Extracts the HH:MM:SS part from the current entry, falling back to session_time."""
-        current_val = self.date_var.get()
         try:
-            if " " in current_val:
-                return current_val.split(" ")[1]
-            return self.session_time
+            return self.date_var.get().split(" ")[1] if " " in self.date_var.get() else self.session_time
         except:
             return self.session_time
+
+    def set_relative_date(self, days_ago):
+        """
+        Sets the date_var to Today (0) or Yesterday (1).
+        Keeps the time.
+        """
+        active_time = self.get_current_time_part()
+        target_date = datetime.datetime.now() - datetime.timedelta(days=days_ago)
+        self.date_var.set(f"{target_date.strftime('%Y-%m-%d')} {active_time}")
+
+    def update_fx_list(self):
+        """Refreshes FX rate based on currency and date."""
+        selected_currency = self.currency_var.get()
+        if selected_currency == "EUR":
+            self.lbl_fx.grid_forget()
+            self.fx_entry.grid_forget()
+            return
+
+        self.lbl_fx.grid(row=3, column=0, padx=(20, 10), pady=8, sticky="w")
+        self.fx_entry.grid(row=3, column=1, padx=(0, 20), pady=8, sticky="ew")
+
+        try:
+            full_date = self.date_var.get()
+            if not full_date or len(full_date) < 10: return
+            result = self.manager.get_historical_fx_rate(selected_currency, full_date)
+            if result:
+                self.fx_entry.delete(0, 'end')
+                self.fx_entry.insert(0, str(result[0]))
+                self.fx_entry.configure(text_color="white")
+                self.fx_tooltip.text = f"Suggested rate from: {result[1].strftime('%Y-%m-%d')}"
+            else:
+                self.fx_entry.delete(0, 'end')
+                self.fx_entry.insert(0, self.fx_placeholder)
+                self.fx_entry.configure(text_color="gray")
+                self.fx_tooltip.text = "No historical rate found."
+        except Exception as e:
+            print(f"FX Sync Error: {e}")
+
+    @staticmethod
+    def is_float(val):
+        """Checks if a string can be a valid currency float."""
+        try:
+            float(val.replace(",", "."))
+            return True
+        except ValueError:
+            return False
+
+    @staticmethod
+    def is_valid_date(val):
+        """Checks if the date string matches the YYYY-MM-DD HH:MM format."""
+        try:
+            datetime.datetime.strptime(val, "%Y-%m-%d %H:%M:%S")
+            return True
+        except ValueError:
+            return False
 
     def clear_all(self):
         """Resets the form to default values."""
@@ -445,238 +502,71 @@ class AddExpenseWindow(ctk.CTkToplevel):
         self.desc_entry.insert(0, self.desc_placeholder)
         self.desc_entry.configure(text_color="gray")
 
-        for combo in [self.category_combo, self.vendor_combo]:
-            combo.set(combo.placeholder)
-            # noinspection PyProtectedMember
-            combo._entry.configure(foreground="gray")
-
-        # Reset Menus and Date
         self.currency_var.set("EUR")
-        self.update_pm_list("EUR")
         self.project_var.set("")
         self.date_var.set(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+
+        self.clear_specific_fields()
         self.update_fx_list()
-
-        # Put focus back at the start
         self.force_focus()
-        self.amount_entry.focus()
-
-    def set_relative_date(self, days_ago):
-        """
-        Sets the date_var to Today (0) or Yesterday (1).
-        Keeps the time.
-        """
-        active_time = self.get_current_time_part()
-        target_date = datetime.datetime.now() - datetime.timedelta(days=days_ago)
-        date_part = target_date.strftime("%Y-%m-%d")
-        formatted_date = f"{date_part} {active_time}"
-        self.date_var.set(formatted_date)
-
-    def update_fx_list(self, *args):
-        """Refreshes FX rate based on currency and date."""
-        selected_currency = self.currency_var.get()
-        if selected_currency == "EUR":
-            self.fx_label.grid_forget()
-            self.fx_entry.grid_forget()
-            return
-
-        # 1. Show the fields
-        self.fx_label.grid(row=3, column=0, padx=(20, 10), pady=8, sticky="w")
-        self.fx_entry.grid(row=3, column=1, padx=(0, 20), pady=8, sticky="ew")
-
-        # 2. Extract Date (Handling potential empty/malformed strings)
-        try:
-            full_date = self.date_var.get()
-            if not full_date or len(full_date) < 10:
-                return
-
-            result = self.manager.get_historical_fx_rate(
-                currency_code=selected_currency,
-                target_date=full_date
-            )
-
-            if result:
-                rate_val, ts = result
-                self.fx_entry.delete(0, 'end')
-                self.fx_entry.insert(0, str(rate_val))
-                self.fx_entry.configure(text_color="white")
-                self.fx_tooltip.text = f"Suggested rate from: {ts.strftime('%Y-%m-%d')}"
-            else:
-                self.fx_entry.delete(0, 'end')
-                self.fx_entry.insert(0, self.fx_placeholder)
-                self.fx_entry.configure(text_color="gray")
-                self.fx_tooltip.text = "No historical rate found."
-        except Exception as e:
-            print(f"FX Sync Error: {e}")
-
-    def update_pm_list(self, selected_currency):
-        """Filters Payment Methods based on the account's currency."""
-        valid_pms = (
-            session.query(PaymentMethod)
-            .join(Account)
-            .filter(Account.currency_code == selected_currency)
-            .filter(PaymentMethod.active_bool == True)
-            .order_by(PaymentMethod.name.asc())
-            .all()
-        )
-
-        pm_names = [p.name for p in valid_pms]
-
-        if pm_names:
-            self.pm_menu.configure(values=pm_names)
-            self.pm_menu.set(pm_names[0])
-        else:
-            self.pm_menu.configure(values=["No valid PM found"])
-            self.pm_menu.set("No valid PM found")
-
-        self.validate_form()
-
-    def is_float(self, val):
-        """Checks if a string can be a valid currency float."""
-        try:
-            float(val.replace(",", "."))
-            return True
-        except ValueError:
-            return False
-
-    def is_valid_date(self, val):
-        """Checks if the date string matches the YYYY-MM-DD HH:MM format."""
-        try:
-            datetime.datetime.strptime(val, "%Y-%m-%d %H:%M:%S")
-            return True
-        except ValueError:
-            return False
 
     def validate_form(self, *args):
         """Checks if all required fields are filled to enable the Save button."""
-        # 0. Reset
         self.error_label.configure(text="", text_color="orange")
         self.save_btn.configure(state="normal", fg_color="green", text_color="white")
-        # 1. Required: Amount (Must not be placeholder or empty)
+
         amt_val = self.amount_entry.get()
-        amt_ok = (amt_val != self.amount_placeholder and
-                  amt_val.strip() != "" and
-                  self.is_float(amt_val))
-
-        # 2. Required: Date
-        date_val = self.date_var.get()
-        date_ok = self.is_valid_date(date_val)
-
-        # 2. Required: Currency & PM (OptionMenus usually always have a value, but just in case)
+        amt_ok = amt_val != self.amount_placeholder and amt_val.strip() != "" and self.is_float(amt_val)
+        date_ok = self.is_valid_date(self.date_var.get())
         cur_ok = self.currency_var.get() != ""
-        pm_ok = self.pm_menu.get() not in ["", "No valid PM found"]
+        fx_val = self.fx_entry.get()
+        fx_ok = self.currency_var.get() == "EUR" or (
+                    fx_val != self.fx_placeholder and fx_val.strip() != "" and self.is_float(fx_val))
 
-        # 3. Required: FX Rate (ONLY if Currency != EUR)
-        if self.currency_var.get() != "EUR":
-            fx_val = self.fx_entry.get()
-            fx_ok = (fx_val != self.fx_placeholder and fx_val.strip() != "" and self.is_float(fx_val))
-        else:
-            fx_ok = True
-
-        # 4. Toggle Button State
-        error_text = {
-            "duplicate": "⚠ Potential duplicate detected!",
-            "amount": "⚠ Check Amount (must be a number)",
-            "date": "⚠ Check Date format (YYYY-MM-DD HH:MM:SS)",
-            "fx_rate": "⚠ Check Exchange Rate (must be a number)",
-            "pm": "⚠ Select a valid Payment Method",
-            "currency": "⚠ Select a valid Currency"
-        }
-
-        if amt_ok and date_ok and cur_ok and pm_ok and fx_ok:
-            try:
-                current_amt = float(self.amount_entry.get().replace(",", "."))
-                current_category = self.category_combo.get().strip()
-                current_vendor = self.vendor_combo.get().strip()
-                current_date = self.date_var.get()
-
-                is_new_vendor = (current_vendor not in self.all_vendors and
-                                 current_vendor != self.ven_placeholder and
-                                 current_vendor != "")
-
-                is_new_category = (current_category not in self.all_categories and
-                                   current_category != self.cat_placeholder and
-                                   current_category != "")
-
-                is_duplicate = self.manager.check_for_duplicate(current_amt, current_vendor, current_date)
-
-                self.save_btn.configure(state="normal", fg_color="#EBCB8B", text_color="black")
-
-                if is_duplicate:
-                    self.error_label.configure(text=error_text.get("duplicate", ""), text_color="orange")
-                elif is_new_vendor or is_new_category:
-                    msg = "Notice: "
-                    if is_new_vendor and is_new_category:
-                        msg += "New Vendor & Category will be created."
-                    elif is_new_vendor:
-                        msg += f"New Vendor '{current_vendor}' will be created."
-                    else:
-                        msg += f"New Category '{current_category}' will be created."
-
-                    self.error_label.configure(text=msg, text_color="#EBCB8B")
-                else:
-                    self.save_btn.configure(state="normal", fg_color="green", text_color="white")
-                    self.error_label.configure(text="")
-            except:
-                self.save_btn.configure(state="normal", fg_color="green", text_color="white")
-        else:
+        if not (amt_ok and date_ok and cur_ok and fx_ok):
             self.save_btn.configure(state="disabled", fg_color="gray30", text_color="white")
             if not amt_ok:
-                self.error_label.configure(text=error_text.get("amount", ""))
+                self.error_label.configure(text="⚠ Check Amount (must be a number)")
             elif not date_ok:
-                self.error_label.configure(text=error_text.get("date", ""))
+                self.error_label.configure(text="⚠ Check Date format (YYYY-MM-DD HH:MM:SS)")
             elif not fx_ok:
-                self.error_label.configure(text=error_text.get("fx_rate", ""))
-            elif not pm_ok:
-                self.error_label.configure(text=error_text.get("pm", ""))
+                self.error_label.configure(text="⚠ Check Exchange Rate (must be a number)")
             elif not cur_ok:
-                self.error_label.configure(text=error_text.get("currency", ""))
+                self.error_label.configure(text="⚠ Select a valid Currency")
+            return
+
+        spec_ok, spec_err = self.validate_specific_fields()
+        if not spec_ok:
+            self.save_btn.configure(state="disabled", fg_color="gray30", text_color="white")
+            self.error_label.configure(text=spec_err)
+            return
+
+        warn_msg, is_duplicate = self.get_warnings()
+        if is_duplicate:
+            self.save_btn.configure(fg_color="#EBCB8B", text_color="black")
+            self.error_label.configure(text=warn_msg, text_color="orange")
+        elif warn_msg:
+            self.error_label.configure(text=warn_msg, text_color="#EBCB8B")
 
     def submit_data(self):
         """Invokes the finance manager to submit to DB."""
         try:
-            # 1. Mandatory Fields
             amt = float(self.amount_entry.get().replace(",", "."))
             cur = self.currency_var.get()
-            pm = self.pm_menu.get()
             ts = datetime.datetime.strptime(self.date_var.get(), "%Y-%m-%d %H:%M:%S")
-
-            # 2. FX Rate Logic
-            if cur == "EUR":
-                fx_rate = None
-            else:
-                fx_rate = float(self.fx_entry.get().replace(",", "."))
-
-            # 3. Handle Optional Fields (Convert placeholders to empty strings)
-            cat = self.category_combo.get()
-            if cat == self.cat_placeholder: cat = ""
-
-            ven = self.vendor_combo.get()
-            if ven == self.ven_placeholder: ven = ""
-
-            descr = self.desc_entry.get()
-            if descr == self.desc_placeholder: descr = ""
-
+            fx_rate = None if cur == "EUR" else float(self.fx_entry.get().replace(",", "."))
+            descr = "" if self.desc_entry.get() == self.desc_placeholder else self.desc_entry.get()
             proj = self.project_var.get()
 
-            # 4. Execute the manager
-            self.manager.add_expense(
-                amount=amt,
-                currency_code=cur,
-                category_name=cat,
-                vendor_name=ven,
-                payment_method_name=pm,
-                project_name=proj,
-                description=descr,
-                exchange_rate=fx_rate,
-                timestamp=ts
-            )
+            base_data = {
+                "amount": amt, "currency_code": cur, "timestamp": ts,
+                "exchange_rate": fx_rate, "description": descr, "project_name": proj
+            }
 
-            # 5. Success Flash
+            self.execute_db_submission(base_data)
+
             self.save_btn.configure(text="✔ Added!", fg_color="darkgreen", state="disabled")
-            self.error_label.configure(text="Expense saved successfully", text_color="green")
-
-            # 6. Wait & Refresh Main
+            self.error_label.configure(text="Saved successfully", text_color="green")
             self.after(1000, self.finalize_and_refresh)
 
         except Exception as e:
@@ -686,12 +576,133 @@ class AddExpenseWindow(ctk.CTkToplevel):
     def finalize_and_refresh(self):
         """Kills the popup and triggers the main app reload."""
         main_app = self.master
-
         self.destroy()
-
         if hasattr(main_app, "refresh_accounts") and hasattr(main_app, "load_transactions"):
             main_app.after(10, main_app.refresh_accounts)
             main_app.after(50, main_app.load_transactions)
+
+    # Abstract Methods
+    def layout_specific_widgets(self):
+        pass
+
+    def on_currency_change(self, selected_currency):
+        pass
+
+    def clear_specific_fields(self):
+        pass
+
+    def validate_specific_fields(self):
+        return True, ""
+
+    def get_warnings(self):
+        return "", False
+
+    def execute_db_submission(self, base_data):
+        pass
+
+class AddExpenseWindow(BaseTransactionWindow):
+    def __init__(self, parent, manager):
+        super().__init__(parent, manager, "New Expense")
+
+        self.cat_placeholder = "Search or type Category..."
+        self.ven_placeholder = "Search or type Vendor..."
+
+        # Category
+        self.lbl_category = ctk.CTkLabel(self, text="Category", font=("JetBrains Mono", 13, "bold"), anchor="w")
+        self.all_categories = [c.name for c in
+                               session.query(Category).filter_by(active_bool=True).order_by(Category.name.asc()).all()]
+        self.category_combo = SearchableComboBox(self, placeholder=self.cat_placeholder, values=self.all_categories,
+                                                 command=lambda _: self.validate_form())
+        # noinspection PyProtectedMember
+        self.category_combo._entry.bind("<KeyRelease>", self.validate_form, add="+")
+
+        # Vendor
+        self.lbl_vendor = ctk.CTkLabel(self, text="Vendor", font=("JetBrains Mono", 13, "bold"), anchor="w")
+        self.all_vendors = [v.name for v in
+                            session.query(Vendor).filter_by(active_bool=True).order_by(Vendor.name.asc()).all()]
+        self.vendor_combo = SearchableComboBox(self, placeholder=self.ven_placeholder, values=self.all_vendors,
+                                               command=lambda _: self.validate_form())
+        # noinspection PyProtectedMember
+        self.vendor_combo._entry.bind("<KeyRelease>", self.validate_form, add="+")
+
+        # Payment Method
+        self.lbl_pm = ctk.CTkLabel(self, text="Payment Method", font=("JetBrains Mono", 13, "bold"), anchor="w")
+        self.pm_menu = ctk.CTkOptionMenu(self, values=[])
+
+        # Initialize PM list based on currency
+        self.on_currency_change(self.mem["currency"])
+        if self.mem["pm"] in self.pm_menu.cget("values"):
+            self.pm_menu.set(self.mem["pm"])
+
+        self.finalize_initialization()
+
+    def layout_specific_widgets(self):
+        self.lbl_category.grid(row=4, column=0, padx=(20, 10), pady=8, sticky="w")
+        self.category_combo.grid(row=4, column=1, padx=(0, 20), pady=8, sticky="ew")
+
+        self.lbl_vendor.grid(row=5, column=0, padx=(20, 10), pady=8, sticky="w")
+        self.vendor_combo.grid(row=5, column=1, padx=(0, 20), pady=8, sticky="ew")
+
+        self.lbl_pm.grid(row=6, column=0, padx=(20, 10), pady=8, sticky="w")
+        self.pm_menu.grid(row=6, column=1, padx=(0, 20), pady=8, sticky="ew")
+
+    def on_currency_change(self, selected_currency):
+        """Filters Payment Methods based on the account's currency."""
+        valid_pms = (
+            session.query(PaymentMethod)
+            .join(Account).filter(Account.currency_code == selected_currency, PaymentMethod.active_bool == True)
+            .order_by(PaymentMethod.name.asc())
+            .all()
+        )
+        pm_names = [p.name for p in valid_pms]
+        if pm_names:
+            self.pm_menu.configure(values=pm_names)
+            self.pm_menu.set(pm_names[0])
+        else:
+            self.pm_menu.configure(values=["No valid PM found"])
+            self.pm_menu.set("No valid PM found")
+
+    def clear_specific_fields(self):
+        for combo in [self.category_combo, self.vendor_combo]:
+            combo.set(combo.placeholder)
+            # noinspection PyProtectedMember
+            combo._entry.configure(foreground="gray")
+        self.on_currency_change("EUR")
+
+    def validate_specific_fields(self):
+        if self.pm_menu.get() in ["", "No valid PM found"]:
+            return False, "⚠ Select a valid Payment Method"
+        return True, ""
+
+    def get_warnings(self):
+        current_amt = float(self.amount_entry.get().replace(",", "."))
+        current_category = self.category_combo.get().strip()
+        current_vendor = self.vendor_combo.get().strip()
+
+        is_duplicate = self.manager.check_for_duplicate(current_amt, current_vendor, self.date_var.get())
+        if is_duplicate:
+            return "⚠ Potential duplicate detected!", True
+
+        is_new_vendor = current_vendor not in self.all_vendors and current_vendor not in [self.ven_placeholder, ""]
+        is_new_category = current_category not in self.all_categories and current_category not in [self.cat_placeholder, ""]
+
+        if is_new_vendor and is_new_category: return "Notice: New Vendor & Category will be created.", False
+        if is_new_vendor: return f"Notice: New Vendor '{current_vendor}' will be created.", False
+        if is_new_category: return f"Notice: New Category '{current_category}' will be created.", False
+
+        return "", False
+
+    def execute_db_submission(self, base_data):
+        cat = "" if self.category_combo.get().strip() == self.cat_placeholder else self.category_combo.get().strip()
+        ven = "" if self.vendor_combo.get().strip() == self.ven_placeholder else self.vendor_combo.get().strip()
+        pm = self.pm_menu.get()
+
+        self.manager.add_expense(
+            **base_data,
+            category_name=cat,
+            vendor_name=ven,
+            payment_method_name=pm
+        )
 
 class FinanceApp(ctk.CTk):
     def __init__(self):
@@ -1051,10 +1062,10 @@ class FinanceApp(ctk.CTk):
             acc_card.pack(pady=2, padx=5, fill="x")
 
             # Hover Effect
-            def on_enter(e, card=acc_card, h_bg=hover_bg):
+            def on_enter(_e, card=acc_card, h_bg=hover_bg):
                 card.configure(fg_color=h_bg)
 
-            def on_leave(e, card=acc_card, b_bg=base_bg):
+            def on_leave(_e, card=acc_card, b_bg=base_bg):
                 card.configure(fg_color=b_bg)
 
             # Bind to the frame itself
@@ -1085,7 +1096,8 @@ class FinanceApp(ctk.CTk):
         self.reorder_btn.configure(fg_color=color)
         self.refresh_accounts()
 
-    def load_account_order(self):
+    @staticmethod
+    def load_account_order():
         """Loads the account ID order from a local JSON file."""
         try:
             if os.path.exists("config.json"):
@@ -1095,7 +1107,8 @@ class FinanceApp(ctk.CTk):
             return[]
         return []
 
-    def save_account_order(self, order_list):
+    @staticmethod
+    def save_account_order(order_list):
         """Saves the current list of account IDs to JSON."""
         config = {}
         if os.path.exists("config.json"):
@@ -1192,7 +1205,8 @@ class FinanceApp(ctk.CTk):
 
         self.update_pagination_ui(total_count, query)
 
-    def get_unified_transaction_query(self, current_session):
+    @staticmethod
+    def get_unified_transaction_query(current_session):
         # 1. EXPENSES
         q1 = current_session.query(
             Expense.id.label("id"),
@@ -1301,7 +1315,8 @@ class FinanceApp(ctk.CTk):
 
         self.render_pagination_controls()
 
-    def calculate_totals(self, base_query):
+    @staticmethod
+    def calculate_totals(base_query):
         """
         Calculates In, Out, and Balance.
         Ignores Transfers.
@@ -1426,7 +1441,7 @@ class FinanceApp(ctk.CTk):
             # noinspection PyProtectedMember
             self.scroll_frame._parent_canvas.yview_moveto(0)
 
-    def jump_to_page(self, event=None):
+    def jump_to_page(self, _event=None):
         try:
             target = int(self.jump_entry.get()) - 1  # UI is 1-indexed
             if 0 <= target < self.total_pages:

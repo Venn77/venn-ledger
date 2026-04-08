@@ -704,6 +704,110 @@ class AddExpenseWindow(BaseTransactionWindow):
             payment_method_name=pm
         )
 
+class AddGainWindow(BaseTransactionWindow):
+    def __init__(self, parent, manager):
+        super().__init__(parent, manager, "New Gain")
+
+        self.stream_placeholder = "Search or type Stream..."
+        self.payer_placeholder = "Search or type Payer..."
+
+        # Stream
+        self.lbl_stream = ctk.CTkLabel(self, text="Stream", font=("JetBrains Mono", 13, "bold"), anchor="w")
+        self.all_streams = [s.name for s in
+                               session.query(Stream).filter_by(active_bool=True).order_by(Stream.name.asc()).all()]
+        self.stream_combo = SearchableComboBox(self, placeholder=self.stream_placeholder, values=self.all_streams,
+                                                 command=lambda _: self.validate_form())
+        # noinspection PyProtectedMember
+        self.stream_combo._entry.bind("<KeyRelease>", self.validate_form, add="+")
+
+        # Payer
+        self.lbl_payer = ctk.CTkLabel(self, text="Payer", font=("JetBrains Mono", 13, "bold"), anchor="w")
+        self.all_payers = [p.name for p in
+                            session.query(Payer).filter_by(active_bool=True).order_by(Payer.name.asc()).all()]
+        self.payer_combo = SearchableComboBox(self, placeholder=self.payer_placeholder, values=self.all_payers,
+                                               command=lambda _: self.validate_form())
+        # noinspection PyProtectedMember
+        self.payer_combo._entry.bind("<KeyRelease>", self.validate_form, add="+")
+
+        # Account
+        self.lbl_acc = ctk.CTkLabel(self, text="Account", font=("JetBrains Mono", 13, "bold"), anchor="w")
+        self.acc_menu = ctk.CTkOptionMenu(self, values=[])
+
+        # Initialize Account list based on currency
+        self.on_currency_change(self.mem["currency"])
+        if self.mem["acc"] in self.acc_menu.cget("values"):
+            self.acc_menu.set(self.mem["acc"])
+
+        self.finalize_initialization()
+
+    def layout_specific_widgets(self):
+        self.lbl_stream.grid(row=4, column=0, padx=(20, 10), pady=8, sticky="w")
+        self.stream_combo.grid(row=4, column=1, padx=(0, 20), pady=8, sticky="ew")
+
+        self.lbl_payer.grid(row=5, column=0, padx=(20, 10), pady=8, sticky="w")
+        self.payer_combo.grid(row=5, column=1, padx=(0, 20), pady=8, sticky="ew")
+
+        self.lbl_acc.grid(row=6, column=0, padx=(20, 10), pady=8, sticky="w")
+        self.acc_menu.grid(row=6, column=1, padx=(0, 20), pady=8, sticky="ew")
+
+    def on_currency_change(self, selected_currency):
+        """Filters Accounts based on the selected currency."""
+        valid_accounts = (
+            session.query(Account)
+            .filter(Account.currency_code == selected_currency, Account.active_bool == True)
+            .order_by(Account.name.asc())
+            .all()
+        )
+        acc_names = [a.name for a in valid_accounts]
+        if acc_names:
+            self.acc_menu.configure(values=acc_names)
+            self.acc_menu.set(acc_names[0])
+        else:
+            self.acc_menu.configure(values=["No valid Account found"])
+            self.acc_menu.set("No valid Account found")
+
+    def clear_specific_fields(self):
+        for combo in [self.stream_combo, self.payer_combo]:
+            combo.set(combo.placeholder)
+            # noinspection PyProtectedMember
+            combo._entry.configure(foreground="gray")
+        self.on_currency_change("EUR")
+
+    def validate_specific_fields(self):
+        if self.acc_menu.get() in ["", "No valid Account found"]:
+            return False, "⚠ Select a valid Account"
+        return True, ""
+
+    def get_warnings(self):
+        current_amt = float(self.amount_entry.get().replace(",", "."))
+        current_stream = self.stream_combo.get().strip()
+        current_payer = self.payer_combo.get().strip()
+
+        is_duplicate = self.manager.check_for_duplicate(current_amt, current_payer, self.date_var.get(), transaction_type="gain")
+        if is_duplicate:
+            return "⚠ Potential duplicate detected!", True
+
+        is_new_payer = current_payer not in self.all_payers and current_payer not in [self.payer_placeholder, ""]
+        is_new_stream = current_stream not in self.all_streams and current_stream not in [self.stream_placeholder, ""]
+
+        if is_new_payer and is_new_stream: return "Notice: New Payer & Stream will be created.", False
+        if is_new_payer: return f"Notice: New Payer '{current_payer}' will be created.", False
+        if is_new_stream: return f"Notice: New Stream '{current_stream}' will be created.", False
+
+        return "", False
+
+    def execute_db_submission(self, base_data):
+        stream = "" if self.stream_combo.get().strip() == self.stream_placeholder else self.stream_combo.get().strip()
+        payer = "" if self.payer_combo.get().strip() == self.payer_placeholder else self.payer_combo.get().strip()
+        acc_id = session.query(Account).filter_by(name=self.acc_menu.get()).first().id
+
+        self.manager.add_gain(
+            **base_data,
+            stream_name=stream,
+            payer_name=payer,
+            account_id=acc_id
+        )
+
 class FinanceApp(ctk.CTk):
     def __init__(self):
         super().__init__()
@@ -731,8 +835,11 @@ class FinanceApp(ctk.CTk):
         self.logo = ctk.CTkLabel(self.sidebar, text="FINANCE", font=("JetBrains Mono", 24, "bold"))
         self.logo.pack(pady=30, padx=20)
 
-        self.add_btn = ctk.CTkButton(self.sidebar, text="+ Add Expense", command=self.open_add_expense)
-        self.add_btn.pack(pady=20, padx=20)
+        self.add_exp_btn = ctk.CTkButton(self.sidebar, text="+ Add Expense", command=self.open_add_expense)
+        self.add_exp_btn.pack(pady=(20, 4), padx=20)
+
+        self.add_gain_btn = ctk.CTkButton(self.sidebar, text="+ Add Gain", command=self.open_add_gain)
+        self.add_gain_btn.pack(pady=(4, 20), padx=20)
 
         self.nw_frame = ctk.CTkFrame(self.sidebar, fg_color="gray15", corner_radius=8)
         self.nw_frame.pack(fill="x", pady=(0, 15), padx=15)
@@ -1459,6 +1566,9 @@ class FinanceApp(ctk.CTk):
 
     def open_add_expense(self):
         AddExpenseWindow(self, self.manager)
+
+    def open_add_gain(self):
+        AddGainWindow(self, self.manager)
 
 
 if __name__ == "__main__":

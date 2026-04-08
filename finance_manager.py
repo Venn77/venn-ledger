@@ -15,6 +15,7 @@ class TransactionManager:
         self.last_used = {
             "currency": "EUR",
             "pm": "",
+            "acc": "",
             "project": "",
             "date": datetime.datetime.now().strftime("%Y-%m-%d")
         }
@@ -150,20 +151,42 @@ class TransactionManager:
         try:
             self.session.add(new_gain)
             self.session.commit()
-            return new_gain
         except Exception as e:
             self.session.rollback()
             raise e
 
-    def check_for_duplicate(self, amount, vendor_name, date_str):
-        """Returns True if an expense with same amount, vendor, and date exists."""
+        # Update the Memory after a successful save
+        self.last_used["currency"] = currency_code
+        self.last_used["acc"] = account.name
+        self.last_used["project"] = project_name
+        # Store just the date part
+        if timestamp and hasattr(timestamp, 'strftime'):
+            self.last_used["date"] = timestamp.strftime("%Y-%m-%d")
+        else:
+            self.last_used["date"] = datetime.datetime.now().strftime("%Y-%m-%d")
+
+        return new_gain
+
+    def check_for_duplicate(self, amount, entity_name, date_str, transaction_type="expense"):
+        """Returns True if a transaction with same amount, entity (vendor/payer), and date exists."""
         target_date = date_str.split(" ")[0]
 
-        exists = self.session.query(Expense).join(Vendor).filter(
-            Expense.amount == amount,
-            Vendor.name == vendor_name,
-            func.date(Expense.timestamp) == target_date
-        ).first()
+        if transaction_type == "expense":
+            exists = self.session.query(Expense).join(Vendor).filter(
+                Expense.amount == amount,
+                Vendor.name == entity_name,
+                func.date(Expense.timestamp) == target_date
+            ).first()
+
+        elif transaction_type == "gain":
+            exists = self.session.query(Gain).join(Payer).filter(
+                Gain.amount == amount,
+                Payer.name == entity_name,
+                func.date(Gain.timestamp) == target_date
+            ).first()
+
+        else:
+            exists = None
 
         return exists is not None
 

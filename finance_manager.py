@@ -16,6 +16,8 @@ class TransactionManager:
             "currency": "EUR",
             "pm": "",
             "acc": "",
+            "orig_acc": "",
+            "dest_acc": "",
             "project": "",
             "date": datetime.datetime.now().strftime("%Y-%m-%d")
         }
@@ -167,8 +169,8 @@ class TransactionManager:
 
         return new_gain
 
-    def check_for_duplicate(self, amount, entity_name, date_str, transaction_type="expense"):
-        """Returns True if a transaction with same amount, entity (vendor/payer), and date exists."""
+    def check_for_duplicate(self, amount, entity_name, date_str, transaction_type="expense", origin_id=None, destination_id=None, amount_dest=None):
+        """Returns True if a transaction with same amount, entity (vendor/payer) / account (origin/destination), and date exists."""
         target_date = date_str.split(" ")[0]
 
         if transaction_type == "expense":
@@ -183,6 +185,15 @@ class TransactionManager:
                 Gain.amount == amount,
                 Payer.name == entity_name,
                 func.date(Gain.timestamp) == target_date
+            ).first()
+
+        elif transaction_type == "transfer":
+            exists = self.session.query(Transfer).filter(
+                Transfer.amount_origin == amount,
+                Transfer.amount_destination == amount_dest,
+                Transfer.origin_account_id == origin_id,
+                Transfer.destination_account_id == destination_id,
+                func.date(Transfer.timestamp) == target_date
             ).first()
 
         else:
@@ -249,8 +260,18 @@ class TransactionManager:
 
             self.session.add(new_transfer)
             self.session.commit()
-            return new_transfer
+
         except Exception as e:
             self.session.rollback()
             raise e
+
+        self.last_used["orig_acc"] = origin.name
+        self.last_used["dest_acc"] = destination.name
+
+        if ts and hasattr(ts, 'strftime'):
+            self.last_used["date"] = ts.strftime("%Y-%m-%d")
+        else:
+            self.last_used["date"] = datetime.datetime.now().strftime("%Y-%m-%d")
+
+        return new_transfer
 

@@ -270,6 +270,7 @@ class BaseTransactionWindow(ctk.CTkToplevel):
 
         self.cal_window = None
         self.fx_tooltip = None
+        self._val_timer = None
 
         # 2. Create Shared Widgets (Top & Bottom)
         self.title_lbl = ctk.CTkLabel(self, text=title, font=("JetBrains Mono", 20, "bold"))
@@ -322,8 +323,8 @@ class BaseTransactionWindow(ctk.CTkToplevel):
     def finalize_initialization(self):
         """Subclasses call it after creating their specific widgets."""
         self.layout_shared_top()
-        self.layout_specific_widgets()
         self.layout_shared_bottom()
+        self.layout_specific_widgets()
         self.setup_bindings()
 
         self.update_fx_list()
@@ -380,12 +381,12 @@ class BaseTransactionWindow(ctk.CTkToplevel):
     def setup_bindings(self):
         self.amount_entry.bind("<FocusIn>", lambda e: self._entry_focus_in(self.amount_entry, self.amount_placeholder))
         self.amount_entry.bind("<FocusOut>", lambda e: self._entry_focus_out(self.amount_entry, self.amount_placeholder))
-        self.amount_entry.bind("<KeyRelease>", self.validate_form)
+        self.amount_entry.bind("<KeyRelease>", self.schedule_validation)
 
         self.fx_entry.bind("<FocusIn>", lambda e: self._entry_focus_in(self.fx_entry, self.fx_placeholder))
         self.fx_entry.bind("<FocusOut>", lambda e: self._entry_focus_out(self.fx_entry, self.fx_placeholder))
         self.fx_entry.bind("<KeyRelease>", lambda e: self._clear_fx_tooltip())
-        self.fx_entry.bind("<KeyRelease>", self.validate_form, add="+")
+        self.fx_entry.bind("<KeyRelease>", self.schedule_validation, add="+")
 
         self.desc_entry.bind("<FocusIn>", lambda e: self._entry_focus_in(self.desc_entry, self.desc_placeholder))
         self.desc_entry.bind("<FocusOut>", lambda e: self._entry_focus_out(self.desc_entry, self.desc_placeholder))
@@ -510,6 +511,12 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         self.update_fx_list()
         self.force_focus()
 
+    def schedule_validation(self, *args):
+        """Debounces the validation until user is done typing."""
+        if self._val_timer:
+            self.after_cancel(self._val_timer)
+        self._val_timer = self.after(500, self.validate_form)
+
     def validate_form(self, *args):
         """Checks if all required fields are filled to enable the Save button."""
         self.error_label.configure(text="", text_color="orange")
@@ -614,7 +621,7 @@ class AddExpenseWindow(BaseTransactionWindow):
         self.category_combo = SearchableComboBox(self, placeholder=self.cat_placeholder, values=self.all_categories,
                                                  command=lambda _: self.validate_form())
         # noinspection PyProtectedMember
-        self.category_combo._entry.bind("<KeyRelease>", self.validate_form, add="+")
+        self.category_combo._entry.bind("<KeyRelease>", self.schedule_validation, add="+")
 
         # Vendor
         self.lbl_vendor = ctk.CTkLabel(self, text="Vendor", font=("JetBrains Mono", 13, "bold"), anchor="w")
@@ -623,7 +630,7 @@ class AddExpenseWindow(BaseTransactionWindow):
         self.vendor_combo = SearchableComboBox(self, placeholder=self.ven_placeholder, values=self.all_vendors,
                                                command=lambda _: self.validate_form())
         # noinspection PyProtectedMember
-        self.vendor_combo._entry.bind("<KeyRelease>", self.validate_form, add="+")
+        self.vendor_combo._entry.bind("<KeyRelease>", self.schedule_validation, add="+")
 
         # Payment Method
         self.lbl_pm = ctk.CTkLabel(self, text="Payment Method", font=("JetBrains Mono", 13, "bold"), anchor="w")
@@ -718,7 +725,7 @@ class AddGainWindow(BaseTransactionWindow):
         self.stream_combo = SearchableComboBox(self, placeholder=self.stream_placeholder, values=self.all_streams,
                                                  command=lambda _: self.validate_form())
         # noinspection PyProtectedMember
-        self.stream_combo._entry.bind("<KeyRelease>", self.validate_form, add="+")
+        self.stream_combo._entry.bind("<KeyRelease>", self.schedule_validation, add="+")
 
         # Payer
         self.lbl_payer = ctk.CTkLabel(self, text="Payer", font=("JetBrains Mono", 13, "bold"), anchor="w")
@@ -727,7 +734,7 @@ class AddGainWindow(BaseTransactionWindow):
         self.payer_combo = SearchableComboBox(self, placeholder=self.payer_placeholder, values=self.all_payers,
                                                command=lambda _: self.validate_form())
         # noinspection PyProtectedMember
-        self.payer_combo._entry.bind("<KeyRelease>", self.validate_form, add="+")
+        self.payer_combo._entry.bind("<KeyRelease>", self.schedule_validation, add="+")
 
         # Account
         self.lbl_acc = ctk.CTkLabel(self, text="Account", font=("JetBrains Mono", 13, "bold"), anchor="w")
@@ -808,6 +815,199 @@ class AddGainWindow(BaseTransactionWindow):
             account_id=acc_id
         )
 
+class AddTransferWindow(BaseTransactionWindow):
+    def __init__(self, parent, manager):
+        active_accounts = session.query(Account).filter_by(active_bool=True).order_by(Account.name.asc()).all()
+        self.account_map = {acc.name: acc for acc in active_accounts}
+        self.all_acc_names = list(self.account_map.keys())
+
+        super().__init__(parent, manager, "New Transfer")
+
+        self.origin_acc = None
+        self.dest_acc = None
+        self.auto_mirror = True
+
+        self.dest_amount_placeholder = "Received Amount (e.g. 15.50)"
+
+        self.lbl_origin = ctk.CTkLabel(self, text="From Account", font=("JetBrains Mono", 13, "bold"), anchor="w")
+        self.origin_menu = ctk.CTkOptionMenu(self, values=self.all_acc_names, command=self._sync_account_data)
+
+        self.lbl_destination = ctk.CTkLabel(self, text="To Account", font=("JetBrains Mono", 13, "bold"), anchor="w")
+        self.dest_menu = ctk.CTkOptionMenu(self, values=self.all_acc_names, command=self._sync_account_data)
+
+        self.swap_btn = ctk.CTkButton(self, text="⇅ Swap", width=50, height=24, fg_color="transparent", text_color="gray60", hover_color="gray25", font=("JetBrains Mono", 12),
+                                      command=self.swap_accounts)
+
+        if len(self.all_acc_names) > 1:
+            self.origin_menu.set(self.all_acc_names[0])
+            self.dest_menu.set(self.all_acc_names[1])
+
+        self.lbl_dest_amt = ctk.CTkLabel(self, text="Received Amount", font=("JetBrains Mono", 13, "bold"), anchor="w")
+        self.dest_amount_entry = ctk.CTkEntry(self)
+
+        if self.mem["orig_acc"] in self.origin_menu.cget("values"):
+            self.origin_menu.set(self.mem["orig_acc"])
+
+        if self.mem["dest_acc"] in self.dest_menu.cget("values"):
+            self.dest_menu.set(self.mem["dest_acc"])
+
+        self.finalize_initialization()
+        self._sync_account_data()
+
+    def layout_specific_widgets(self):
+        self.minsize(450, 515)
+        self.maxsize(450, 515)
+        self.lbl_amount.configure(text="Sent Amount")
+        self.lbl_currency.grid_forget()
+        self.currency_menu.grid_forget()
+
+        self.lbl_origin.grid(row=2, column=0, padx=(20, 10), pady=8, sticky="w")
+        self.origin_menu.grid(row=2, column=1, padx=(0, 20), pady=8, sticky="ew")
+
+        self.swap_btn.grid(row=3, column=1, padx=(0, 20), pady=0, sticky="w")
+
+        self.lbl_destination.grid(row=4, column=0, padx=(20, 10), pady=8, sticky="w")
+        self.dest_menu.grid(row=4, column=1, padx=(0, 20), pady=8, sticky="ew")
+
+        self.lbl_dest_amt.grid(row=5, column=0, padx=(20, 10), pady=8, sticky="w")
+        self.dest_amount_entry.grid(row=5, column=1, padx=(0, 20), pady=8, sticky="ew")
+        self.dest_amount_entry.insert(0, self.dest_amount_placeholder)
+        self.dest_amount_entry.configure(text_color="gray")
+
+        self.lbl_project.grid_forget()
+        self.project_menu.grid_forget()
+
+    def _sync_account_data(self, _=None):
+        """Prepares filtered account lists for Origin/Destination menus."""
+        origin_name = self.origin_menu.get()
+        dest_name = self.dest_menu.get()
+        self.origin_acc = self.account_map.get(origin_name)
+        self.dest_acc = self.account_map.get(dest_name)
+
+        to_options = [n for n in self.all_acc_names if n != origin_name]
+        self.dest_menu.configure(values=to_options)
+
+        from_options = [n for n in self.all_acc_names if n != dest_name]
+        self.origin_menu.configure(values=from_options)
+
+        self.update_fx_list()
+        self._handle_mirroring()
+        self.validate_form()
+
+    def update_fx_list(self):
+        """Overrides base method to permanently hide the FX rate for transfers."""
+        self.lbl_fx.grid_forget()
+        self.fx_entry.grid_forget()
+
+    def _handle_mirroring(self, _=None):
+        """
+        Runs if auto mirror is on.
+        Mirrors the origin account value to the destination account value.
+        Debounces validation.
+        """
+        if not self.origin_acc or not self.dest_acc or not self.auto_mirror:
+            return
+
+        if self.origin_acc.currency_code == self.dest_acc.currency_code:
+            current_sent = self.amount_entry.get()
+            self.dest_amount_entry.delete(0, 'end')
+
+            if current_sent == self.amount_placeholder or current_sent == "":
+                self.dest_amount_entry.insert(0, self.dest_amount_placeholder)
+                self.dest_amount_entry.configure(text_color="gray")
+            else:
+                self.dest_amount_entry.insert(0, current_sent)
+                self.dest_amount_entry.configure(text_color="white")
+            self.schedule_validation()
+
+    def _on_dest_manual_edit(self, _event):
+        """Disables auto-mirroring once the user starts typing in the Received box."""
+        if self.dest_amount_entry.get() != self.dest_amount_placeholder:
+            self.auto_mirror = False
+        self.schedule_validation()
+
+    def setup_bindings(self):
+        super().setup_bindings()
+
+        self.amount_entry.bind("<KeyRelease>", self._handle_mirroring, add="+")
+
+        self.dest_amount_entry.bind("<FocusIn>", lambda e: self._entry_focus_in(self.dest_amount_entry, self.dest_amount_placeholder))
+        self.dest_amount_entry.bind("<FocusOut>", lambda e: self._entry_focus_out(self.dest_amount_entry, self.dest_amount_placeholder))
+        self.dest_amount_entry.bind("<KeyRelease>", self._on_dest_manual_edit)
+
+    def swap_accounts(self):
+        """Swaps the selected origin and destination accounts."""
+        curr_orig = self.origin_menu.get()
+        curr_dest = self.dest_menu.get()
+
+        self.origin_menu.set(curr_dest)
+        self.dest_menu.set(curr_orig)
+
+        self._sync_account_data()
+
+    def clear_specific_fields(self):
+        """Hook called by BaseTransactionWindow's clear_all()"""
+        if len(self.all_acc_names) > 1:
+            self.origin_menu.set(self.all_acc_names[0])
+            self.dest_menu.set(self.all_acc_names[1])
+        elif self.all_acc_names:
+            self.origin_menu.set(self.all_acc_names[0])
+            self.dest_menu.set(self.all_acc_names[0])
+
+        self.dest_amount_entry.delete(0, 'end')
+        self.dest_amount_entry.insert(0, self.dest_amount_placeholder)
+        self.dest_amount_entry.configure(text_color="gray")
+
+        self.auto_mirror = True
+        self._sync_account_data()
+
+    def validate_specific_fields(self):
+        dest_val = self.dest_amount_entry.get()
+        dest_ok = dest_val != self.dest_amount_placeholder and dest_val.strip() != "" and self.is_float(dest_val)
+
+        if not dest_ok:
+            return False, "⚠ Check Received Amount"
+
+        return True, ""
+
+    def get_warnings(self):
+        """Checks if an identical transfer already exists for this date."""
+        try:
+            amt_orig = float(self.amount_entry.get().replace(",", "."))
+            amt_dest = float(self.dest_amount_entry.get().replace(",", "."))
+        except ValueError:
+            return "", False
+
+        if not self.origin_acc or not self.dest_acc:
+            return "", False
+
+        is_duplicate = self.manager.check_for_duplicate(
+            amount=amt_orig,
+            entity_name=None,
+            date_str=self.date_var.get(),
+            transaction_type="transfer",
+            origin_id=self.origin_acc.id,
+            destination_id=self.dest_acc.id,
+            amount_dest=amt_dest
+        )
+
+        if is_duplicate:
+            return "⚠ Potential duplicate detected!", True
+
+        return "", False
+
+    def execute_db_submission(self, base_data):
+        dest_amt = float(self.dest_amount_entry.get().replace(",", "."))
+
+        self.manager.transfer_funds(
+            origin_id=self.origin_acc.id,
+            destination_id=self.dest_acc.id,
+            amount_orig=base_data["amount"],
+            amount_dest=dest_amt,
+            desc=base_data["description"],
+            ts=base_data["timestamp"]
+        )
+
 class FinanceApp(ctk.CTk):
     def __init__(self):
         super().__init__()
@@ -839,7 +1039,10 @@ class FinanceApp(ctk.CTk):
         self.add_exp_btn.pack(pady=(20, 4), padx=20)
 
         self.add_gain_btn = ctk.CTkButton(self.sidebar, text="+ Add Gain", command=self.open_add_gain)
-        self.add_gain_btn.pack(pady=(4, 20), padx=20)
+        self.add_gain_btn.pack(pady=(4, 4), padx=20)
+
+        self.add_transfer_btn = ctk.CTkButton(self.sidebar, text="⇄ Transfer Funds", command=self.open_add_transfer)
+        self.add_transfer_btn.pack(pady=(4, 20), padx=20)
 
         self.nw_frame = ctk.CTkFrame(self.sidebar, fg_color="gray15", corner_radius=8)
         self.nw_frame.pack(fill="x", pady=(0, 15), padx=15)
@@ -984,6 +1187,8 @@ class FinanceApp(ctk.CTk):
         self.current_search_text = ""
 
         self.load_transactions()
+
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     def _search_focus_in(self):
         if self.search_entry.get() == self.search_placeholder:
@@ -1564,11 +1769,24 @@ class FinanceApp(ctk.CTk):
             self.jump_entry.delete(0, "end")
             self.jump_entry.insert(0, str(self.current_page + 1))
 
+    def on_closing(self):
+        """Ensures the DB session is safely closed before quitting."""
+        try:
+            session.close()
+            print("Database session closed successfully.")
+        except Exception as e:
+            print(f"Error closing database session: {e}")
+        finally:
+            self.destroy()
+
     def open_add_expense(self):
         AddExpenseWindow(self, self.manager)
 
     def open_add_gain(self):
         AddGainWindow(self, self.manager)
+
+    def open_add_transfer(self):
+        AddTransferWindow(self, self.manager)
 
 
 if __name__ == "__main__":

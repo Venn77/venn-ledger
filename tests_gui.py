@@ -271,6 +271,7 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         self.cal_window = None
         self.fx_tooltip = None
         self._val_timer = None
+        self.tab_widgets = None
 
         # 2. Create Shared Widgets (Top & Bottom)
         self.title_lbl = ctk.CTkLabel(self, text=title, font=("JetBrains Mono", 20, "bold"))
@@ -329,6 +330,8 @@ class BaseTransactionWindow(ctk.CTkToplevel):
 
         self.update_fx_list()
         self.validate_form()
+
+        self.setup_tab_order()
 
     # Layout Methods
     def layout_shared_top(self):
@@ -393,6 +396,50 @@ class BaseTransactionWindow(ctk.CTkToplevel):
 
         self.currency_var.trace_add("write", self._handle_currency_change)
         self.date_var.trace_add("write", self._handle_date_change)
+
+    def setup_tab_order(self):
+        """Binds custom Tab traversal strictly enforcing visual layout order."""
+        self.tab_widgets = self.get_tab_order()
+
+        for w in self.tab_widgets:
+            # noinspection PyProtectedMember
+            target = w._entry if hasattr(w, '_entry') else w
+
+            target.bind("<Tab>", lambda e, widget=w: self._handle_tab(e, widget, 1), add="+")
+            target.bind("<Shift-Tab>", lambda e, widget=w: self._handle_tab(e, widget, -1), add="+")
+
+    def _handle_tab(self, _event, widget, direction):
+        """
+        Forces sequential focus.
+        Automatically skips hidden widgets.
+        """
+        try:
+            start_idx = self.tab_widgets.index(widget)
+        except ValueError:
+            return "break"
+
+        idx = (start_idx + direction) % len(self.tab_widgets)
+        while idx != start_idx:
+            w = self.tab_widgets[idx]
+            # noinspection PyProtectedMember
+            target = w._entry if hasattr(w, '_entry') else w
+
+            if target.winfo_ismapped():
+                state = "normal"
+                try:
+                    state = w.cget("state")
+                except:
+                    pass
+
+                if state != "disabled":
+                    # noinspection PyProtectedMember
+                    focus_target = w._entry if hasattr(w, '_entry') else w
+                    focus_target.focus()
+                    return "break"
+
+            idx = (idx + direction) % len(self.tab_widgets)
+
+        return "break"
 
     # Shared Methods
     @staticmethod
@@ -601,6 +648,9 @@ class BaseTransactionWindow(ctk.CTkToplevel):
     def validate_specific_fields(self):
         return True, ""
 
+    def get_tab_order(self):
+        return []
+
     def get_warnings(self):
         return "", False
 
@@ -652,6 +702,13 @@ class AddExpenseWindow(BaseTransactionWindow):
 
         self.lbl_pm.grid(row=6, column=0, padx=(20, 10), pady=8, sticky="w")
         self.pm_menu.grid(row=6, column=1, padx=(0, 20), pady=8, sticky="ew")
+
+    def get_tab_order(self):
+        return [
+            self.amount_entry, self.currency_menu, self.fx_entry,
+            self.category_combo, self.vendor_combo, self.pm_menu,
+            self.date_entry, self.desc_entry, self.project_menu, self.save_btn
+        ]
 
     def on_currency_change(self, selected_currency):
         """Filters Payment Methods based on the account's currency."""
@@ -756,6 +813,13 @@ class AddGainWindow(BaseTransactionWindow):
 
         self.lbl_acc.grid(row=6, column=0, padx=(20, 10), pady=8, sticky="w")
         self.acc_menu.grid(row=6, column=1, padx=(0, 20), pady=8, sticky="ew")
+
+    def get_tab_order(self):
+        return [
+            self.amount_entry, self.currency_menu, self.fx_entry,
+            self.stream_combo, self.payer_combo, self.acc_menu,
+            self.date_entry, self.desc_entry, self.project_menu, self.save_btn
+        ]
 
     def on_currency_change(self, selected_currency):
         """Filters Accounts based on the selected currency."""
@@ -876,6 +940,13 @@ class AddTransferWindow(BaseTransactionWindow):
 
         self.lbl_project.grid_forget()
         self.project_menu.grid_forget()
+
+    def get_tab_order(self):
+        return [
+            self.amount_entry, self.origin_menu, self.swap_btn,
+            self.dest_menu, self.dest_amount_entry,
+            self.date_entry, self.desc_entry, self.save_btn
+        ]
 
     def _sync_account_data(self, _=None):
         """Prepares filtered account lists for Origin/Destination menus."""

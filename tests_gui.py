@@ -305,7 +305,8 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         self.error_label = ctk.CTkLabel(self, text="", text_color="orange", font=("JetBrains Mono", 12))
         self.btn_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.clear_btn = ctk.CTkButton(self.btn_frame, text="Clear All", fg_color="gray30", command=self.clear_all)
-        self.save_btn = ctk.CTkButton(self.btn_frame, text="Save", command=self.submit_data, fg_color="green")
+        self.save_btn_ring = ctk.CTkFrame(self.btn_frame, fg_color="transparent", corner_radius=6)
+        self.save_btn = ctk.CTkButton(self.save_btn_ring, text="Save", command=self.submit_data, fg_color="green", border_width=0)
 
     def center_relative_to_parent(self, width, height):
         """Calculates coordinates to center this window over its parent."""
@@ -379,7 +380,8 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         self.error_label.grid(row=10, column=0, columnspan=2, pady=(10, 5))
         self.btn_frame.grid(row=11, column=0, columnspan=2, pady=10)
         self.clear_btn.pack(side="left", padx=10)
-        self.save_btn.pack(side="left", padx=10)
+        self.save_btn_ring.pack(side="left", padx=10)
+        self.save_btn.pack(padx=2, pady=2)
 
     def setup_bindings(self):
         self.amount_entry.bind("<FocusIn>", lambda e: self._entry_focus_in(self.amount_entry, self.amount_placeholder))
@@ -394,8 +396,29 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         self.desc_entry.bind("<FocusIn>", lambda e: self._entry_focus_in(self.desc_entry, self.desc_placeholder))
         self.desc_entry.bind("<FocusOut>", lambda e: self._entry_focus_out(self.desc_entry, self.desc_placeholder))
 
+        self.save_btn.bind("<FocusIn>", self._save_btn_focus_in)
+        self.save_btn.bind("<FocusOut>", self._save_btn_focus_out)
+        self.save_btn.bind("<Return>", self._save_btn_enter)
+
         self.currency_var.trace_add("write", self._handle_currency_change)
         self.date_var.trace_add("write", self._handle_date_change)
+
+    def _save_btn_focus_in(self, _event):
+        """Shows a bright border when the button receives keyboard focus."""
+        if self.save_btn.cget("state") == "normal":
+            self.save_btn_ring.configure(fg_color="white")
+
+    def _save_btn_focus_out(self, _event):
+        """Hides the border when focus moves away."""
+        self.save_btn_ring.configure(fg_color="transparent")
+
+    def _save_btn_enter(self, _event):
+        """Executes the save command if the user hits Enter while focused."""
+        if self.save_btn.cget("state") == "normal":
+            self.submit_data()
+            return "break"
+        else:
+            return None
 
     def setup_tab_order(self):
         """Binds custom Tab traversal strictly enforcing visual layout order."""

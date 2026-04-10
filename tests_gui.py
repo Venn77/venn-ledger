@@ -1158,7 +1158,7 @@ class FinanceApp(ctk.CTk):
         self.clear_search_btn.pack(side="left", padx=(5, 0))
 
         # 4. Filter Bar
-        self.date_filter_var = ctk.StringVar(value="All Time")
+        self.date_filter_var = ctk.StringVar(value="This Month")
 
         self.filter_bar = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.filter_bar.pack(fill="x", pady=(0, 10))
@@ -1174,16 +1174,37 @@ class FinanceApp(ctk.CTk):
         )
         self.date_menu.pack(side="left")
 
-        self.month_nav_frame = ctk.CTkFrame(self.filter_bar, fg_color="gray20", height=28, corner_radius=8)
+        self.time_nav_frame = ctk.CTkFrame(self.filter_bar, fg_color="transparent")
 
-        self.btn_prev_month = ctk.CTkButton(self.month_nav_frame, text="‹", width=30, height=28, command=self.go_prev_month)
+        self.year_frame = ctk.CTkFrame(self.time_nav_frame, fg_color="gray20", height=28, corner_radius=8)
+        self.year_frame.pack_propagate(False)
+        self.year_frame.configure(width=128)
+        self.btn_prev_year = ctk.CTkButton(self.year_frame, text="‹", width=30, height=28,
+                                           hover_color="#14375e", command=self.go_prev_year)
+        self.btn_prev_year.pack(side="left", padx=2)
+        self.year_display_lbl = ctk.CTkLabel(self.year_frame, text="", font=("JetBrains Mono", 12, "bold"), width=60,
+                                             height=28, fg_color="#1f538d"
+                                             )
+        self.year_display_lbl.pack(side="left")
+        self.btn_next_year = ctk.CTkButton(self.year_frame, text="›", width=30, height=28,
+                                           hover_color="#14375e", command=self.go_next_year)
+        self.btn_next_year.pack(side="left", padx=2)
+
+        self.month_frame = ctk.CTkFrame(self.time_nav_frame, fg_color="gray20", height=28, corner_radius=8)
+        self.month_frame.pack_propagate(False)
+        self.month_frame.configure(width=148)
+        self.btn_prev_month = ctk.CTkButton(self.month_frame, text="‹", width=30, height=28,
+                                            hover_color="#14375e", command=self.go_prev_month)
         self.btn_prev_month.pack(side="left", padx=2)
-
-        self.month_display_lbl = ctk.CTkLabel(self.month_nav_frame, text="", font=("JetBrains Mono", 12, "bold"), width=110, height=28, fg_color="#1f538d", corner_radius=0)
+        self.month_display_lbl = ctk.CTkLabel(self.month_frame, text="", font=("JetBrains Mono", 12, "bold"), width=80,
+                                              height=28, fg_color="#1f538d")
         self.month_display_lbl.pack(side="left")
-
-        self.btn_next_month = ctk.CTkButton(self.month_nav_frame, text="›", width=30, height=28, command=self.go_next_month)
+        self.btn_next_month = ctk.CTkButton(self.month_frame, text="›", width=30, height=28,
+                                            hover_color="#14375e", command=self.go_next_month)
         self.btn_next_month.pack(side="left", padx=2)
+
+        self.year_frame.pack(side="left", padx=(0, 5))
+        self.month_frame.pack(side="left")
 
         self.start_date_var = ctk.StringVar(value=(datetime.datetime.now() - datetime.timedelta(days=30)).strftime("%Y-%m-%d"))
         self.end_date_var = ctk.StringVar(value=datetime.datetime.now().strftime("%Y-%m-%d"))
@@ -1256,8 +1277,9 @@ class FinanceApp(ctk.CTk):
         self.jump_entry = None
         self.search_timer = None
         self.current_search_text = ""
+        self.nav_timer = None
 
-        self.load_transactions()
+        self.on_date_filter_change("This Month")
 
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
@@ -1314,15 +1336,15 @@ class FinanceApp(ctk.CTk):
 
     def on_date_filter_change(self, selection):
         if selection == "This Month":
-            self.current_view_date = datetime.datetime.now().replace(day=1)
+            self.current_view_date = datetime.datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             self.custom_date_frame.pack_forget()
-            self.month_nav_frame.pack(side="left", padx=20)
-            self.update_month_display()
+            self.time_nav_frame.pack(side="left", padx=20, anchor="n")
+            self.update_time_display()
             self.current_page = 0
             self.load_transactions()
             self.reset_scroll_to_top()
         else:
-            self.month_nav_frame.pack_forget()
+            self.time_nav_frame.pack_forget()
             if selection == "Custom...":
                 self.custom_date_frame.pack(side="left", padx=20)
             else:
@@ -1331,20 +1353,43 @@ class FinanceApp(ctk.CTk):
                 self.load_transactions()
                 self.reset_scroll_to_top()
 
-    def update_month_display(self):
-        self.month_display_lbl.configure(text=self.current_view_date.strftime("%B %Y"))
+    def _schedule_nav_load(self):
+        """Debounces DB calls to allow rapid clicking."""
+        if self.nav_timer:
+            self.after_cancel(self.nav_timer)
+        self.nav_timer = self.after(300, self._execute_nav_load)
+
+    def _execute_nav_load(self):
+        self.nav_timer = None
+        self.current_page = 0
+        self.load_transactions()
+        self.reset_scroll_to_top()
+
+    def update_time_display(self):
+        self.year_display_lbl.configure(text=self.current_view_date.strftime("%Y"))
+        self.month_display_lbl.configure(text=self.current_view_date.strftime("%B"))
+
+    def go_prev_year(self):
+        self.current_view_date = self.current_view_date.replace(year=self.current_view_date.year - 1)
+        self.update_time_display()
+        self._schedule_nav_load()
+
+    def go_next_year(self):
+        self.current_view_date = self.current_view_date.replace(year=self.current_view_date.year + 1)
+        self.update_time_display()
+        self._schedule_nav_load()
 
     def go_prev_month(self):
         last_month = self.current_view_date - datetime.timedelta(days=1)
         self.current_view_date = last_month.replace(day=1)
-        self.update_month_display()
-        self.load_transactions()
+        self.update_time_display()
+        self._schedule_nav_load()
 
     def go_next_month(self):
         next_month = self.current_view_date + datetime.timedelta(days=32)
         self.current_view_date = next_month.replace(day=1)
-        self.update_month_display()
-        self.load_transactions()
+        self.update_time_display()
+        self._schedule_nav_load()
 
     def get_date_limit(self, selection):
         """Calculates the 'start' and 'end' dates for the SQL query."""

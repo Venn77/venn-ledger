@@ -120,6 +120,11 @@ class SearchableComboBox(ctk.CTkComboBox):
         except Exception:
             pass
 
+    def reset(self):
+        """Resets the combobox to its placeholder state."""
+        self.set(self.placeholder)
+        self._entry.configure(foreground="gray")
+
 class ToolTip:
     def __init__(self, widget, text, delay=500, max_width=400):
         self.widget = widget
@@ -466,6 +471,13 @@ class BaseTransactionWindow(ctk.CTkToplevel):
 
     # Shared Methods
     @staticmethod
+    def _apply_placeholder(widget, placeholder):
+        """Clears an entry, applies a placeholder, and styles it gray."""
+        widget.delete(0, 'end')
+        widget.insert(0, placeholder)
+        widget.configure(text_color="gray")
+
+    @staticmethod
     def _entry_focus_in(widget, placeholder):
         """Clears the placeholder and sets value color."""
         if widget.get() == placeholder:
@@ -566,12 +578,8 @@ class BaseTransactionWindow(ctk.CTkToplevel):
 
     def clear_all(self):
         """Resets the form to default values."""
-        self.amount_entry.delete(0, 'end')
-        self.amount_entry.insert(0, self.amount_placeholder)
-        self.amount_entry.configure(text_color="gray")
-        self.desc_entry.delete(0, 'end')
-        self.desc_entry.insert(0, self.desc_placeholder)
-        self.desc_entry.configure(text_color="gray")
+        self._apply_placeholder(self.amount_entry, self.amount_placeholder)
+        self._apply_placeholder(self.desc_entry, self.desc_placeholder)
 
         self.currency_var.set("EUR")
         self.project_var.set("")
@@ -750,10 +758,8 @@ class AddExpenseWindow(BaseTransactionWindow):
             self.pm_menu.set("No valid PM found")
 
     def clear_specific_fields(self):
-        for combo in [self.category_combo, self.vendor_combo]:
-            combo.set(combo.placeholder)
-            # noinspection PyProtectedMember
-            combo._entry.configure(foreground="gray")
+        self.category_combo.reset()
+        self.vendor_combo.reset()
         self.on_currency_change("EUR")
 
     def validate_specific_fields(self):
@@ -861,10 +867,8 @@ class AddGainWindow(BaseTransactionWindow):
             self.acc_menu.set("No valid Account found")
 
     def clear_specific_fields(self):
-        for combo in [self.stream_combo, self.payer_combo]:
-            combo.set(combo.placeholder)
-            # noinspection PyProtectedMember
-            combo._entry.configure(foreground="gray")
+        self.stream_combo.reset()
+        self.payer_combo.reset()
         self.on_currency_change("EUR")
 
     def validate_specific_fields(self):
@@ -1048,9 +1052,7 @@ class AddTransferWindow(BaseTransactionWindow):
             self.origin_menu.set(self.all_acc_names[0])
             self.dest_menu.set(self.all_acc_names[0])
 
-        self.dest_amount_entry.delete(0, 'end')
-        self.dest_amount_entry.insert(0, self.dest_amount_placeholder)
-        self.dest_amount_entry.configure(text_color="gray")
+        self._apply_placeholder(self.dest_amount_entry, self.dest_amount_placeholder)
 
         self.auto_mirror = True
         self._sync_account_data()

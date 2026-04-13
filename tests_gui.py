@@ -120,6 +120,14 @@ class SearchableComboBox(ctk.CTkComboBox):
         except Exception:
             pass
 
+    def inject_value(self, value):
+        """Pre-fills data for Copy/Edit modes."""
+        if value and str(value).strip() != "":
+            self.set(str(value))
+            self._entry.configure(foreground="white")
+        else:
+            self.reset()
+
     def reset(self):
         """Resets the combobox to its placeholder state."""
         self.set(self.placeholder)
@@ -247,7 +255,7 @@ class TransactionRow(ctk.CTkFrame):
         return lbl
 
 class BaseTransactionWindow(ctk.CTkToplevel):
-    def __init__(self, parent, manager, title):
+    def __init__(self, parent, manager, title, transaction_data = None):
         super().__init__(parent)
         self.title(title)
         self.center_relative_to_parent(width=450, height=585)
@@ -255,7 +263,11 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         self.minsize(450, 585)
         self.maxsize(450, 585)
         self.manager = manager
-        self.mem = self.manager.last_used
+        self.transaction_data = transaction_data
+        self.is_edit_mode = transaction_data is not None and transaction_data.get("id") is not None
+        self.mem = self.manager.last_used.copy()
+        if transaction_data:
+            self.mem.update(transaction_data)
 
         self.after(100, self.force_focus)
         self.attributes('-topmost', False)
@@ -269,9 +281,9 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         self.fx_placeholder = "Rate (e.g. 1.15)"
         self.session_time = datetime.datetime.now().strftime("%H:%M:%S")
 
-        self.currency_var = ctk.StringVar(value=self.mem["currency"])
-        self.date_var = ctk.StringVar(value=f"{self.mem['date']} {self.session_time}")
-        self.project_var = ctk.StringVar(value=self.mem["project"])
+        self.currency_var = ctk.StringVar(value=self.mem.get("currency", "EUR"))
+        self.date_var = ctk.StringVar(value=f"{self.mem.get('date')} {self.session_time}")
+        self.project_var = ctk.StringVar(value=self.mem.get("project", ""))
 
         self.cal_window = None
         self.fx_tooltip = None
@@ -346,8 +358,7 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         # Amount (Row 1)
         self.lbl_amount.grid(row=1, column=0, padx=(20, 10), pady=8, sticky="w")
         self.amount_entry.grid(row=1, column=1, padx=(0, 20), pady=8, sticky="ew")
-        self.amount_entry.insert(0, self.amount_placeholder)
-        self.amount_entry.configure(text_color="gray")
+        self._apply_entry_state(self.amount_entry, self.mem.get("amount"), self.amount_placeholder)
 
         # Currency (Row 2)
         self.lbl_currency.grid(row=2, column=0, padx=(20, 10), pady=8, sticky="w")
@@ -374,8 +385,7 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         # Description (Row 8)
         self.lbl_desc.grid(row=8, column=0, padx=(20, 10), pady=8, sticky="w")
         self.desc_entry.grid(row=8, column=1, padx=(0, 20), pady=8, sticky="ew")
-        self.desc_entry.insert(0, self.desc_placeholder)
-        self.desc_entry.configure(text_color="gray")
+        self._apply_entry_state(self.desc_entry, self.mem.get("desc"), self.desc_placeholder)
 
         # Project (Row 9)
         self.lbl_project.grid(row=9, column=0, padx=(20, 10), pady=8, sticky="w")
@@ -478,6 +488,17 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         widget.configure(text_color="gray")
 
     @staticmethod
+    def _apply_entry_state(widget, value, placeholder):
+        """Applies either injected data or a gray placeholder."""
+        widget.delete(0, 'end')
+        if value is not None and str(value).strip() != "":
+            widget.insert(0, str(value))
+            widget.configure(text_color="white")
+        else:
+            widget.insert(0, placeholder)
+            widget.configure(text_color="gray")
+
+    @staticmethod
     def _entry_focus_in(widget, placeholder):
         """Clears the placeholder and sets value color."""
         if widget.get() == placeholder:
@@ -544,6 +565,16 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         try:
             full_date = self.date_var.get()
             if not full_date or len(full_date) < 10: return
+
+            injected_fx = self.mem.get("fx_rate")
+            if injected_fx:
+                self.fx_entry.delete(0, 'end')
+                self.fx_entry.insert(0, str(injected_fx))
+                self.fx_entry.configure(text_color="white")
+                self.fx_tooltip.text = "Injected rate from original transaction"
+                self.mem["fx_rate"] = None
+                return
+
             result = self.manager.get_historical_fx_rate(selected_currency, full_date)
             if result:
                 self.fx_entry.delete(0, 'end')
@@ -701,6 +732,7 @@ class AddExpenseWindow(BaseTransactionWindow):
                                session.query(Category).filter_by(active_bool=True).order_by(Category.name.asc()).all()]
         self.category_combo = SearchableComboBox(self, placeholder=self.cat_placeholder, values=self.all_categories,
                                                  command=lambda _: self.validate_form())
+        self.category_combo.inject_value(self.mem.get("category"))
         # noinspection PyProtectedMember
         self.category_combo._entry.bind("<KeyRelease>", self.schedule_validation, add="+")
 
@@ -710,6 +742,7 @@ class AddExpenseWindow(BaseTransactionWindow):
                             session.query(Vendor).filter_by(active_bool=True).order_by(Vendor.name.asc()).all()]
         self.vendor_combo = SearchableComboBox(self, placeholder=self.ven_placeholder, values=self.all_vendors,
                                                command=lambda _: self.validate_form())
+        self.vendor_combo.inject_value(self.mem.get("entity"))
         # noinspection PyProtectedMember
         self.vendor_combo._entry.bind("<KeyRelease>", self.schedule_validation, add="+")
 
@@ -810,6 +843,7 @@ class AddGainWindow(BaseTransactionWindow):
                                session.query(Stream).filter_by(active_bool=True).order_by(Stream.name.asc()).all()]
         self.stream_combo = SearchableComboBox(self, placeholder=self.stream_placeholder, values=self.all_streams,
                                                  command=lambda _: self.validate_form())
+        self.stream_combo.inject_value(self.mem.get("stream"))
         # noinspection PyProtectedMember
         self.stream_combo._entry.bind("<KeyRelease>", self.schedule_validation, add="+")
 
@@ -819,6 +853,7 @@ class AddGainWindow(BaseTransactionWindow):
                             session.query(Payer).filter_by(active_bool=True).order_by(Payer.name.asc()).all()]
         self.payer_combo = SearchableComboBox(self, placeholder=self.payer_placeholder, values=self.all_payers,
                                                command=lambda _: self.validate_form())
+        self.payer_combo.inject_value(self.mem.get("entity"))
         # noinspection PyProtectedMember
         self.payer_combo._entry.bind("<KeyRelease>", self.schedule_validation, add="+")
 

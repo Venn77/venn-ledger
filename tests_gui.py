@@ -1113,6 +1113,9 @@ class FinanceApp(ctk.CTk):
         self.manager = finance_manager.TransactionManager(session)
         self.cal_window = None
         self.current_view_date = datetime.datetime.now().replace(day=1)
+        self.show_expenses_var = ctk.BooleanVar(value=True)
+        self.show_gains_var = ctk.BooleanVar(value=True)
+        self.show_transfers_var = ctk.BooleanVar(value=True)
 
         # 1. Grid Configuration
         self.grid_columnconfigure(1, weight=1)
@@ -1257,6 +1260,12 @@ class FinanceApp(ctk.CTk):
         self.apply_date_btn = ctk.CTkButton(self.custom_date_frame, text="Apply", width=60, command=self.load_transactions)
         self.apply_date_btn.pack(side="left", padx=5)
 
+        self.type_filter_frame = ctk.CTkFrame(self.filter_bar, fg_color="transparent")
+        self.type_filter_frame.pack(side="right", padx=(20, 0))
+
+        ctk.CTkLabel(self.type_filter_frame, text="Type:", font=("JetBrains Mono", 12, "bold")).pack(side="left",
+                                                                                                     padx=(0, 10))
+
         self.search_entry.bind("<FocusIn>", lambda e: self._search_focus_in())
         self.search_entry.bind("<FocusOut>", lambda e: self._search_focus_out())
         self.search_entry.bind("<KeyRelease>", self.on_search_key_release)
@@ -1301,10 +1310,23 @@ class FinanceApp(ctk.CTk):
         self.search_timer = None
         self.current_search_text = ""
         self.nav_timer = None
+        self.type_timer = None
 
         self.on_date_filter_change("This Month")
 
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+        self.chk_expenses = ctk.CTkCheckBox(self.type_filter_frame, text="Expenses", variable=self.show_expenses_var,
+                                       font=("JetBrains Mono", 11), width=60, command=self._schedule_type_filter)
+        self.chk_expenses.pack(side="left", padx=5)
+
+        self.chk_gains = ctk.CTkCheckBox(self.type_filter_frame, text="Gains", variable=self.show_gains_var,
+                                        font=("JetBrains Mono", 11), width=60, command=self._schedule_type_filter)
+        self.chk_gains.pack(side="left", padx=5)
+
+        self.chk_transfers = ctk.CTkCheckBox(self.type_filter_frame, text="Transfers", variable=self.show_transfers_var,
+                                       font=("JetBrains Mono", 11), width=60, command=self._schedule_type_filter)
+        self.chk_transfers.pack(side="left", padx=5)
 
     def _search_focus_in(self):
         if self.search_entry.get() == self.search_placeholder:
@@ -1384,6 +1406,19 @@ class FinanceApp(ctk.CTk):
 
     def _execute_nav_load(self):
         self.nav_timer = None
+        self.current_page = 0
+        self.load_transactions()
+        self.reset_scroll_to_top()
+
+    def _schedule_type_filter(self):
+        """Debounces DB calls to allow rapid clicking."""
+        if self.type_timer:
+            self.after_cancel(self.type_timer)
+        self.type_timer = self.after(600, self._execute_type_filter)
+
+    def _execute_type_filter(self):
+        """Resets view and reloads when a type checkbox is toggled."""
+        self.type_timer = None
         self.current_page = 0
         self.load_transactions()
         self.reset_scroll_to_top()
@@ -1627,6 +1662,16 @@ class FinanceApp(ctk.CTk):
 
         if self.filter_account_id:
             query = query.filter(column("acc_id") == self.filter_account_id)
+
+        allowed_types = []
+        if self.show_expenses_var.get():
+            allowed_types.append('expense')
+        if self.show_gains_var.get():
+            allowed_types.append('gain')
+        if self.show_transfers_var.get():
+            allowed_types.extend(['transfer_in', 'transfer_out'])
+
+        query = query.filter(column("type").in_(allowed_types))
 
         search_text = str(getattr(self, 'current_search_text', "")).strip()
         if search_text:

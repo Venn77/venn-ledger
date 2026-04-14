@@ -196,8 +196,9 @@ class ToolTip:
 
 
 class TransactionRow(ctk.CTkFrame):
-    def __init__(self, master, data, char_limit, ent_char_limit):
+    def __init__(self, master, main_app, data, char_limit, ent_char_limit):
         super().__init__(master, fg_color="gray15")
+        self.main_app = main_app
         self.data = data
         self.pack(fill="x", pady=2, padx=5)
 
@@ -226,13 +227,45 @@ class TransactionRow(ctk.CTkFrame):
         # Project
         self._add_lbl(data.proj_name or "", width=100, anchor="w", color="#5AC8FA")
         # Description
+        desc_px_width = char_limit * 7
         display_desc = (data.desc[:char_limit] + "...") if data.desc and len(data.desc) > char_limit else data.desc
-        lbl_desc = self._add_lbl(display_desc or "", anchor="w", expand=True, color="gray50")
+        lbl_desc = self._add_lbl(display_desc or "", width=desc_px_width, anchor="w", color="gray50")
         if data.desc: ToolTip(lbl_desc, data.desc)
+        # Row Actions
+        self.actions_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.actions_frame.pack(side="left", padx=(10, 10))
+
+        btn_kwargs = {
+            "width": 24,
+            "height": 24,
+            "fg_color": "transparent",
+            "text_color": "gray60",
+            "hover_color": "gray25",
+            "font": ("JetBrains Mono", 11)
+        }
+
+        # Copy Button
+        self.btn_copy = ctk.CTkButton(self.actions_frame, text="C", command=self._trigger_copy, **btn_kwargs)
+        self.btn_copy.pack(side="left", padx=2)
+        ToolTip(self.btn_copy, "Copy Transaction")
+
+        # Edit Button
+        self.btn_edit = ctk.CTkButton(self.actions_frame, text="E", command=self._trigger_edit, **btn_kwargs)
+        self.btn_edit.pack(side="left", padx=2)
+        ToolTip(self.btn_edit, "Edit Transaction")
+
+        # Delete Button
+        del_kwargs = btn_kwargs.copy()
+        del_kwargs["hover_color"] = "#8b2525"
+
+        self.btn_del = ctk.CTkButton(self.actions_frame, text="X", command=self._trigger_delete, **del_kwargs)
+        self.btn_del.pack(side="left", padx=2)
+        ToolTip(self.btn_del, "Delete Transaction")
         # Amount
         amt_str = f"{style['prefix']}{data.amount:,.2f} {data.currency}"
-        lbl_amt = self._add_lbl(amt_str, width=150, anchor="e", color=style['text'], bold=True)
+        lbl_amt = self._add_lbl(amt_str, width=120, anchor="e", color=style['text'], bold=True)
         if data.currency != 'EUR': ToolTip(lbl_amt, f"Converted: {style['prefix']}{data.eur_val:,.2f} EUR (Rate: {data.fx_rate})")
+
         # Hover Effect
         def on_enter(_e, r=self):
             r.configure(fg_color="gray25")
@@ -248,11 +281,20 @@ class TransactionRow(ctk.CTkFrame):
             child.bind("<Enter>", on_enter)
             child.bind("<Leave>", on_leave)
 
-    def _add_lbl(self, text, width=0, anchor="center", expand=False, color="white", bold=False):
+    def _add_lbl(self, text, width=0, anchor="center", expand=False, color="white", bold=False, side="left"):
         font = ("JetBrains Mono", 11, "bold") if bold else ("JetBrains Mono", 11)
         lbl = ctk.CTkLabel(self, text=text, width=width, anchor=anchor, text_color=color, font=font)
-        lbl.pack(side="left", padx=10, fill="x" if expand else None, expand=expand)
+        lbl.pack(side=side, padx=10, fill="x" if expand else None, expand=expand)
         return lbl
+
+    def _trigger_copy(self):
+        self.main_app.open_copy_transaction(self.data)
+
+    def _trigger_edit(self):
+        self.main_app.open_edit_transaction(self.data)
+
+    def _trigger_delete(self):
+        self.main_app.delete_transaction_prompt(self.data.id, self.data.type)
 
 class BaseTransactionWindow(ctk.CTkToplevel):
     def __init__(self, parent, manager, title, transaction_data = None):
@@ -1143,9 +1185,9 @@ class FinanceApp(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("Venn Ledger 2026")
-        self.geometry("1300x700")
-        self.minsize(1300, 700)
-        self.maxsize(1300,980)
+        self.geometry("1400x700")
+        self.minsize(1400, 700)
+        self.maxsize(1400,980)
         ctk.set_appearance_mode("dark")
         self.manager = finance_manager.TransactionManager(session)
         self.cal_window = None
@@ -1521,9 +1563,9 @@ class FinanceApp(ctk.CTk):
     def get_dynamic_char_limit(self):
         """Calculates how many characters can fit in the Description gap."""
         self.update_idletasks()
-        current_width = 1300
+        current_width = 1400
         # Sum of static widths + sidebar:
-        static_space = 800+250
+        static_space = 800+250+140
 
         available_pixels = current_width - static_space
 
@@ -1734,7 +1776,7 @@ class FinanceApp(ctk.CTk):
         ent_char_limit = char_limit - 17
 
         for row_data in results:
-            TransactionRow(self.scroll_frame, row_data, char_limit, ent_char_limit)
+            TransactionRow(self.scroll_frame, self, row_data, char_limit, ent_char_limit)
 
         self.update_pagination_ui(total_count, query)
 

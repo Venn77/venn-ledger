@@ -42,8 +42,8 @@ class TransactionManager:
 
     def add_expense(self, amount, currency_code, payment_method_name, exchange_rate=None, category_name=None, vendor_name=None,
                     project_name=None, description=None,
-                    timestamp=None):
-        """Adds an expense to DB."""
+                    timestamp=None, expense_id=None):
+        """Adds an expense to DB or edits an existing one."""
         # 1. Resolve Master Data
         category = self._get_or_create_dimension(Category, category_name) if category_name else None
         vendor = self._get_or_create_dimension(Vendor, vendor_name) if vendor_name else None
@@ -53,7 +53,7 @@ class TransactionManager:
         pm = self.session.query(PaymentMethod).filter_by(name=payment_method_name).first()
 
         if not pm:
-            raise ValueError(f"Payment Method '{payment_method_name}' not found. Please create it first.")
+            raise ValueError(f"Payment Method '{payment_method_name}' not found.")
 
         account = pm.account
 
@@ -66,40 +66,45 @@ class TransactionManager:
                               .order_by(ExchangeRate.timestamp.desc())
                               .first())
                 if not rate_entry:
-                    raise ValueError(f"No exchange rate found for {currency_code}. Please seed rates.")
+                    raise ValueError(f"No exchange rate found for {currency_code}.")
                 fx_rate = rate_entry.fx_multiplier
         else:
             fx_rate = exchange_rate
 
-        # 4. Create Expense Object
-        new_expense = Expense(
-            amount=amount,
-            currency_code=currency_code,
-            fx_rate=fx_rate,
-            category_id=category.id if category else None,
-            vendor_id=vendor.id if vendor else None,
-            payment_method_id=pm.id,
-            project_id=project.id if project else None,
-            description=description,
-            timestamp=timestamp or datetime.datetime.now()
-        )
+        # 4. Upsert Object & Revert Balance
+        if expense_id:
+            new_expense = self.session.query(Expense).get(expense_id)
+            old_account = new_expense.payment_method.account
+            old_account.balance = float(Decimal(str(old_account.balance)) + Decimal(str(new_expense.amount)))
+        else:
+            new_expense = Expense()
+
+        # 5. Update Fields
+        new_expense.amount = amount
+        new_expense.currency_code = currency_code
+        new_expense.fx_rate = fx_rate
+        new_expense.category_id = category.id if category else None
+        new_expense.vendor_id = vendor.id if vendor else None
+        new_expense.payment_method_id = pm.id
+        new_expense.project_id = project.id if project else None
+        new_expense.description = description
+        new_expense.timestamp = timestamp or datetime.datetime.now()
+
         new_expense = calculate_conversion(new_expense)
 
-        # Subtract the 'raw' amount from the account balance
         account.balance = float(Decimal(str(account.balance)) - Decimal(str(amount)))
 
         try:
-            self.session.add(new_expense)
+            if not expense_id: self.session.add(new_expense)
             self.session.commit()
         except Exception as e:
             self.session.rollback()
             raise e
 
-        # Update the Memory after a successful save
+        # 6. Update the Memory after a successful save
         self.last_used["currency"] = currency_code
         self.last_used["pm"] = payment_method_name
         self.last_used["project"] = project_name
-        # Store just the date part
         if timestamp and hasattr(timestamp, 'strftime'):
             self.last_used["date"] = timestamp.strftime("%Y-%m-%d")
         else:
@@ -109,8 +114,8 @@ class TransactionManager:
 
     def add_gain(self, amount, currency_code, account_id, exchange_rate=None, stream_name=None, payer_name=None,
                     project_name=None, description=None,
-                    timestamp=None):
-        """Adds a gain to DB."""
+                    timestamp=None, gain_id=None):
+        """Adds a gain to DB or edits an existing one."""
         # 1. Resolve Master Data
         stream = self._get_or_create_dimension(Stream, stream_name) if stream_name else None
         payer = self._get_or_create_dimension(Payer, payer_name) if payer_name else None
@@ -128,40 +133,45 @@ class TransactionManager:
                               .order_by(ExchangeRate.timestamp.desc())
                               .first())
                 if not rate_entry:
-                    raise ValueError(f"No exchange rate found for {currency_code}. Please seed rates.")
+                    raise ValueError(f"No exchange rate found for {currency_code}.")
                 fx_rate = rate_entry.fx_multiplier
         else:
             fx_rate = exchange_rate
 
-        # 4. Create Gain Object
-        new_gain = Gain(
-            amount=amount,
-            currency_code=currency_code,
-            fx_rate=fx_rate,
-            stream_id=stream.id if stream else None,
-            payer_id=payer.id if payer else None,
-            account_id=account_id,
-            project_id=project.id if project else None,
-            description=description,
-            timestamp=timestamp or datetime.datetime.now()
-        )
+        # 4. Upsert Object & Revert Balance
+        if gain_id:
+            new_gain = self.session.query(Gain).get(gain_id)
+            old_account = new_gain.account
+            old_account.balance = float(Decimal(str(old_account.balance)) - Decimal(str(new_gain.amount)))
+        else:
+            new_gain = Gain()
+
+        # 5. Update Fields
+        new_gain.amount = amount
+        new_gain.currency_code = currency_code
+        new_gain.fx_rate = fx_rate
+        new_gain.stream_id = stream.id if stream else None
+        new_gain.payer_id = payer.id if payer else None
+        new_gain.account_id = account_id
+        new_gain.project_id = project.id if project else None
+        new_gain.description = description
+        new_gain.timestamp = timestamp or datetime.datetime.now()
+
         new_gain = calculate_conversion(new_gain)
 
-        # Add the 'raw' amount from the account balance
         account.balance = float(Decimal(str(account.balance)) + Decimal(str(amount)))
 
         try:
-            self.session.add(new_gain)
+            if not gain_id: self.session.add(new_gain)
             self.session.commit()
         except Exception as e:
             self.session.rollback()
             raise e
 
-        # Update the Memory after a successful save
+        # 6. Update the Memory after a successful save
         self.last_used["currency"] = currency_code
         self.last_used["acc"] = account.name
         self.last_used["project"] = project_name
-        # Store just the date part
         if timestamp and hasattr(timestamp, 'strftime'):
             self.last_used["date"] = timestamp.strftime("%Y-%m-%d")
         else:
@@ -236,8 +246,8 @@ class TransactionManager:
 
         return total_eur
 
-    def transfer_funds(self, origin_id, destination_id, amount_orig, amount_dest, desc, ts=None):
-        """Transfers funds between two accounts."""
+    def transfer_funds(self, origin_id, destination_id, amount_orig, amount_dest, desc, ts=None, transfer_id=None):
+        """Transfers funds between two accounts or edits an existing transfer."""
         try:
             origin = self.session.query(Account).get(origin_id)
             destination = self.session.query(Account).get(destination_id)
@@ -245,20 +255,27 @@ class TransactionManager:
             prefix = f"{origin.currency_code} -> {destination.currency_code}{' | ' if desc else ''}"
             full_desc = prefix + desc
 
-            new_transfer = Transfer(
-                origin_account_id=origin_id,
-                destination_account_id=destination_id,
-                amount_origin=amount_orig,
-                amount_destination=amount_dest,
-                description=full_desc,
-                timestamp=ts or datetime.datetime.now()
-            )
+            if transfer_id:
+                new_transfer = self.session.query(Transfer).get(transfer_id)
+                old_origin_account = new_transfer.origin_account
+                old_origin_account.balance = float(Decimal(str(old_origin_account.balance)) + Decimal(str(new_transfer.amount_origin)))
+                old_destination_account = new_transfer.destination_account
+                old_destination_account.balance = float(Decimal(str(old_destination_account.balance)) - Decimal(str(new_transfer.amount_destination)))
+            else:
+                new_transfer = Transfer()
+
+            new_transfer.origin_account_id = origin_id
+            new_transfer.destination_account_id = destination_id
+            new_transfer.amount_origin = amount_orig
+            new_transfer.amount_destination = amount_dest
+            new_transfer.description = full_desc
+            new_transfer.timestamp = ts or datetime.datetime.now()
 
             # Update balances
             origin.balance = float(Decimal(str(origin.balance)) - Decimal(str(amount_orig)))
             destination.balance = float(Decimal(str(destination.balance)) + Decimal(str(amount_dest)))
 
-            self.session.add(new_transfer)
+            if not transfer_id: self.session.add(new_transfer)
             self.session.commit()
 
         except Exception as e:
@@ -274,4 +291,38 @@ class TransactionManager:
             self.last_used["date"] = datetime.datetime.now().strftime("%Y-%m-%d")
 
         return new_transfer
+
+    def delete_transaction(self, transaction_id, transaction_type):
+        """Deletes a transaction and reverses its impact on account balances."""
+        try:
+            if transaction_type == "expense":
+                item = self.session.query(Expense).get(transaction_id)
+                if item:
+                    account = item.payment_method.account
+                    account.balance = float(Decimal(str(account.balance)) + Decimal(str(item.amount)))
+                    self.session.delete(item)
+
+            elif transaction_type == "gain":
+                item = self.session.query(Gain).get(transaction_id)
+                if item:
+                    account = item.account
+                    account.balance = float(Decimal(str(account.balance)) - Decimal(str(item.amount)))
+                    self.session.delete(item)
+
+            elif transaction_type in ["transfer_out", "transfer_in"]:
+                item = self.session.query(Transfer).get(transaction_id)
+                if item:
+                    origin = item.origin_account
+                    destination = item.destination_account
+                    origin.balance = float(Decimal(str(origin.balance)) + Decimal(str(item.amount_origin)))
+                    destination.balance = float(
+                        Decimal(str(destination.balance)) - Decimal(str(item.amount_destination)))
+                    self.session.delete(item)
+
+            self.session.commit()
+            return True
+
+        except Exception as e:
+            self.session.rollback()
+            raise e
 

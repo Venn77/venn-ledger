@@ -47,7 +47,12 @@ def open_calendar(parent, target_var, include_time=False):
     def set_date():
         selected_date = cal.selection_get()
         if include_time:
-            active_time = getattr(parent, 'session_time', datetime.datetime.now().strftime("%H:%M:%S"))
+            current_val = target_var.get().strip()
+            if " " in current_val:
+                active_time = current_val.split(" ")[1]
+            else:
+                active_time = getattr(parent, 'session_time', datetime.datetime.now().strftime("%H:%M:%S"))
+
             target_var.set(f"{selected_date} {active_time}")
         else:
             target_var.set(f"{selected_date}")
@@ -214,7 +219,7 @@ class TransactionRow(ctk.CTkFrame):
         # Date
         self._add_lbl(data.ts.strftime("%Y-%m-%d"), width=100)
         # Vendor or Stream
-        if len(data.entity) > ent_char_limit:
+        if data.entity and len(data.entity) > ent_char_limit:
             display_ent = data.entity[:ent_char_limit].strip() + "..."
         else:
             display_ent = data.entity
@@ -323,8 +328,14 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         self.fx_placeholder = "Rate (e.g. 1.15)"
         self.session_time = datetime.datetime.now().strftime("%H:%M:%S")
 
+        mem_date = self.mem.get("date", "")
+        if " " in mem_date:
+            initial_date = mem_date
+        else:
+            initial_date = f"{mem_date} {self.session_time}"
+
         self.currency_var = ctk.StringVar(value=self.mem.get("currency", "EUR"))
-        self.date_var = ctk.StringVar(value=f"{self.mem.get('date')} {self.session_time}")
+        self.date_var = ctk.StringVar(value=initial_date)
         self.project_var = ctk.StringVar(value=self.mem.get("project", ""))
 
         self.cal_window = None
@@ -762,8 +773,9 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         pass
 
 class AddExpenseWindow(BaseTransactionWindow):
-    def __init__(self, parent, manager):
-        super().__init__(parent, manager, "New Expense")
+    def __init__(self, parent, manager, transaction_data=None):
+        title = "Edit Expense" if transaction_data and transaction_data.get("id") else "New Expense"
+        super().__init__(parent, manager, title, transaction_data)
 
         self.cat_placeholder = "Search or type Category..."
         self.ven_placeholder = "Search or type Vendor..."
@@ -864,17 +876,20 @@ class AddExpenseWindow(BaseTransactionWindow):
         cat = "" if self.category_combo.get().strip() == self.cat_placeholder else self.category_combo.get().strip()
         ven = "" if self.vendor_combo.get().strip() == self.ven_placeholder else self.vendor_combo.get().strip()
         pm = self.pm_menu.get()
+        exp_id = self.transaction_data.get("id") if self.is_edit_mode and self.transaction_data else None
 
         self.manager.add_expense(
             **base_data,
             category_name=cat,
             vendor_name=ven,
-            payment_method_name=pm
+            payment_method_name=pm,
+            expense_id=exp_id
         )
 
 class AddGainWindow(BaseTransactionWindow):
-    def __init__(self, parent, manager):
-        super().__init__(parent, manager, "New Gain")
+    def __init__(self, parent, manager, transaction_data=None):
+        title = "Edit Gain" if transaction_data and transaction_data.get("id") else "New Gain"
+        super().__init__(parent, manager, title, transaction_data)
 
         self.stream_placeholder = "Search or type Stream..."
         self.payer_placeholder = "Search or type Payer..."
@@ -975,21 +990,24 @@ class AddGainWindow(BaseTransactionWindow):
         stream = "" if self.stream_combo.get().strip() == self.stream_placeholder else self.stream_combo.get().strip()
         payer = "" if self.payer_combo.get().strip() == self.payer_placeholder else self.payer_combo.get().strip()
         acc_id = session.query(Account).filter_by(name=self.acc_menu.get()).first().id
+        g_id = self.transaction_data.get("id") if self.is_edit_mode and self.transaction_data else None
 
         self.manager.add_gain(
             **base_data,
             stream_name=stream,
             payer_name=payer,
-            account_id=acc_id
+            account_id=acc_id,
+            gain_id=g_id
         )
 
 class AddTransferWindow(BaseTransactionWindow):
-    def __init__(self, parent, manager):
+    def __init__(self, parent, manager, transaction_data=None):
         active_accounts = session.query(Account).filter_by(active_bool=True).order_by(Account.name.asc()).all()
         self.account_map = {acc.name: acc for acc in active_accounts}
         self.all_acc_names = list(self.account_map.keys())
 
-        super().__init__(parent, manager, "New Transfer")
+        title = "Edit Transfer" if transaction_data and transaction_data.get("id") else "New Transfer"
+        super().__init__(parent, manager, title, transaction_data)
 
         self.origin_acc = None
         self.dest_acc = None
@@ -1039,8 +1057,7 @@ class AddTransferWindow(BaseTransactionWindow):
 
         self.lbl_dest_amt.grid(row=5, column=0, padx=(20, 10), pady=8, sticky="w")
         self.dest_amount_entry.grid(row=5, column=1, padx=(0, 20), pady=8, sticky="ew")
-        self.dest_amount_entry.insert(0, self.dest_amount_placeholder)
-        self.dest_amount_entry.configure(text_color="gray")
+        self._apply_entry_state(self.dest_amount_entry, self.mem.get("dest_amount"), self.dest_amount_placeholder)
 
         self.lbl_project.grid_forget()
         self.project_menu.grid_forget()
@@ -1171,6 +1188,7 @@ class AddTransferWindow(BaseTransactionWindow):
 
     def execute_db_submission(self, base_data):
         dest_amt = float(self.dest_amount_entry.get().replace(",", "."))
+        trf_id = self.transaction_data.get("id") if self.is_edit_mode and self.transaction_data else None
 
         self.manager.transfer_funds(
             origin_id=self.origin_acc.id,
@@ -1178,7 +1196,8 @@ class AddTransferWindow(BaseTransactionWindow):
             amount_orig=base_data["amount"],
             amount_dest=dest_amt,
             desc=base_data["description"],
-            ts=base_data["timestamp"]
+            ts=base_data["timestamp"],
+            transfer_id=trf_id
         )
 
 class FinanceApp(ctk.CTk):
@@ -2031,6 +2050,95 @@ class FinanceApp(ctk.CTk):
         except ValueError:
             self.jump_entry.delete(0, "end")
             self.jump_entry.insert(0, str(self.current_page + 1))
+
+    @staticmethod
+    def _prepare_transaction_data(row_data, is_edit=False):
+        """Maps a unified SQL row into the dictionary for the forms."""
+        data = {
+            "amount": row_data.amount,
+            "currency": row_data.currency,
+            "date": row_data.ts.strftime("%Y-%m-%d"),
+            "desc": row_data.desc,
+            "project": row_data.proj_name,
+            "fx_rate": row_data.fx_rate
+        }
+
+        if is_edit:
+            data["id"] = row_data.id
+            data["date"] = row_data.ts.strftime("%Y-%m-%d %H:%M:%S")
+
+        if row_data.type == "expense":
+            data["category"] = row_data.category
+            data["entity"] = row_data.entity
+            data["pm"] = row_data.pm_or_acc
+        elif row_data.type == "gain":
+            data["stream"] = row_data.category
+            data["entity"] = row_data.entity
+            data["acc"] = row_data.pm_or_acc
+        elif "transfer" in row_data.type:
+            t = session.query(Transfer).get(row_data.id)
+            data["amount"] = t.amount_origin
+            data["dest_amount"] = t.amount_destination
+            data["orig_acc"] = t.origin_account.name
+            data["dest_acc"] = t.destination_account.name
+
+        return data
+
+    def open_copy_transaction(self, row_data):
+        """Strips the ID and opens the form as a new entry."""
+        mapped_data = self._prepare_transaction_data(row_data, is_edit=False)
+        if row_data.type == "expense":
+            AddExpenseWindow(self, self.manager, transaction_data=mapped_data)
+        elif row_data.type == "gain":
+            AddGainWindow(self, self.manager, transaction_data=mapped_data)
+        elif "transfer" in row_data.type:
+            AddTransferWindow(self, self.manager, transaction_data=mapped_data)
+
+    def open_edit_transaction(self, row_data):
+        """
+        Keeps the ID so the backend knows to upsert.
+        Opens the form for editing.
+        """
+        mapped_data = self._prepare_transaction_data(row_data, is_edit=True)
+        if row_data.type == "expense":
+            AddExpenseWindow(self, self.manager, transaction_data=mapped_data)
+        elif row_data.type == "gain":
+            AddGainWindow(self, self.manager, transaction_data=mapped_data)
+        elif "transfer" in row_data.type:
+            AddTransferWindow(self, self.manager, transaction_data=mapped_data)
+
+    def delete_transaction_prompt(self, transaction_id, transaction_type):
+        """Generates a popup to confirm deletion before modifying the DB."""
+        popup = ctk.CTkToplevel(self)
+        popup.title("Confirm Delete")
+        popup.geometry("300x150")
+        popup.attributes("-topmost", True)
+        popup.grab_set()
+
+        self.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() // 2) - 150
+        y = self.winfo_y() + (self.winfo_height() // 2) - 75
+        popup.geometry(f"+{x}+{y}")
+
+        ctk.CTkLabel(popup, text="Are you sure you want to delete\nthis transaction?",
+                     font=("JetBrains Mono", 12)).pack(pady=20)
+        btn_frame = ctk.CTkFrame(popup, fg_color="transparent")
+        btn_frame.pack(pady=10)
+
+        def confirm():
+            try:
+                self.manager.delete_transaction(transaction_id, transaction_type)
+                self.refresh_accounts()
+                self.load_transactions()
+            except Exception as e:
+                print(f"Delete error: {e}")
+            finally:
+                popup.destroy()
+
+        ctk.CTkButton(btn_frame, text="Cancel", width=80, fg_color="gray40", command=popup.destroy).pack(side="left",
+                                                                                                         padx=10)
+        ctk.CTkButton(btn_frame, text="Delete", width=80, fg_color="#8b2525", hover_color="#611a1a",
+                      command=confirm).pack(side="left", padx=10)
 
     def on_closing(self):
         """Ensures the DB session is safely closed before quitting."""

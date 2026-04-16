@@ -236,8 +236,9 @@ class TransactionRow(ctk.CTkFrame):
         display_desc = (data.desc[:char_limit] + "...") if data.desc and len(data.desc) > char_limit else data.desc
         lbl_desc = self._add_lbl(display_desc or "", width=desc_px_width, anchor="w", color="gray50")
         if data.desc: ToolTip(lbl_desc, data.desc)
-        # Row Actions
-        self.actions_frame = ctk.CTkFrame(self, fg_color="transparent")
+        # Row Actions (Buttons will be packed only when cursor hovers over row)
+        self.actions_frame = ctk.CTkFrame(self, fg_color="transparent", width=96, height=24)
+        self.actions_frame.pack_propagate(False)
         self.actions_frame.pack(side="left", padx=(10, 10))
 
         btn_kwargs = {
@@ -245,18 +246,16 @@ class TransactionRow(ctk.CTkFrame):
             "height": 24,
             "fg_color": "transparent",
             "text_color": "gray60",
-            "hover_color": "gray25",
+            "hover_color": "gray40",
             "font": ("JetBrains Mono", 11)
         }
 
         # Copy Button
         self.btn_copy = ctk.CTkButton(self.actions_frame, text="C", command=self._trigger_copy, **btn_kwargs)
-        self.btn_copy.pack(side="left", padx=2)
         ToolTip(self.btn_copy, "Copy Transaction")
 
         # Edit Button
         self.btn_edit = ctk.CTkButton(self.actions_frame, text="E", command=self._trigger_edit, **btn_kwargs)
-        self.btn_edit.pack(side="left", padx=2)
         ToolTip(self.btn_edit, "Edit Transaction")
 
         # Delete Button
@@ -264,7 +263,6 @@ class TransactionRow(ctk.CTkFrame):
         del_kwargs["hover_color"] = "#8b2525"
 
         self.btn_del = ctk.CTkButton(self.actions_frame, text="X", command=self._trigger_delete, **del_kwargs)
-        self.btn_del.pack(side="left", padx=2)
         ToolTip(self.btn_del, "Delete Transaction")
         # Amount
         amt_str = f"{style['prefix']}{data.amount:,.2f} {data.currency}"
@@ -272,19 +270,56 @@ class TransactionRow(ctk.CTkFrame):
         if data.currency != 'EUR': ToolTip(lbl_amt, f"Converted: {style['prefix']}{data.eur_val:,.2f} EUR (Rate: {data.fx_rate})")
 
         # Hover Effect
-        def on_enter(_e, r=self):
-            r.configure(fg_color="gray25")
+        self.is_locked = False
+        self._is_hovered = False
 
-        def on_leave(_e, r=self):
-            r.configure(fg_color="gray15")
+        def check_hover():
+            if not self.winfo_exists(): return
 
-        self.bind("<Enter>", on_enter)
-        self.bind("<Leave>", on_leave)
+            if self.is_locked:
+                self.after(100, check_hover)
+                return
 
-        # Propagate Hover
-        for child in self.winfo_children():
-            child.bind("<Enter>", on_enter)
-            child.bind("<Leave>", on_leave)
+            x, y = self.winfo_pointerxy()
+            widget_under_mouse = self.winfo_containing(x, y)
+
+            curr = widget_under_mouse
+            is_inside = False
+            while curr:
+                if curr == self:
+                    is_inside = True
+                    break
+                curr = getattr(curr, 'master', None)
+
+            if is_inside:
+                self.after(100, check_hover)
+            else:
+                self._is_hovered = False
+                self.configure(fg_color="gray15")
+                self.btn_copy.pack_forget()
+                self.btn_edit.pack_forget()
+                self.btn_del.pack_forget()
+
+        def on_enter(_e=None, r=self):
+            if not r._is_hovered:
+                r._is_hovered = True
+                r.configure(fg_color="gray25")
+                if not r.btn_copy.winfo_ismapped():
+                    r.btn_copy.pack(side="left", padx=2)
+                    r.btn_edit.pack(side="left", padx=2)
+                    r.btn_del.pack(side="left", padx=2)
+                r.after(50, check_hover)
+
+        self.on_enter_action = on_enter
+        self.on_leave_action = lambda: setattr(self, 'is_locked', False)
+
+        def bind_enter(widget):
+            if isinstance(widget, ctk.CTkButton): return
+            widget.bind("<Enter>", on_enter, add="+")
+            for c in widget.winfo_children():
+                bind_enter(c)
+
+        bind_enter(self)
 
     def _add_lbl(self, text, width=0, anchor="center", expand=False, color="white", bold=False, side="left"):
         font = ("JetBrains Mono", 11, "bold") if bold else ("JetBrains Mono", 11)
@@ -299,7 +334,17 @@ class TransactionRow(ctk.CTkFrame):
         self.main_app.open_edit_transaction(self.data)
 
     def _trigger_delete(self):
-        self.main_app.delete_transaction_prompt(self.data.id, self.data.type)
+        self.is_locked = True
+
+        amt_str = f"{self.data.amount:,.2f} {self.data.currency}"
+        ent_str = self.data.entity or self.data.proj_name or "Unknown"
+        context_str = f"[{self.data.ts.strftime('%Y-%m-%d')}] {ent_str} | {amt_str}"
+
+        def on_cancel():
+            self.is_locked = False
+            self.on_leave_action()
+
+        self.main_app.delete_transaction_prompt(self.data.id, self.data.type, context_str, on_cancel)
 
 class BaseTransactionWindow(ctk.CTkToplevel):
     def __init__(self, parent, manager, title, transaction_data = None):
@@ -316,8 +361,9 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         if transaction_data:
             self.mem.update(transaction_data)
 
+        self.attributes('-topmost', True)
+        self.after(50, lambda: self.attributes('-topmost', False))
         self.after(100, self.force_focus)
-        self.attributes('-topmost', False)
 
         self.grid_columnconfigure(0, weight=0, minsize=120)
         self.grid_columnconfigure(1, weight=1)
@@ -2076,7 +2122,7 @@ class FinanceApp(ctk.CTk):
             data["entity"] = row_data.entity
             data["acc"] = row_data.pm_or_acc
         elif "transfer" in row_data.type:
-            t = session.query(Transfer).get(row_data.id)
+            t = session.get(Transfer, row_data.id)
             data["amount"] = t.amount_origin
             data["dest_amount"] = t.amount_destination
             data["orig_acc"] = t.origin_account.name
@@ -2107,23 +2153,30 @@ class FinanceApp(ctk.CTk):
         elif "transfer" in row_data.type:
             AddTransferWindow(self, self.manager, transaction_data=mapped_data)
 
-    def delete_transaction_prompt(self, transaction_id, transaction_type):
+    def delete_transaction_prompt(self, transaction_id, transaction_type, context_text="", on_cancel=None):
         """Generates a popup to confirm deletion before modifying the DB."""
         popup = ctk.CTkToplevel(self)
         popup.title("Confirm Delete")
-        popup.geometry("300x150")
+        popup.geometry("350x170")
         popup.attributes("-topmost", True)
         popup.grab_set()
 
         self.update_idletasks()
-        x = self.winfo_x() + (self.winfo_width() // 2) - 150
-        y = self.winfo_y() + (self.winfo_height() // 2) - 75
+        x = self.winfo_x() + (self.winfo_width() // 2) - 175
+        y = self.winfo_y() + (self.winfo_height() // 2) - 85
         popup.geometry(f"+{x}+{y}")
 
+        def cancel_action():
+            if on_cancel: on_cancel()
+            popup.destroy()
+
+        popup.protocol("WM_DELETE_WINDOW", cancel_action)
+
         ctk.CTkLabel(popup, text="Are you sure you want to delete\nthis transaction?",
-                     font=("JetBrains Mono", 12)).pack(pady=20)
+                     font=("JetBrains Mono", 12)).pack(pady=(20, 5))
+        ctk.CTkLabel(popup, text=context_text, font=("JetBrains Mono", 11), text_color="orange").pack(pady=(0, 15))
         btn_frame = ctk.CTkFrame(popup, fg_color="transparent")
-        btn_frame.pack(pady=10)
+        btn_frame.pack(pady=5)
 
         def confirm():
             try:
@@ -2135,7 +2188,7 @@ class FinanceApp(ctk.CTk):
             finally:
                 popup.destroy()
 
-        ctk.CTkButton(btn_frame, text="Cancel", width=80, fg_color="gray40", command=popup.destroy).pack(side="left",
+        ctk.CTkButton(btn_frame, text="Cancel", width=80, fg_color="gray40", command=cancel_action).pack(side="left",
                                                                                                          padx=10)
         ctk.CTkButton(btn_frame, text="Delete", width=80, fg_color="#8b2525", hover_color="#611a1a",
                       command=confirm).pack(side="left", padx=10)

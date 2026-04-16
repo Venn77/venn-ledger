@@ -73,7 +73,7 @@ class TransactionManager:
 
         # 4. Upsert Object & Revert Balance
         if expense_id:
-            new_expense = self.session.query(Expense).get(expense_id)
+            new_expense = self.session.get(Expense, expense_id)
             old_account = new_expense.payment_method.account
             old_account.balance = float(Decimal(str(old_account.balance)) + Decimal(str(new_expense.amount)))
         else:
@@ -140,7 +140,7 @@ class TransactionManager:
 
         # 4. Upsert Object & Revert Balance
         if gain_id:
-            new_gain = self.session.query(Gain).get(gain_id)
+            new_gain = self.session.get(Gain, gain_id)
             old_account = new_gain.account
             old_account.balance = float(Decimal(str(old_account.balance)) - Decimal(str(new_gain.amount)))
         else:
@@ -249,14 +249,14 @@ class TransactionManager:
     def transfer_funds(self, origin_id, destination_id, amount_orig, amount_dest, desc, ts=None, transfer_id=None):
         """Transfers funds between two accounts or edits an existing transfer."""
         try:
-            origin = self.session.query(Account).get(origin_id)
-            destination = self.session.query(Account).get(destination_id)
+            origin = self.session.get(Account, origin_id)
+            destination = self.session.get(Account, destination_id)
 
             prefix = f"{origin.currency_code} -> {destination.currency_code}{' | ' if desc else ''}"
             full_desc = prefix + desc
 
             if transfer_id:
-                new_transfer = self.session.query(Transfer).get(transfer_id)
+                new_transfer = self.session.get(Transfer, transfer_id)
                 old_origin_account = new_transfer.origin_account
                 old_origin_account.balance = float(Decimal(str(old_origin_account.balance)) + Decimal(str(new_transfer.amount_origin)))
                 old_destination_account = new_transfer.destination_account
@@ -296,21 +296,21 @@ class TransactionManager:
         """Deletes a transaction and reverses its impact on account balances."""
         try:
             if transaction_type == "expense":
-                item = self.session.query(Expense).get(transaction_id)
+                item = self.session.get(Expense, transaction_id)
                 if item:
                     account = item.payment_method.account
                     account.balance = float(Decimal(str(account.balance)) + Decimal(str(item.amount)))
                     self.session.delete(item)
 
             elif transaction_type == "gain":
-                item = self.session.query(Gain).get(transaction_id)
+                item = self.session.get(Gain, transaction_id)
                 if item:
                     account = item.account
                     account.balance = float(Decimal(str(account.balance)) - Decimal(str(item.amount)))
                     self.session.delete(item)
 
             elif transaction_type in ["transfer_out", "transfer_in"]:
-                item = self.session.query(Transfer).get(transaction_id)
+                item = self.session.get(Transfer, transaction_id)
                 if item:
                     origin = item.origin_account
                     destination = item.destination_account

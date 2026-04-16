@@ -320,12 +320,51 @@ class TransactionRow(ctk.CTkFrame):
                 bind_enter(c)
 
         bind_enter(self)
+        self._bind_mouse_scroll(self)
 
     def _add_lbl(self, text, width=0, anchor="center", expand=False, color="white", bold=False, side="left"):
         font = ("JetBrains Mono", 11, "bold") if bold else ("JetBrains Mono", 11)
         lbl = ctk.CTkLabel(self, text=text, width=width, anchor=anchor, text_color=color, font=font)
         lbl.pack(side=side, padx=10, fill="x" if expand else None, expand=expand)
         return lbl
+
+    def _bind_mouse_scroll(self, widget):
+        """Forces scroll events to bubble up to the parent scrollable frame."""
+        # Windows & Mac
+        widget.bind("<MouseWheel>", self._on_mousewheel, add="+")
+        # Linux
+        widget.bind("<Button-4>", self._on_mousewheel, add="+")
+        widget.bind("<Button-5>", self._on_mousewheel, add="+")
+
+        widget.bind("<Button-2>", self._start_pan, add="+")
+        widget.bind("<B2-Motion>", self._pan, add="+")
+
+        for child in widget.winfo_children():
+            self._bind_mouse_scroll(child)
+
+    def _on_mousewheel(self, event):
+        """Passes the scroll math to the internal canvas."""
+        canvas = getattr(self.master, '_parent_canvas', None)
+
+        if hasattr(canvas, 'yview_scroll'):
+            if event.num == 4:  # Linux Up
+                canvas.yview_scroll(-1, "units")
+            elif event.num == 5:  # Linux Down
+                canvas.yview_scroll(1, "units")
+            else:  # Windows / Mac
+                canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+    def _start_pan(self, event):
+        """Records the starting anchor point for a middle-click drag."""
+        canvas = getattr(self.master, '_parent_canvas', None)
+        if hasattr(canvas, 'scan_mark'):
+            canvas.scan_mark(0, event.y_root)
+
+    def _pan(self, event):
+        """Executes the drag based on the anchor point."""
+        canvas = getattr(self.master, '_parent_canvas', None)
+        if hasattr(canvas, 'scan_dragto'):
+            canvas.scan_dragto(0, event.y_root, gain=1)
 
     def _trigger_copy(self):
         self.main_app.open_copy_transaction(self.data)

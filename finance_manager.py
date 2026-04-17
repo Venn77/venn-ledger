@@ -22,6 +22,31 @@ class TransactionManager:
             "date": datetime.datetime.now().strftime("%Y-%m-%d")
         }
 
+    @staticmethod
+    def _safe_add(val1, val2):
+        """Safely adds two floats using Decimal to prevent precision drift."""
+        return float(Decimal(str(val1)) + Decimal(str(val2)))
+
+    @staticmethod
+    def _safe_sub(val1, val2):
+        """Safely subtracts val2 from val1 using Decimal."""
+        return float(Decimal(str(val1)) - Decimal(str(val2)))
+
+    def _resolve_fx_rate(self, currency_code, exchange_rate):
+        """Resolves the FX rate, fetching the latest historical rate if none is provided."""
+        if exchange_rate:
+            return exchange_rate
+        if currency_code == "EUR":
+            return None
+
+        rate_entry = (self.session.query(ExchangeRate)
+                      .filter_by(currency_code=currency_code)
+                      .order_by(ExchangeRate.timestamp.desc())
+                      .first())
+        if not rate_entry:
+            raise ValueError(f"No exchange rate found for {currency_code}.")
+        return rate_entry.fx_multiplier
+
     def _get_or_create_dimension(self, model, name):
         """
         Handles the 'Master Data' lookup.
@@ -58,24 +83,13 @@ class TransactionManager:
         account = pm.account
 
         # 3. FX Logic
-        if not exchange_rate:
-            fx_rate = None
-            if currency_code != "EUR":
-                rate_entry = (self.session.query(ExchangeRate)
-                              .filter_by(currency_code=currency_code)
-                              .order_by(ExchangeRate.timestamp.desc())
-                              .first())
-                if not rate_entry:
-                    raise ValueError(f"No exchange rate found for {currency_code}.")
-                fx_rate = rate_entry.fx_multiplier
-        else:
-            fx_rate = exchange_rate
+        fx_rate = self._resolve_fx_rate(currency_code, exchange_rate)
 
         # 4. Upsert Object & Revert Balance
         if expense_id:
             new_expense = self.session.get(Expense, expense_id)
             old_account = new_expense.payment_method.account
-            old_account.balance = float(Decimal(str(old_account.balance)) + Decimal(str(new_expense.amount)))
+            old_account.balance = self._safe_add(old_account.balance, new_expense.amount)
         else:
             new_expense = Expense()
 
@@ -92,7 +106,7 @@ class TransactionManager:
 
         new_expense = calculate_conversion(new_expense)
 
-        account.balance = float(Decimal(str(account.balance)) - Decimal(str(amount)))
+        account.balance = self._safe_sub(account.balance, amount)
 
         try:
             if not expense_id: self.session.add(new_expense)
@@ -125,24 +139,13 @@ class TransactionManager:
         account = self.session.query(Account).filter_by(id=account_id).first()
 
         # 3. FX Logic
-        if not exchange_rate:
-            fx_rate = None
-            if currency_code != "EUR":
-                rate_entry = (self.session.query(ExchangeRate)
-                              .filter_by(currency_code=currency_code)
-                              .order_by(ExchangeRate.timestamp.desc())
-                              .first())
-                if not rate_entry:
-                    raise ValueError(f"No exchange rate found for {currency_code}.")
-                fx_rate = rate_entry.fx_multiplier
-        else:
-            fx_rate = exchange_rate
+        fx_rate = self._resolve_fx_rate(currency_code, exchange_rate)
 
         # 4. Upsert Object & Revert Balance
         if gain_id:
             new_gain = self.session.get(Gain, gain_id)
             old_account = new_gain.account
-            old_account.balance = float(Decimal(str(old_account.balance)) - Decimal(str(new_gain.amount)))
+            old_account.balance = self._safe_sub(old_account.balance, new_gain.amount)
         else:
             new_gain = Gain()
 
@@ -159,7 +162,7 @@ class TransactionManager:
 
         new_gain = calculate_conversion(new_gain)
 
-        account.balance = float(Decimal(str(account.balance)) + Decimal(str(amount)))
+        account.balance = self._safe_add(account.balance, amount)
 
         try:
             if not gain_id: self.session.add(new_gain)
@@ -233,7 +236,7 @@ class TransactionManager:
 
         for acc in accounts:
             if acc.currency_code == "EUR":
-                total_eur += float(Decimal(str(acc.balance)))
+                total_eur = self._safe_add(total_eur, acc.balance)
             else:
                 # Get the latest rate
                 rate = (self.session.query(ExchangeRate)
@@ -242,7 +245,8 @@ class TransactionManager:
                         .first())
 
                 multiplier = rate.fx_multiplier if rate else 1.0
-                total_eur += float(Decimal(str(acc.balance))) / multiplier
+                converted_balance = float(Decimal(str(acc.balance)) / Decimal(str(multiplier)))
+                total_eur = self._safe_add(total_eur, converted_balance)
 
         return total_eur
 
@@ -258,9 +262,9 @@ class TransactionManager:
             if transfer_id:
                 new_transfer = self.session.get(Transfer, transfer_id)
                 old_origin_account = new_transfer.origin_account
-                old_origin_account.balance = float(Decimal(str(old_origin_account.balance)) + Decimal(str(new_transfer.amount_origin)))
+                old_origin_account.balance = self._safe_add(old_origin_account.balance, new_transfer.amount_origin)
                 old_destination_account = new_transfer.destination_account
-                old_destination_account.balance = float(Decimal(str(old_destination_account.balance)) - Decimal(str(new_transfer.amount_destination)))
+                old_destination_account.balance = self._safe_sub(old_destination_account.balance, new_transfer.amount_destination)
             else:
                 new_transfer = Transfer()
 
@@ -272,8 +276,8 @@ class TransactionManager:
             new_transfer.timestamp = ts or datetime.datetime.now()
 
             # Update balances
-            origin.balance = float(Decimal(str(origin.balance)) - Decimal(str(amount_orig)))
-            destination.balance = float(Decimal(str(destination.balance)) + Decimal(str(amount_dest)))
+            origin.balance = self._safe_sub(origin.balance, amount_orig)
+            destination.balance = self._safe_add(destination.balance, amount_dest)
 
             if not transfer_id: self.session.add(new_transfer)
             self.session.commit()
@@ -299,14 +303,14 @@ class TransactionManager:
                 item = self.session.get(Expense, transaction_id)
                 if item:
                     account = item.payment_method.account
-                    account.balance = float(Decimal(str(account.balance)) + Decimal(str(item.amount)))
+                    account.balance = self._safe_add(account.balance, item.amount)
                     self.session.delete(item)
 
             elif transaction_type == "gain":
                 item = self.session.get(Gain, transaction_id)
                 if item:
                     account = item.account
-                    account.balance = float(Decimal(str(account.balance)) - Decimal(str(item.amount)))
+                    account.balance = self._safe_sub(account.balance, item.amount)
                     self.session.delete(item)
 
             elif transaction_type in ["transfer_out", "transfer_in"]:
@@ -314,9 +318,8 @@ class TransactionManager:
                 if item:
                     origin = item.origin_account
                     destination = item.destination_account
-                    origin.balance = float(Decimal(str(origin.balance)) + Decimal(str(item.amount_origin)))
-                    destination.balance = float(
-                        Decimal(str(destination.balance)) - Decimal(str(item.amount_destination)))
+                    origin.balance = self._safe_add(origin.balance, item.amount_origin)
+                    destination.balance = self._safe_sub(destination.balance, item.amount_destination)
                     self.session.delete(item)
 
             self.session.commit()

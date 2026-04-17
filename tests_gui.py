@@ -1563,9 +1563,13 @@ class FinanceApp(ctk.CTk):
         self.reset_scroll_to_top()
 
     def on_date_filter_change(self, selection):
-        if selection == "This Month":
+        if selection in ["This Month", "This Year"]:
             self.current_view_date = datetime.datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             self.custom_date_frame.pack_forget()
+            if selection == "This Year":
+                self.month_frame.pack_forget()
+            else:
+                self.month_frame.pack(side="left")
             self.time_nav_frame.pack(side="left", padx=20, anchor="n")
             self.update_time_display()
             self.current_page = 0
@@ -1659,8 +1663,9 @@ class FinanceApp(ctk.CTk):
             return first_of_last_month, last_of_last_month
 
         elif selection == "This Year":
-            start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-            return start, end_of_now
+            start = self.current_view_date.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+            end = start.replace(month=12, day=31, hour=23, minute=59, second=59, microsecond=999999)
+            return start, end
 
         return None, None
 

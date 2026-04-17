@@ -400,8 +400,8 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         if transaction_data:
             self.mem.update(transaction_data)
 
-        self.attributes('-topmost', True)
-        self.after(50, lambda: self.attributes('-topmost', False))
+        self.after(50, lambda: self.attributes('-topmost', True))
+        self.after(75, lambda: self.attributes('-topmost', False))
         self.after(100, self.force_focus)
 
         self.grid_columnconfigure(0, weight=0, minsize=120)
@@ -1289,9 +1289,9 @@ class FinanceApp(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("Venn Ledger 2026")
-        self.geometry("1400x700")
-        self.minsize(1400, 700)
-        self.maxsize(1400,980)
+        self.geometry("1440x700")
+        self.minsize(1440, 700)
+        self.maxsize(1440,980)
         ctk.set_appearance_mode("dark")
         self.manager = finance_manager.TransactionManager(session)
         self.cal_window = None

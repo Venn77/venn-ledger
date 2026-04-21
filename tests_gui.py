@@ -251,6 +251,121 @@ class FXDialog(ctk.CTkToplevel):
             else:
                 self.err_lbl.configure(text=msg)
 
+class AccountDialog(ctk.CTkToplevel):
+    def __init__(self, parent, active_currencies, initial_name="", initial_desc="", initial_curr="", initial_bal="0.00",
+                 is_edit=False, on_submit=None):
+        super().__init__(parent)
+        self.title("Edit Account" if is_edit else "New Account")
+        width = 320
+        height = 350
+        self.geometry(f"{width}x{height}")
+        self.attributes("-topmost", True)
+        self.grab_set()
+        self.on_submit = on_submit
+
+        self.update_idletasks()
+        x = parent.winfo_x() + (parent.winfo_width() // 2) - (width // 2)
+        y = parent.winfo_y() + (parent.winfo_height() // 2) - (height // 2)
+        self.geometry(f"+{x}+{y}")
+
+        ctk.CTkLabel(self, text="Account Name:", font=("JetBrains Mono", 11, "bold")).pack(pady=(15, 0))
+        self.name_entry = ctk.CTkEntry(self, width=260)
+        self.name_entry.insert(0, initial_name)
+        self.name_entry.pack(pady=(2, 10))
+
+        ctk.CTkLabel(self, text="Description:", font=("JetBrains Mono", 11, "bold")).pack()
+        self.desc_entry = ctk.CTkEntry(self, width=260)
+        self.desc_entry.insert(0, initial_desc)
+        self.desc_entry.pack(pady=(2, 10))
+
+        ctk.CTkLabel(self, text="Currency:", font=("JetBrains Mono", 11, "bold")).pack()
+        self.curr_combo = ctk.CTkComboBox(self, values=active_currencies, width=260)
+        if initial_curr: self.curr_combo.set(initial_curr)
+        if is_edit: self.curr_combo.configure(state="disabled")
+        self.curr_combo.pack(pady=(2, 10))
+
+        ctk.CTkLabel(self, text="Initial Balance:", font=("JetBrains Mono", 11, "bold")).pack()
+        self.bal_entry = ctk.CTkEntry(self, width=260)
+        self.bal_entry.insert(0, initial_bal)
+        if is_edit: self.bal_entry.configure(state="disabled")
+        self.bal_entry.pack(pady=(2, 10))
+
+        self.err_lbl = ctk.CTkLabel(self, text="", text_color="#FF6B6B", font=("JetBrains Mono", 10), height=15)
+        self.err_lbl.pack()
+
+        btn_frame = ctk.CTkFrame(self, fg_color="transparent")
+        btn_frame.pack(pady=5)
+        ctk.CTkButton(btn_frame, text="Cancel", width=80, fg_color="gray40", command=self.destroy).pack(side="left",
+                                                                                                        padx=10)
+        ctk.CTkButton(btn_frame, text="Save", width=80, command=self.submit).pack(side="left", padx=10)
+
+    def submit(self):
+        name = self.name_entry.get().strip()
+        if not name:
+            self.err_lbl.configure(text="Name cannot be empty.")
+            return
+
+        try:
+            bal = float(self.bal_entry.get().replace(",", "."))
+        except ValueError:
+            self.err_lbl.configure(text="Invalid balance amount.")
+            return
+
+        if self.on_submit:
+            success, msg = self.on_submit(name, self.desc_entry.get().strip(), self.curr_combo.get(), bal)
+            if success:
+                self.destroy()
+            else:
+                self.err_lbl.configure(text=msg)
+
+class PMDialog(ctk.CTkToplevel):
+    def __init__(self, parent, active_accounts, initial_name="", initial_acc="", on_submit=None):
+        super().__init__(parent)
+        self.title("Payment Method")
+        width = 300
+        height = 220
+        self.geometry(f"{width}x{height}")
+        self.attributes("-topmost", True)
+        self.grab_set()
+        self.on_submit = on_submit
+
+        self.update_idletasks()
+        x = parent.winfo_x() + (parent.winfo_width() // 2) - (width // 2)
+        y = parent.winfo_y() + (parent.winfo_height() // 2) - (height // 2)
+        self.geometry(f"+{x}+{y}")
+
+        ctk.CTkLabel(self, text="Method Name (e.g. Santander Debit):", font=("JetBrains Mono", 11, "bold")).pack(
+            pady=(15, 0))
+        self.name_entry = ctk.CTkEntry(self, width=260)
+        self.name_entry.insert(0, initial_name)
+        self.name_entry.pack(pady=(2, 10))
+
+        ctk.CTkLabel(self, text="Linked Account:", font=("JetBrains Mono", 11, "bold")).pack()
+        self.acc_combo = ctk.CTkComboBox(self, values=active_accounts, width=260)
+        if initial_acc: self.acc_combo.set(initial_acc)
+        self.acc_combo.pack(pady=(2, 10))
+
+        self.err_lbl = ctk.CTkLabel(self, text="", text_color="#FF6B6B", font=("JetBrains Mono", 10), height=15)
+        self.err_lbl.pack()
+
+        btn_frame = ctk.CTkFrame(self, fg_color="transparent")
+        btn_frame.pack(pady=5)
+        ctk.CTkButton(btn_frame, text="Cancel", width=80, fg_color="gray40", command=self.destroy).pack(side="left",
+                                                                                                        padx=10)
+        ctk.CTkButton(btn_frame, text="Save", width=80, command=self.submit).pack(side="left", padx=10)
+
+    def submit(self):
+        name = self.name_entry.get().strip()
+        if not name:
+            self.err_lbl.configure(text="Name cannot be empty.")
+            return
+        if self.on_submit:
+            success, msg = self.on_submit(name, self.acc_combo.get())
+            if success:
+                self.destroy()
+            else:
+                self.err_lbl.configure(text=msg)
+
 class SimpleMasterDataGrid(ctk.CTkFrame):
     """Renders a dynamic grid for simple CRUD operations on db."""
     def __init__(self, parent, db_session, model, title, has_desc=False):
@@ -524,6 +639,184 @@ class ExchangeRateGrid(ctk.CTkFrame):
             return True, ""
 
         FXDialog(self, active_currencies=act_currencies, on_submit=_save)
+
+class AccountGrid(ctk.CTkFrame):
+    def __init__(self, parent, db_session):
+        super().__init__(parent, fg_color="transparent")
+        self.session = db_session
+        header = ctk.CTkFrame(self, fg_color="transparent")
+        header.pack(fill="x", pady=(0, 10))
+        ctk.CTkLabel(header, text="Accounts", font=("JetBrains Mono", 16, "bold")).pack(side="left")
+        ctk.CTkButton(header, text="+ Add Account", width=130, command=self.add_new).pack(side="right")
+
+        self.scroll = ctk.CTkScrollableFrame(self)
+        self.scroll.pack(fill="both", expand=True)
+        self.load_data()
+
+    def load_data(self):
+        for widget in self.scroll.winfo_children(): widget.destroy()
+        items = self.session.query(Account).order_by(Account.name).all()
+        for item in items:
+            row = ctk.CTkFrame(self.scroll, fg_color="gray20", corner_radius=6)
+            row.pack(fill="x", pady=2, padx=2)
+
+            ctk.CTkLabel(row, text=item.name, width=150, anchor="w", font=("JetBrains Mono", 12, "bold")).pack(
+                side="left", padx=10, pady=8)
+            ctk.CTkLabel(row, text=f"{item.balance:,.2f} {item.currency_code}", width=100, anchor="w",
+                         text_color="#5AC8FA", font=("JetBrains Mono", 11, "bold")).pack(side="left", padx=5)
+
+            btn_frame = ctk.CTkFrame(row, fg_color="transparent")
+            btn_frame.pack(side="right", padx=10)
+            t_text, t_color = ("Deactivate", "#b13e3e") if item.active_bool else ("Activate", "#1f538d")
+
+            ctk.CTkButton(btn_frame, text=t_text, width=80, height=24, fg_color=t_color,
+                          command=lambda i=item: self.toggle(i)).pack(side="right", padx=2)
+            ctk.CTkButton(btn_frame, text="Edit", width=60, height=24, fg_color="gray30", hover_color="gray40",
+                          command=lambda i=item: self.edit(i)).pack(side="right", padx=2)
+
+            status, color = ("Active", "#4CD964") if item.active_bool else ("Inactive", "gray50")
+            ctk.CTkLabel(row, text=status, text_color=color, width=60, font=("JetBrains Mono", 11)).pack(side="right",
+                                                                                                         padx=10)
+
+    def toggle(self, acc):
+        if acc.active_bool and acc.balance != 0:
+            popup = ctk.CTkToplevel(self)
+            popup.title("Warning")
+            popup.geometry("350x180")
+            popup.attributes("-topmost", True)
+            popup.grab_set()
+            self.update_idletasks()
+            popup.geometry(f"+{self.winfo_x() + 100}+{self.winfo_y() + 100}")
+
+            msg = f"Account '{acc.name}' has a balance of {acc.balance:,.2f}.\n\nDeactivating it hides it from menus and\ndeactivates its Payment Methods, but the\nbalance will STILL count toward Net Worth.\n\nProceed?"
+            ctk.CTkLabel(popup, text=msg, font=("JetBrains Mono", 11)).pack(pady=15)
+
+            def _confirm():
+                self._execute_toggle(acc)
+                popup.destroy()
+
+            bf = ctk.CTkFrame(popup, fg_color="transparent")
+            bf.pack()
+            ctk.CTkButton(bf, text="Cancel", width=80, fg_color="gray40", command=popup.destroy).pack(side="left",
+                                                                                                      padx=10)
+            ctk.CTkButton(bf, text="Deactivate", width=80, fg_color="#b13e3e", command=_confirm).pack(side="left",
+                                                                                                      padx=10)
+        else:
+            self._execute_toggle(acc)
+
+    def _execute_toggle(self, acc):
+        acc.active_bool = not acc.active_bool
+        if not acc.active_bool:
+            for pm in acc.payment_methods: pm.active_bool = False
+        self.session.commit()
+        self.load_data()
+
+        self.event_generate("<<DataChanged>>")
+
+    def add_new(self):
+        currencies = [c.code for c in self.session.query(Currency).filter_by(active_bool=True).all()]
+        if not currencies: return
+
+        def _save(name, descr, curr, bal):
+            if self.session.query(Account).filter_by(name=name).first(): return False, "Name already exists."
+            self.session.add(Account(name=name, description=descr, currency_code=curr, balance=bal, initial_balance=bal))
+            self.session.commit()
+            self.load_data()
+            return True, ""
+
+        AccountDialog(self, currencies, on_submit=_save)
+
+    def edit(self, acc):
+        def _update(name, descr):
+            existing = self.session.query(Account).filter_by(name=name).first()
+            if existing and existing.id != acc.id: return False, "Name in use."
+            acc.name = name
+            acc.description = descr
+            self.session.commit()
+            self.load_data()
+            return True, ""
+
+        AccountDialog(self, [], initial_name=acc.name, initial_desc=acc.description, initial_curr=acc.currency_code,
+                      initial_bal=str(acc.initial_balance), is_edit=True, on_submit=_update)
+
+class PMGrid(ctk.CTkFrame):
+    def __init__(self, parent, db_session):
+        super().__init__(parent, fg_color="transparent")
+        self.session = db_session
+        header = ctk.CTkFrame(self, fg_color="transparent")
+        header.pack(fill="x", pady=(0, 10))
+        ctk.CTkLabel(header, text="Payment Methods", font=("JetBrains Mono", 16, "bold")).pack(side="left")
+        ctk.CTkButton(header, text="+ Add Method", width=130, command=self.add_new).pack(side="right")
+
+        self.scroll = ctk.CTkScrollableFrame(self)
+        self.scroll.pack(fill="both", expand=True)
+        self.load_data()
+
+    def load_data(self, _event=None):
+        for widget in self.scroll.winfo_children(): widget.destroy()
+        items = self.session.query(PaymentMethod).join(Account).order_by(Account.name, PaymentMethod.name).all()
+        for item in items:
+            row = ctk.CTkFrame(self.scroll, fg_color="gray20", corner_radius=6)
+            row.pack(fill="x", pady=2, padx=2)
+
+            ctk.CTkLabel(row, text=item.name, width=120, anchor="w", font=("JetBrains Mono", 12, "bold")).pack(
+                side="left", padx=10, pady=8)
+
+            acc_color = "gray60" if not item.account.active_bool else "#5AC8FA"
+            acc_text = f"→ {item.account.name}" + (" (Inactive)" if not item.account.active_bool else "")
+            ctk.CTkLabel(row, text=acc_text, width=150, anchor="w", text_color=acc_color,
+                         font=("JetBrains Mono", 11)).pack(side="left", padx=5)
+
+            btn_frame = ctk.CTkFrame(row, fg_color="transparent")
+            btn_frame.pack(side="right", padx=10)
+
+            t_text, t_color = ("Deactivate", "#b13e3e") if item.active_bool else ("Activate", "#1f538d")
+
+            state = "disabled" if not item.active_bool and not item.account.active_bool else "normal"
+            ctk.CTkButton(btn_frame, text=t_text, width=80, height=24, fg_color=t_color, state=state,
+                          command=lambda i=item.id: self.toggle(i)).pack(side="right", padx=2)
+            ctk.CTkButton(btn_frame, text="Edit", width=60, height=24, fg_color="gray30", hover_color="gray40",
+                          command=lambda i=item: self.edit(i)).pack(side="right", padx=2)
+
+            status, color = ("Active", "#4CD964") if item.active_bool else ("Inactive", "gray50")
+            ctk.CTkLabel(row, text=status, text_color=color, width=60, font=("JetBrains Mono", 11)).pack(side="right",
+                                                                                                         padx=10)
+
+    def toggle(self, item_id):
+        item = self.session.get(PaymentMethod, item_id)
+        item.active_bool = not item.active_bool
+        self.session.commit()
+        self.load_data()
+
+    def add_new(self):
+        act_accounts = [a.name for a in self.session.query(Account).filter_by(active_bool=True).all()]
+        if not act_accounts: return
+
+        def _save(name, acc_name):
+            if self.session.query(PaymentMethod).filter_by(name=name).first(): return False, "Name in use."
+            acc = self.session.query(Account).filter_by(name=acc_name).first()
+            self.session.add(PaymentMethod(name=name, account_id=acc.id))
+            self.session.commit()
+            self.load_data()
+            return True, ""
+
+        PMDialog(self, act_accounts, on_submit=_save)
+
+    def edit(self, item):
+        act_accounts = [a.name for a in self.session.query(Account).filter_by(active_bool=True).all()]
+        if item.account.name not in act_accounts: act_accounts.append(item.account.name)
+
+        def _update(name, acc_name):
+            existing = self.session.query(PaymentMethod).filter_by(name=name).first()
+            if existing and existing.id != item.id: return False, "Name in use."
+            acc = self.session.query(Account).filter_by(name=acc_name).first()
+            item.name = name
+            item.account_id = acc.id
+            self.session.commit()
+            self.load_data()
+            return True, ""
+
+        PMDialog(self, act_accounts, initial_name=item.name, initial_acc=item.account.name, on_submit=_update)
 
 class SearchableComboBox(ctk.CTkComboBox):
     def __init__(self, master, placeholder="", **kwargs):
@@ -1996,6 +2289,18 @@ class FinanceApp(ctk.CTk):
         self.tab_entities = self.settings_tabview.add("Vendors & Payers")
         self.tab_projects = self.settings_tabview.add("Projects")
 
+        # Accounts & Payment Methods Tab
+        self.tab_accounts.grid_columnconfigure((0, 1), weight=1, uniform="tab_col")
+        self.tab_accounts.grid_rowconfigure(0, weight=1)
+
+        self.acc_grid = AccountGrid(self.tab_accounts, session)
+        self.acc_grid.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+
+        self.pm_grid = PMGrid(self.tab_accounts, session)
+        self.pm_grid.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
+
+        self.acc_grid.bind("<<DataChanged>>", self.pm_grid.load_data)
+
         # Categories & Streams Tab
         self.tab_categories.grid_columnconfigure((0, 1), weight=1, uniform="tab_col")
         self.tab_categories.grid_rowconfigure(0, weight=1)
@@ -2800,3 +3105,5 @@ class FinanceApp(ctk.CTk):
 if __name__ == "__main__":
     app = FinanceApp()
     app.mainloop()
+
+

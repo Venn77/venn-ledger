@@ -9,6 +9,7 @@ from sqlalchemy import (
     union_all, asc, case
 )
 from sqlalchemy.orm import aliased
+from sqlalchemy.exc import IntegrityError
 from tkcalendar import Calendar
 import finance_manager, datetime, json, os
 
@@ -60,6 +61,189 @@ def open_calendar(parent, target_var, include_time=False):
         parent.cal_window.destroy()
 
     ctk.CTkButton(parent.cal_window, text="Confirm", command=set_date).pack(pady=10)
+
+class SimpleDataDialog(ctk.CTkToplevel):
+    """Generic popup form for creating/editing Master Data."""
+    def __init__(self, parent, title, initial_name="", initial_desc="", has_desc=False, on_submit=None):
+        super().__init__(parent)
+        self.title(title)
+
+        height = 220 if has_desc else 160
+        width = 300
+        self.geometry(f"{width}x{height}")
+        self.attributes("-topmost", True)
+        self.grab_set()
+
+        self.on_submit = on_submit
+        self.has_desc = has_desc
+
+        self.update_idletasks()
+        x = parent.winfo_x() + (parent.winfo_width() // 2) - (width // 2)
+        y = parent.winfo_y() + (parent.winfo_height() // 2) - (height // 2)
+        self.geometry(f"+{x}+{y}")
+
+        ctk.CTkLabel(self, text="Name:", font=("JetBrains Mono", 12, "bold")).pack(pady=(15, 0))
+        self.name_entry = ctk.CTkEntry(self, width=240)
+        self.name_entry.insert(0, initial_name)
+        self.name_entry.pack(pady=(5, 10))
+
+        if self.has_desc:
+            ctk.CTkLabel(self, text="Description:", font=("JetBrains Mono", 12, "bold")).pack()
+            self.desc_entry = ctk.CTkEntry(self, width=240)
+            self.desc_entry.insert(0, initial_desc)
+            self.desc_entry.pack(pady=(5, 10))
+
+        self.err_lbl = ctk.CTkLabel(self, text="", text_color="#FF6B6B", font=("JetBrains Mono", 10), height=15)
+        self.err_lbl.pack()
+
+        btn_frame = ctk.CTkFrame(self, fg_color="transparent")
+        btn_frame.pack(pady=5)
+
+        ctk.CTkButton(btn_frame, text="Cancel", width=80, fg_color="gray40", command=self.destroy).pack(side="left",
+                                                                                                        padx=10)
+        ctk.CTkButton(btn_frame, text="Save", width=80, command=self.submit).pack(side="left", padx=10)
+
+        self.name_entry.focus_set()
+        self.bind("<Return>", lambda e: self.submit())
+
+    def submit(self):
+        name_val = self.name_entry.get().strip()
+        desc_val = self.desc_entry.get().strip() if self.has_desc else None
+
+        if not name_val:
+            self.err_lbl.configure(text="Name cannot be empty.")
+            return
+
+        if self.on_submit:
+            success, msg = self.on_submit(name_val, desc_val)
+            if success:
+                self.destroy()
+            else:
+                self.err_lbl.configure(text=msg)
+
+class SimpleMasterDataGrid(ctk.CTkFrame):
+    """Renders a dynamic grid for CRUD operations on db."""
+    def __init__(self, parent, db_session, model, title, has_desc=False):
+        super().__init__(parent, fg_color="transparent")
+        self.session = db_session
+        self.model = model
+        self.title = title
+        self.has_desc = has_desc
+
+        header_frame = ctk.CTkFrame(self, fg_color="transparent")
+        header_frame.pack(fill="x", pady=(0, 10))
+        ctk.CTkLabel(header_frame, text=title, font=("JetBrains Mono", 16, "bold")).pack(side="left")
+        ctk.CTkButton(header_frame, text="+ Add New", width=80, command=self.add_new).pack(side="right")
+
+        self.scroll = ctk.CTkScrollableFrame(self)
+        self.scroll.pack(fill="both", expand=True)
+
+        self.load_data()
+
+    def load_data(self):
+        for widget in self.scroll.winfo_children():
+            widget.destroy()
+
+        items = self.session.query(self.model).order_by(self.model.name).all()
+        for item in items:
+            row = ctk.CTkFrame(self.scroll, fg_color="gray20", corner_radius=6)
+            row.pack(fill="x", pady=2, padx=2)
+
+            name_lbl = ctk.CTkLabel(row, text=item.name, width=150, anchor="w", font=("JetBrains Mono", 12, "bold"))
+            name_lbl.pack(side="left", padx=10, pady=8)
+
+            if self.has_desc and hasattr(item, 'description'):
+                desc_text = (item.description[:30] + '...') if item.description and len(
+                    item.description) > 30 else item.description
+                ctk.CTkLabel(row, text=desc_text or "", width=150, anchor="w", text_color="gray60").pack(side="left",
+                                                                                                         padx=10)
+
+            # Action Buttons
+            btn_frame = ctk.CTkFrame(row, fg_color="transparent")
+            btn_frame.pack(side="right", padx=10)
+
+            toggle_text = "Deactivate" if item.active_bool else "Activate"
+            toggle_color = "#b13e3e" if item.active_bool else "#1f538d"
+
+            ctk.CTkButton(btn_frame, text=toggle_text, width=80, height=24, fg_color=toggle_color,
+                          command=lambda i=item.id: self.toggle_status(i)).pack(side="right", padx=2)
+
+            ctk.CTkButton(btn_frame, text="Edit", width=60, height=24, fg_color="gray30", hover_color="gray40",
+                          command=lambda i=item: self.edit_item(i)).pack(side="right", padx=2)
+
+            # Status Label
+            status_text = "Active" if item.active_bool else "Inactive"
+            status_color = "#4CD964" if item.active_bool else "gray50"
+            ctk.CTkLabel(row, text=status_text, text_color=status_color, width=60, font=("JetBrains Mono", 11)).pack(
+                side="right", padx=10)
+
+    def toggle_status(self, item_id):
+        item = self.session.get(self.model, item_id)
+        if item:
+            item.active_bool = not item.active_bool
+            self.session.commit()
+            self.load_data()
+
+    def add_new(self):
+        def _save(new_name, new_desc):
+            try:
+                existing_item = self.session.query(self.model).filter_by(name=new_name).first()
+
+                if existing_item:
+                    if not existing_item.active_bool:
+                        existing_item.active_bool = True
+                        if self.has_desc and hasattr(existing_item, 'description'):
+                            existing_item.description = new_desc
+                        self.session.commit()
+                        self.load_data()
+                        return True, ""
+                    else:
+                        return False, f"'{new_name}' already exists and is active."
+
+                if self.has_desc:
+                    new_item = self.model(name=new_name, description=new_desc)
+                else:
+                    new_item = self.model(name=new_name)
+
+                self.session.add(new_item)
+                self.session.commit()
+                self.load_data()
+                return True, ""
+            except IntegrityError:
+                self.session.rollback()
+                return False, "Database error."
+            except Exception as e:
+                self.session.rollback()
+                return False, str(e)
+
+        SimpleDataDialog(self, f"Add {self.model.__name__}", has_desc=self.has_desc, on_submit=_save)
+
+    def edit_item(self, item):
+        initial_desc = item.description if self.has_desc and hasattr(item, 'description') else ""
+
+        def _update(new_name, new_desc):
+            try:
+                existing_item = self.session.query(self.model).filter_by(name=new_name).first()
+                if existing_item and existing_item.id != item.id:
+                    status = "active" if existing_item.active_bool else "deactivated"
+                    return False, f"Name already used by a {status} item."
+
+                item.name = new_name
+                if self.has_desc and hasattr(item, 'description'):
+                    item.description = new_desc
+
+                self.session.commit()
+                self.load_data()
+                return True, ""
+            except IntegrityError:
+                self.session.rollback()
+                return False, "Database error."
+            except Exception as e:
+                self.session.rollback()
+                return False, str(e)
+
+        SimpleDataDialog(self, f"Edit {self.model.__name__}", initial_name=item.name, initial_desc=initial_desc,
+                         has_desc=self.has_desc, on_submit=_update)
 
 class SearchableComboBox(ctk.CTkComboBox):
     def __init__(self, master, placeholder="", **kwargs):
@@ -1304,7 +1488,7 @@ class FinanceApp(ctk.CTk):
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        # 2. Sidebar (Accounts & Quick Actions)
+        # 2. Sidebar (Accounts, Quick Actions & Modes)
         self.reorder_mode = False
         self.selected_account_id = None
         self.filter_account_id = None
@@ -1329,7 +1513,11 @@ class FinanceApp(ctk.CTk):
 
         self.reorder_btn = ctk.CTkButton(self.sidebar, text="⇅ Reorder Accounts", fg_color="transparent",
                                          border_width=1, command=self.toggle_reorder_mode)
-        self.reorder_btn.pack(pady=(10, 20), padx=20, fill="x")
+        self.reorder_btn.pack(pady=(10, 5), padx=20, fill="x")
+
+        self.settings_btn = ctk.CTkButton(self.sidebar, text="⚙️ Settings & Data", fg_color="gray20",
+                                          hover_color="gray30", command=self.show_settings_view)
+        self.settings_btn.pack(side="bottom", pady=20, padx=20, fill="x")
 
         self.acc_scroll = ctk.CTkScrollableFrame(self.sidebar, fg_color="transparent", label_text="Accounts")
         self.acc_scroll.pack(fill="both", expand=True, padx=5, pady=5)
@@ -1337,7 +1525,7 @@ class FinanceApp(ctk.CTk):
         # Account List
         self.refresh_accounts()
 
-        # 3. Main Content Area
+        # 3. Main Content Area (Transactions)
         self.main_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.main_frame.grid(row=0, column=1, padx=20, pady=20, sticky="nsew")
 
@@ -1510,6 +1698,66 @@ class FinanceApp(ctk.CTk):
         self.chk_transfers = ctk.CTkCheckBox(self.type_filter_frame, text="Transfers", variable=self.show_transfers_var,
                                        font=("JetBrains Mono", 11), width=60, command=self._schedule_type_filter)
         self.chk_transfers.pack(side="left", padx=5)
+
+        # 7. Settings & Master Data Area
+        self.settings_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.settings_frame.grid(row=0, column=1, padx=20, pady=20, sticky="nsew")
+
+        self.settings_header = ctk.CTkLabel(self.settings_frame, text="Master Data Management",
+                                            font=("JetBrains Mono", 22, "bold"))
+        self.settings_header.pack(anchor="w", pady=(0, 20))
+
+        self.settings_tabview = ctk.CTkTabview(self.settings_frame)
+        self.settings_tabview.pack(fill="both", expand=True, padx=10, pady=10)
+
+        self.tab_accounts = self.settings_tabview.add("Accounts & Payment Methods")
+        self.tab_categories = self.settings_tabview.add("Categories & Streams")
+        self.tab_entities = self.settings_tabview.add("Vendors & Payers")
+        self.tab_projects = self.settings_tabview.add("Projects")
+
+        # Categories & Streams Tab
+        self.tab_categories.grid_columnconfigure((0, 1), weight=1)
+        self.tab_categories.grid_rowconfigure(0, weight=1)
+
+        self.cat_grid = SimpleMasterDataGrid(self.tab_categories, session, Category, "Categories (Expenses)")
+        self.cat_grid.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+
+        self.stream_grid = SimpleMasterDataGrid(self.tab_categories, session, Stream, "Streams (Gains)")
+        self.stream_grid.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
+
+        # Vendors & Payers Tab
+        self.tab_entities.grid_columnconfigure((0, 1), weight=1)
+        self.tab_entities.grid_rowconfigure(0, weight=1)
+
+        self.vendor_grid = SimpleMasterDataGrid(self.tab_entities, session, Vendor, "Vendors (Outbound)")
+        self.vendor_grid.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+
+        self.payer_grid = SimpleMasterDataGrid(self.tab_entities, session, Payer, "Payers (Inbound)")
+        self.payer_grid.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
+
+        # Projects Tab
+        self.tab_projects.grid_columnconfigure(0, weight=1)
+        self.tab_projects.grid_rowconfigure(0, weight=1)
+
+        self.proj_grid = SimpleMasterDataGrid(self.tab_projects, session, Project, "Projects", has_desc=True)
+        self.proj_grid.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+
+        self.settings_frame.grid_remove()
+
+    def show_transactions_view(self):
+        """Hides the settings and restores the transaction ledger."""
+        self.settings_frame.grid_remove()
+        self.main_frame.grid()
+        self.settings_btn.configure(fg_color="gray20")
+
+    def show_settings_view(self):
+        """Hides the transaction ledger and shows master data controls."""
+        self.main_frame.grid_remove()
+        self.settings_frame.grid()
+        self.settings_btn.configure(fg_color="#1f538d")
+
+        self.filter_account_id = None
+        self.refresh_accounts()
 
     def _search_focus_in(self):
         if self.search_entry.get() == self.search_placeholder:
@@ -1816,6 +2064,7 @@ class FinanceApp(ctk.CTk):
                 self.filter_account_id = None
             else:
                 self.filter_account_id = account_id
+                self.show_transactions_view()
             self.current_page = 0
             self.reset_scroll_to_top()
 

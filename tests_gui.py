@@ -2,7 +2,7 @@ import customtkinter as ctk
 from models import (
     session, Account, Expense, Gain, Category,
     PaymentMethod, Vendor, Currency, Project,
-    Transfer, Payer, Stream
+    Transfer, Payer, Stream, ExchangeRate
 )
 from sqlalchemy import (
     desc, or_, func, column, literal_column,
@@ -121,8 +121,138 @@ class SimpleDataDialog(ctk.CTkToplevel):
             else:
                 self.err_lbl.configure(text=msg)
 
+class CurrencyDialog(ctk.CTkToplevel):
+    """Custom popup for creating Currencies (requires a 3-letter code)."""
+    def __init__(self, parent, title, initial_code="", initial_name="", is_edit=False, on_submit=None):
+        super().__init__(parent)
+        self.title(title)
+        height = 220
+        width = 300
+        self.geometry(f"{width}x{height}")
+        self.attributes("-topmost", True)
+        self.grab_set()
+
+        self.on_submit = on_submit
+
+        self.update_idletasks()
+        x = parent.winfo_x() + (parent.winfo_width() // 2) - (width // 2)
+        y = parent.winfo_y() + (parent.winfo_height() // 2) - (height // 2)
+        self.geometry(f"+{x}+{y}")
+
+        ctk.CTkLabel(self, text="Currency Code (3 Letters):", font=("JetBrains Mono", 11, "bold")).pack(pady=(15, 0))
+        self.code_entry = ctk.CTkEntry(self, width=240)
+        self.code_entry.insert(0, initial_code)
+        if is_edit:
+            self.code_entry.configure(state="disabled")
+        self.code_entry.pack(pady=(2, 10))
+
+        ctk.CTkLabel(self, text="Currency Name:", font=("JetBrains Mono", 11, "bold")).pack()
+        self.name_entry = ctk.CTkEntry(self, width=240)
+        self.name_entry.insert(0, initial_name)
+        self.name_entry.pack(pady=(2, 10))
+
+        self.err_lbl = ctk.CTkLabel(self, text="", text_color="#FF6B6B", font=("JetBrains Mono", 10), height=15)
+        self.err_lbl.pack()
+
+        btn_frame = ctk.CTkFrame(self, fg_color="transparent")
+        btn_frame.pack(pady=5)
+
+        ctk.CTkButton(btn_frame, text="Cancel", width=80, fg_color="gray40", command=self.destroy).pack(side="left",
+                                                                                                        padx=10)
+        ctk.CTkButton(btn_frame, text="Save", width=80, command=self.submit).pack(side="left", padx=10)
+
+    def submit(self):
+        code_val = self.code_entry.get().strip().upper()
+        name_val = self.name_entry.get().strip()
+
+        if len(code_val) != 3:
+            self.err_lbl.configure(text="Code must be exactly 3 letters.")
+            return
+        if not name_val:
+            self.err_lbl.configure(text="Name cannot be empty.")
+            return
+
+        if self.on_submit:
+            success, msg = self.on_submit(code_val, name_val)
+            if success:
+                self.destroy()
+            else:
+                self.err_lbl.configure(text=msg)
+
+class FXDialog(ctk.CTkToplevel):
+    """Custom popup for adding a new Exchange Rate."""
+    def __init__(self, parent, active_currencies, on_submit=None):
+        super().__init__(parent)
+        self.title("New Exchange Rate")
+        height = 340
+        width = 300
+        self.geometry(f"{width}x{height}")
+        self.attributes("-topmost", True)
+        self.grab_set()
+
+        self.on_submit = on_submit
+
+        self.update_idletasks()
+        x = parent.winfo_x() + (parent.winfo_width() // 2) - (width // 2)
+        y = parent.winfo_y() + (parent.winfo_height() // 2) - (height // 2)
+        self.geometry(f"+{x}+{y}")
+
+        ctk.CTkLabel(self, text="Select Currency:", font=("JetBrains Mono", 11, "bold")).pack(pady=(15, 0))
+        self.curr_combo = ctk.CTkComboBox(self, values=active_currencies, width=240)
+        self.curr_combo.pack(pady=(2, 5))
+
+        ctk.CTkLabel(self, text="FX Multiplier (e.g. 1850.0):", font=("JetBrains Mono", 11, "bold")).pack()
+        self.rate_entry = ctk.CTkEntry(self, width=240)
+        self.rate_entry.pack(pady=(2, 5))
+
+        ctk.CTkLabel(self, text="Date (YYYY-MM-DD):", font=("JetBrains Mono", 11, "bold")).pack()
+        self.date_entry = ctk.CTkEntry(self, width=240)
+        self.date_entry.insert(0, datetime.datetime.now().strftime("%Y-%m-%d"))
+        self.date_entry.pack(pady=(2, 5))
+
+        ctk.CTkLabel(self, text="Time (HH:MM):", font=("JetBrains Mono", 11, "bold")).pack()
+        self.time_entry = ctk.CTkEntry(self, width=240)
+        self.time_entry.insert(0, datetime.datetime.now().strftime("%H:%M"))
+        self.time_entry.pack(pady=(2, 5))
+
+        self.err_lbl = ctk.CTkLabel(self, text="", text_color="#FF6B6B", font=("JetBrains Mono", 10), height=15)
+        self.err_lbl.pack()
+
+        btn_frame = ctk.CTkFrame(self, fg_color="transparent")
+        btn_frame.pack(pady=5)
+
+        ctk.CTkButton(btn_frame, text="Cancel", width=80, fg_color="gray40", command=self.destroy).pack(side="left",
+                                                                                                        padx=10)
+        ctk.CTkButton(btn_frame, text="Save", width=80, command=self.submit).pack(side="left", padx=10)
+
+    def submit(self):
+        curr_val = self.curr_combo.get()
+        try:
+            rate_val = float(self.rate_entry.get().replace(",", "."))
+            if rate_val <= 0: raise ValueError
+        except ValueError:
+            self.err_lbl.configure(text="Rate must be a positive number.")
+            return
+
+        date_val = self.date_entry.get().strip()
+        time_val = self.time_entry.get().strip()
+
+        try:
+            dt_str = f"{date_val} {time_val}"
+            timestamp_val = datetime.datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
+        except ValueError:
+            self.err_lbl.configure(text="Invalid date/time format.")
+            return
+
+        if self.on_submit:
+            success, msg = self.on_submit(curr_val, rate_val, timestamp_val)
+            if success:
+                self.destroy()
+            else:
+                self.err_lbl.configure(text=msg)
+
 class SimpleMasterDataGrid(ctk.CTkFrame):
-    """Renders a dynamic grid for CRUD operations on db."""
+    """Renders a dynamic grid for simple CRUD operations on db."""
     def __init__(self, parent, db_session, model, title, has_desc=False):
         super().__init__(parent, fg_color="transparent")
         self.session = db_session
@@ -133,7 +263,7 @@ class SimpleMasterDataGrid(ctk.CTkFrame):
         header_frame = ctk.CTkFrame(self, fg_color="transparent")
         header_frame.pack(fill="x", pady=(0, 10))
         ctk.CTkLabel(header_frame, text=title, font=("JetBrains Mono", 16, "bold")).pack(side="left")
-        ctk.CTkButton(header_frame, text="+ Add New", width=80, command=self.add_new).pack(side="right")
+        ctk.CTkButton(header_frame, text="+ Add New", width=130, command=self.add_new).pack(side="right")
 
         self.scroll = ctk.CTkScrollableFrame(self)
         self.scroll.pack(fill="both", expand=True)
@@ -244,6 +374,156 @@ class SimpleMasterDataGrid(ctk.CTkFrame):
 
         SimpleDataDialog(self, f"Edit {self.model.__name__}", initial_name=item.name, initial_desc=initial_desc,
                          has_desc=self.has_desc, on_submit=_update)
+
+class CurrencyGrid(ctk.CTkFrame):
+    """Renders a dynamic grid for CRUD operations on currencies table."""
+    def __init__(self, parent, db_session):
+        super().__init__(parent, fg_color="transparent")
+        self.session = db_session
+
+        header = ctk.CTkFrame(self, fg_color="transparent")
+        header.pack(fill="x", pady=(0, 10))
+        ctk.CTkLabel(header, text="Currencies", font=("JetBrains Mono", 16, "bold")).pack(side="left")
+        ctk.CTkButton(header, text="+ Add Currency", width=130, command=self.add_new).pack(side="right")
+
+        self.scroll = ctk.CTkScrollableFrame(self)
+        self.scroll.pack(fill="both", expand=True)
+        self.load_data()
+
+    def load_data(self):
+        for widget in self.scroll.winfo_children(): widget.destroy()
+        items = self.session.query(Currency).order_by(Currency.code).all()
+        for item in items:
+            row = ctk.CTkFrame(self.scroll, fg_color="gray20", corner_radius=6)
+            row.pack(fill="x", pady=2, padx=2)
+
+            ctk.CTkLabel(row, text=item.code, width=40, font=("JetBrains Mono", 12, "bold"), text_color="#5AC8FA").pack(
+                side="left", padx=(10, 5), pady=8)
+            ctk.CTkLabel(row, text=item.name, width=150, anchor="w", font=("JetBrains Mono", 11)).pack(side="left",
+                                                                                                       padx=5)
+
+            btn_frame = ctk.CTkFrame(row, fg_color="transparent")
+            btn_frame.pack(side="right", padx=10)
+
+            toggle_text, toggle_color = ("Deactivate", "#b13e3e") if item.active_bool else ("Activate", "#1f538d")
+            state = "disabled" if item.code == "EUR" else "normal"
+            ctk.CTkButton(btn_frame, text=toggle_text, width=80, height=24, fg_color=toggle_color, state=state,
+                          command=lambda i=item.code: self.toggle(i)).pack(side="right", padx=2)
+            ctk.CTkButton(btn_frame, text="Edit", width=60, height=24, fg_color="gray30", hover_color="gray40",
+                          command=lambda i=item: self.edit(i)).pack(side="right", padx=2)
+
+            status = "Active" if item.active_bool else "Inactive"
+            color = "#4CD964" if item.active_bool else "gray50"
+            ctk.CTkLabel(row, text=status, text_color=color, width=60, font=("JetBrains Mono", 11)).pack(side="right",
+                                                                                                         padx=10)
+
+    def toggle(self, code):
+        item = self.session.get(Currency, code)
+        item.active_bool = not item.active_bool
+        self.session.commit()
+        self.load_data()
+
+    def add_new(self):
+        def _save(code, name):
+            if self.session.get(Currency, code): return False, "Currency Code already exists."
+            self.session.add(Currency(code=code, name=name))
+            self.session.commit()
+            self.load_data()
+            return True, ""
+
+        CurrencyDialog(self, "Add Currency", on_submit=_save)
+
+    def edit(self, item):
+        def _update(code, name):
+            item.name = name
+            self.session.commit()
+            self.load_data()
+            return True, ""
+
+        CurrencyDialog(self, "Edit Currency Name", initial_code=item.code, initial_name=item.name, is_edit=True,
+                       on_submit=_update)
+
+class ExchangeRateGrid(ctk.CTkFrame):
+    """Renders a dynamic grid for CRUD operations on exchange_rates table."""
+    def __init__(self, parent, db_session):
+        super().__init__(parent, fg_color="transparent")
+        self.session = db_session
+
+        header = ctk.CTkFrame(self, fg_color="transparent")
+        header.pack(fill="x", pady=(0, 10))
+        ctk.CTkLabel(header, text="Exchange Rates", font=("JetBrains Mono", 16, "bold")).pack(side="left")
+        ctk.CTkButton(header, text="+ Log New Rate", width=130, command=self.add_new).pack(side="right")
+
+        self.scroll = ctk.CTkScrollableFrame(self)
+        self.scroll.pack(fill="both", expand=True)
+        self.load_data()
+
+    def load_data(self):
+        for widget in self.scroll.winfo_children(): widget.destroy()
+        rates = self.session.query(ExchangeRate).filter(ExchangeRate.currency_code != "EUR").order_by(
+            ExchangeRate.timestamp.desc()).limit(500).all()
+        for r in rates:
+            row = ctk.CTkFrame(self.scroll, fg_color="gray20", corner_radius=6)
+            row.pack(fill="x", pady=2, padx=2)
+
+            ctk.CTkLabel(row, text=r.currency_code, width=40, font=("JetBrains Mono", 12, "bold"),
+                         text_color="#5AC8FA").pack(side="left", padx=(10, 5), pady=8)
+            ctk.CTkLabel(row, text=f"Rate: {r.fx_multiplier:,.4f}", width=120, anchor="w",
+                         font=("JetBrains Mono", 11, "bold")).pack(side="left", padx=5)
+            ctk.CTkLabel(row, text=r.timestamp.strftime("%Y-%m-%d %H:%M"), text_color="gray50",
+                         font=("JetBrains Mono", 10)).pack(side="left", padx=10)
+
+            ctk.CTkButton(row, text="✕", width=30, height=24, fg_color="transparent", text_color="gray50",
+                          hover_color="#8b2525",
+                          command=lambda i=r.id: self.delete(i)).pack(side="right", padx=10)
+
+    def delete(self, rate_id):
+        rate = self.session.get(ExchangeRate, rate_id)
+        context_text = f"[{rate.timestamp.strftime('%Y-%m-%d')}] {rate.currency_code} | {rate.fx_multiplier}" if rate else ""
+        popup = ctk.CTkToplevel(self)
+        popup.title("Confirm")
+        width = 250
+        height = 150
+        popup.geometry(f"{width}x{height}")
+        popup.attributes("-topmost", True)
+        popup.grab_set()
+
+        self.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() // 2) - (width // 2)
+        y = self.winfo_y() + (self.winfo_height() // 2) - (height // 2)
+        popup.geometry(f"+{x}+{y}")
+
+        ctk.CTkLabel(popup, text="Delete this exchange rate?", font=("JetBrains Mono", 12)).pack(pady=(20, 5))
+        ctk.CTkLabel(popup, text=context_text, font=("JetBrains Mono", 11), text_color="orange").pack(pady=(0, 15))
+
+        btn_frame = ctk.CTkFrame(popup, fg_color="transparent")
+        btn_frame.pack()
+
+        def _confirm():
+            if rate:
+                self.session.delete(rate)
+                self.session.commit()
+                self.load_data()
+            popup.destroy()
+
+        ctk.CTkButton(btn_frame, text="Cancel", width=70, fg_color="gray40", command=popup.destroy).pack(side="left",
+                                                                                                         padx=5)
+        ctk.CTkButton(btn_frame, text="Delete", width=70, fg_color="#8b2525", hover_color="#611a1a",
+                      command=_confirm).pack(side="left", padx=5)
+
+    def add_new(self):
+        act_currencies = [c.code for c in self.session.query(Currency).filter_by(active_bool=True).all() if
+                        c.code != "EUR"]
+        if not act_currencies:
+            return
+
+        def _save(code, rate, timestamp):
+            self.session.add(ExchangeRate(currency_code=code, fx_multiplier=rate, timestamp=timestamp))
+            self.session.commit()
+            self.load_data()
+            return True, ""
+
+        FXDialog(self, active_currencies=act_currencies, on_submit=_save)
 
 class SearchableComboBox(ctk.CTkComboBox):
     def __init__(self, master, placeholder="", **kwargs):
@@ -1711,12 +1991,13 @@ class FinanceApp(ctk.CTk):
         self.settings_tabview.pack(fill="both", expand=True, padx=10, pady=10)
 
         self.tab_accounts = self.settings_tabview.add("Accounts & Payment Methods")
+        self.tab_currencies = self.settings_tabview.add("Currencies & FX")
         self.tab_categories = self.settings_tabview.add("Categories & Streams")
         self.tab_entities = self.settings_tabview.add("Vendors & Payers")
         self.tab_projects = self.settings_tabview.add("Projects")
 
         # Categories & Streams Tab
-        self.tab_categories.grid_columnconfigure((0, 1), weight=1)
+        self.tab_categories.grid_columnconfigure((0, 1), weight=1, uniform="tab_col")
         self.tab_categories.grid_rowconfigure(0, weight=1)
 
         self.cat_grid = SimpleMasterDataGrid(self.tab_categories, session, Category, "Categories (Expenses)")
@@ -1726,7 +2007,7 @@ class FinanceApp(ctk.CTk):
         self.stream_grid.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
 
         # Vendors & Payers Tab
-        self.tab_entities.grid_columnconfigure((0, 1), weight=1)
+        self.tab_entities.grid_columnconfigure((0, 1), weight=1, uniform="tab_col")
         self.tab_entities.grid_rowconfigure(0, weight=1)
 
         self.vendor_grid = SimpleMasterDataGrid(self.tab_entities, session, Vendor, "Vendors (Outbound)")
@@ -1741,6 +2022,16 @@ class FinanceApp(ctk.CTk):
 
         self.proj_grid = SimpleMasterDataGrid(self.tab_projects, session, Project, "Projects", has_desc=True)
         self.proj_grid.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+
+        # Currencies & FX Tab
+        self.tab_currencies.grid_columnconfigure((0, 1), weight=1, uniform="tab_col")
+        self.tab_currencies.grid_rowconfigure(0, weight=1)
+
+        self.curr_grid = CurrencyGrid(self.tab_currencies, session)
+        self.curr_grid.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+
+        self.fx_grid = ExchangeRateGrid(self.tab_currencies, session)
+        self.fx_grid.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
 
         self.settings_frame.grid_remove()
 

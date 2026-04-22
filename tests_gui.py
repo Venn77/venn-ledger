@@ -4,6 +4,7 @@ from models import (
     PaymentMethod, Vendor, Currency, Project,
     Transfer, Payer, Stream, ExchangeRate
 )
+from ai_parser import chunk_file_by_day, get_structured_data
 from sqlalchemy import (
     desc, or_, func, column, literal_column,
     union_all, asc, case
@@ -11,7 +12,8 @@ from sqlalchemy import (
 from sqlalchemy.orm import aliased
 from sqlalchemy.exc import IntegrityError
 from tkcalendar import Calendar
-import finance_manager, datetime, json, os
+from customtkinter import filedialog
+import finance_manager, datetime, json, os, threading
 
 
 def open_calendar(parent, target_var, include_time=False):
@@ -2384,11 +2386,161 @@ class FinanceApp(ctk.CTk):
         self.btn_view_ai.configure(fg_color="#1f538d")
 
     def _build_ai_frame(self):
-        """Builds the AI Import view."""
+        """Builds the AI Import configuration panel and staging area."""
         self.ai_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.ai_frame.grid(row=0, column=1, padx=20, pady=20, sticky="nsew")
-        (ctk.CTkLabel(self.ai_frame, text="AI Transaction Parser", font=("JetBrains Mono", 22, "bold"))
-         .pack(anchor="w", pady=(0, 20)))
+
+        self.ai_header = ctk.CTkLabel(self.ai_frame, text="AI Transaction Parser", font=("JetBrains Mono", 22, "bold"))
+        self.ai_header.pack(anchor="w", pady=(0, 20))
+
+        self.ai_config_frame = ctk.CTkFrame(self.ai_frame, fg_color="gray15", corner_radius=8)
+        self.ai_config_frame.pack(fill="x", pady=(0, 20), padx=2)
+
+        # Row 1: File Selection
+        file_row = ctk.CTkFrame(self.ai_config_frame, fg_color="transparent")
+        file_row.pack(fill="x", pady=(15, 10), padx=15)
+
+        ctk.CTkLabel(file_row, text="Target File:", font=("JetBrains Mono", 12, "bold"), width=100, anchor="w").pack(
+            side="left")
+        self.lbl_container = ctk.CTkFrame(file_row, width=400, height=28, fg_color="gray20", corner_radius=4)
+        self.lbl_container.pack_propagate(False)
+        self.lbl_container.pack(side="left", padx=10)
+
+        self.ai_full_filepath = ""
+        self.ai_filepath_var = ctk.StringVar(value="No file selected...")
+        self.ai_file_lbl = ctk.CTkLabel(self.lbl_container, textvariable=self.ai_filepath_var, text_color="gray60",
+                                        anchor="w")
+        self.ai_file_lbl.pack(fill="both", expand=True, padx=5)
+
+        self.btn_browse = ctk.CTkButton(file_row, text="Browse", width=80, fg_color="gray30", hover_color="gray40",
+                                        command=self._ai_browse_file)
+        self.btn_browse.pack(side="left")
+
+        # Row 2: Dropdowns
+        drop_row = ctk.CTkFrame(self.ai_config_frame, fg_color="transparent")
+        drop_row.pack(fill="x", pady=(0, 15), padx=15)
+
+        active_currencies = [c.code for c in session.query(Currency).filter_by(active_bool=True).all()]
+        active_projects = ["None"] + [p.name for p in session.query(Project).filter_by(active_bool=True).all()]
+        current_year = str(datetime.datetime.now().year)
+        years = [str(y) for y in range(int(current_year) - 2, int(current_year) + 3)]
+
+        ctk.CTkLabel(drop_row, text="Year:", font=("JetBrains Mono", 11, "bold")).pack(side="left")
+        self.ai_year_combo = ctk.CTkComboBox(drop_row, values=years, width=80)
+        self.ai_year_combo.set(current_year)
+        self.ai_year_combo.pack(side="left", padx=(5, 20))
+
+        ctk.CTkLabel(drop_row, text="Default Currency:", font=("JetBrains Mono", 11, "bold")).pack(side="left")
+        self.ai_curr_combo = ctk.CTkComboBox(drop_row, values=active_currencies, width=80)
+        if "EUR" in active_currencies: self.ai_curr_combo.set("EUR")
+        self.ai_curr_combo.pack(side="left", padx=(5, 20))
+
+        ctk.CTkLabel(drop_row, text="Tag Project:", font=("JetBrains Mono", 11, "bold")).pack(side="left")
+        self.ai_proj_combo = ctk.CTkComboBox(drop_row, values=active_projects, width=150)
+        self.ai_proj_combo.pack(side="left", padx=(5, 20))
+
+        self.btn_start_ai = ctk.CTkButton(drop_row, text="⚡ Start Parsing", fg_color="#1f538d", width=120,
+                                          font=("JetBrains Mono", 12, "bold"), command=self._start_ai_thread)
+        self.btn_start_ai.pack(side="right")
+
+        self.btn_cancel_ai = ctk.CTkButton(drop_row, text="✕ Cancel", fg_color="#b13e3e", hover_color="#611a1a",
+                                           width=120, font=("JetBrains Mono", 12, "bold"),
+                                           command=self._cancel_ai_thread)
+
+        self.ai_status_lbl = ctk.CTkLabel(self.ai_frame, text="", text_color="#5AC8FA",
+                                          font=("JetBrains Mono", 12, "italic"))
+        self.ai_status_lbl.pack(pady=(0, 10))
+
+        self.ai_staging_frame = ctk.CTkFrame(self.ai_frame, fg_color="transparent")
+        self.ai_staging_frame.pack(fill="both", expand=True)
+
+        self.ai_cancel_event = threading.Event()
+
+    def _ai_browse_file(self):
+        """Opens the OS file picker."""
+        filepath = filedialog.askopenfilename(filetypes=[("Text Files", "*.txt")])
+        if filepath:
+            self.ai_full_filepath = filepath
+            display = filepath if len(filepath) < 45 else ".../" + filepath.split("/")[-1]
+            self.ai_filepath_var.set(display)
+
+    def _start_ai_thread(self):
+        """Validates inputs, disables UI, and spins up the background worker."""
+        if not self.ai_full_filepath:
+            self.ai_status_lbl.configure(text="Error: Please select a file first.", text_color="#FF6B6B")
+            return
+
+        self.ai_cancel_event.clear()
+        self.btn_browse.configure(state="disabled")
+        self.btn_start_ai.pack_forget()
+        self.btn_cancel_ai.pack(side="right")
+        self.btn_cancel_ai.configure(state="normal")
+        self.ai_status_lbl.configure(text="Connecting to Mistral 7B... Please wait.", text_color="#5AC8FA")
+
+        currency = self.ai_curr_combo.get()
+        year = self.ai_year_combo.get()
+        project = self.ai_proj_combo.get()
+
+        thread = threading.Thread(target=self._run_ai_parser_backend,
+                                  args=(self.ai_full_filepath, currency, year, project))
+        thread.daemon = True
+        thread.start()
+
+    def _cancel_ai_thread(self):
+        """Triggers the threading event to stop the parser loop."""
+        self.ai_cancel_event.set()
+        self.btn_cancel_ai.configure(state="disabled")
+        self.ai_status_lbl.configure(text="Cancelling... waiting for current line to finish.", text_color="orange")
+
+    def _run_ai_parser_backend(self, filepath, currency, year, project):
+        """Runs in the background."""
+        try:
+            # 1. Chunk the file
+            daily_chunks = chunk_file_by_day(filepath)
+
+            # 2. Combine chunks into a single string for parsing
+            combined_str = ""
+            for day in daily_chunks:
+                combined_str += f"{day['header']}\n{day['data']}\n"
+
+            # 3. Get active categories
+            active_cats = session.query(Category).filter_by(active_bool=True).all()
+
+            # 4. Invoke LLM
+            parsed_results = get_structured_data(combined_str, currency, active_cats, cancel_event=self.ai_cancel_event)
+
+            # 5. Pass results back to the main GUI thread
+            self.after(0, self._on_ai_parsing_complete, parsed_results, year, project)
+
+        except Exception as e:
+            self.after(0, self._on_ai_parsing_failed, str(e))
+
+    def _on_ai_parsing_failed(self, error_msg):
+        """Runs on main thread: Handles crashes during parsing."""
+        self.btn_cancel_ai.pack_forget()
+        self.btn_start_ai.pack(side="right")
+        self.btn_start_ai.configure(state="normal")
+        self.btn_browse.configure(state="normal")
+        color = "orange" if "cancelled" in error_msg.lower() else "#FF6B6B"
+        self.ai_status_lbl.configure(text=f"Stopped: {error_msg}", text_color=color)
+
+    def _on_ai_parsing_complete(self, parsed_results, year, project):
+        """Runs on main thread: Receives data and prepares to build the grid."""
+        self.btn_cancel_ai.pack_forget()
+        self.btn_start_ai.pack(side="right")
+        self.btn_start_ai.configure(state="normal")
+        self.btn_browse.configure(state="normal")
+
+        if not parsed_results:
+            self.ai_status_lbl.configure(text="No transactions found.", text_color="#FF6B6B")
+            return
+
+        self.ai_status_lbl.configure(text=f"Successfully extracted {len(parsed_results)} transactions!",
+                                     text_color="#4CD964")
+
+        print("--- THREAD COMPLETE. DATA RECEIVED IN GUI ---")
+        for res in parsed_results:
+            print(res)
 
     def _search_focus_in(self):
         if self.search_entry.get() == self.search_placeholder:

@@ -188,13 +188,18 @@ Before finalizing the JSON:
 </verification_protocol>
 """
 
-def get_structured_data(combined_text, default_currency, categories):
+def get_structured_data(combined_text, default_currency, categories, cancel_event=None):
     """
     Invokes a local LLM (e.g. Mistral) to convert
     text lines into JSON objects.
     Returns a list of objects which are meant
     to be validated and injected into a SQL db.
     """
+    # 0. Check Ollama is running
+    try:
+        ollama.list()
+    except Exception:
+        raise ConnectionError("Cannot connect to Ollama. Is the desktop app running?")
     # 1. Clean lines
     lines = [l.strip() for l in combined_text.split('\n') if l.strip()]
 
@@ -220,6 +225,10 @@ def get_structured_data(combined_text, default_currency, categories):
     final_results = []
 
     for line in lines:
+        # 0. Check for cancellation
+        if cancel_event and cancel_event.is_set():
+            raise InterruptedError("Parsing cancelled by user.")
+
         # 1. Update the date if the line is a header
         date_match = re.match(r'(\d{2}/\d{2})', line)
         if date_match and line.endswith(':'):
@@ -250,9 +259,8 @@ def get_structured_data(combined_text, default_currency, categories):
                 print(f"Skipping: No category match for {line}")
                 continue
 
-        # 3. LLM loop.
+        # 3. LLM loop
         try:
-            # We tell Mistral the category is already decided
             user_content = f"FIXED CATEGORY: {expected_cat}\nLINE: {line_to_process}"
 
             response = ollama.chat(
@@ -278,8 +286,11 @@ def get_structured_data(combined_text, default_currency, categories):
             print(f"✅ {line}")
             print(f">>> [{item['date']}] {item['vendor']}: {item['amount']} {item['currency']} [{item['category']}] [{item['payment_method']}] [{item['description']}]\n")
 
+        except json.JSONDecodeError as e:
+            print(f"Skipping line due to JSON formatting error: {e}")
+            continue
         except Exception as e:
-            print(f"Error parsing: {e}")
+            raise ConnectionError(f"Ollama execution failed: {str(e)}")
 
     # Debug
     # print(f"--- DEBUG STATS ---")

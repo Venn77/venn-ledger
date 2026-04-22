@@ -2088,9 +2088,23 @@ class FinanceApp(ctk.CTk):
                                          border_width=1, command=self.toggle_reorder_mode)
         self.reorder_btn.pack(pady=(10, 5), padx=20, fill="x")
 
-        self.settings_btn = ctk.CTkButton(self.sidebar, text="⚙️ Settings & Data", fg_color="gray20",
-                                          hover_color="gray30", command=self.show_settings_view)
-        self.settings_btn.pack(side="bottom", pady=20, padx=20, fill="x")
+        self.nav_group = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        self.nav_group.pack(side="bottom", fill="x", pady=20, padx=15)
+
+        self.btn_view_ledger = ctk.CTkButton(self.nav_group, text="📊 Transactions",
+                                             fg_color="#1f538d", anchor="w",
+                                             command=self.show_transactions_view)
+        self.btn_view_ledger.pack(fill="x", pady=2)
+
+        self.btn_view_ai = ctk.CTkButton(self.nav_group, text="⚡ AI Import",
+                                         fg_color="transparent", hover_color="gray30", anchor="w",
+                                         command=self.show_ai_view)
+        self.btn_view_ai.pack(fill="x", pady=2)
+
+        self.btn_view_settings = ctk.CTkButton(self.nav_group, text="⚙️ Master Data",
+                                               fg_color="transparent", hover_color="gray30", anchor="w",
+                                               command=self.show_settings_view)
+        self.btn_view_settings.pack(fill="x", pady=2)
 
         self.acc_scroll = ctk.CTkScrollableFrame(self.sidebar, fg_color="transparent", label_text="Accounts")
         self.acc_scroll.pack(fill="both", expand=True, padx=5, pady=5)
@@ -2340,20 +2354,41 @@ class FinanceApp(ctk.CTk):
 
         self.settings_frame.grid_remove()
 
-    def show_transactions_view(self):
-        """Hides the settings and restores the transaction ledger."""
+    def _hide_all_views(self):
+        """Hides all main frames and resets navigation button colors."""
+        self.main_frame.grid_remove()
         self.settings_frame.grid_remove()
+        if hasattr(self, 'ai_frame'):
+            self.ai_frame.grid_remove()
+
+        for btn in [self.btn_view_ledger, self.btn_view_ai, self.btn_view_settings]:
+            btn.configure(fg_color="transparent")
+
+    def show_transactions_view(self):
+        self._hide_all_views()
         self.main_frame.grid()
-        self.settings_btn.configure(fg_color="gray20")
+        self.btn_view_ledger.configure(fg_color="#1f538d")
 
     def show_settings_view(self):
-        """Hides the transaction ledger and shows master data controls."""
-        self.main_frame.grid_remove()
+        self._hide_all_views()
         self.settings_frame.grid()
-        self.settings_btn.configure(fg_color="#1f538d")
+        self.btn_view_settings.configure(fg_color="#1f538d")
 
-        self.filter_account_id = None
-        self.refresh_accounts()
+    def show_ai_view(self):
+        self._hide_all_views()
+
+        if not hasattr(self, 'ai_frame'):
+            self._build_ai_frame()
+
+        self.ai_frame.grid()
+        self.btn_view_ai.configure(fg_color="#1f538d")
+
+    def _build_ai_frame(self):
+        """Builds the AI Import view."""
+        self.ai_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.ai_frame.grid(row=0, column=1, padx=20, pady=20, sticky="nsew")
+        (ctk.CTkLabel(self.ai_frame, text="AI Transaction Parser", font=("JetBrains Mono", 22, "bold"))
+         .pack(anchor="w", pady=(0, 20)))
 
     def _search_focus_in(self):
         if self.search_entry.get() == self.search_placeholder:
@@ -2660,12 +2695,12 @@ class FinanceApp(ctk.CTk):
                 self.filter_account_id = None
             else:
                 self.filter_account_id = account_id
-                self.show_transactions_view()
             self.current_page = 0
             self.reset_scroll_to_top()
 
             self.refresh_accounts()
             self.load_transactions()
+            self.show_transactions_view()
 
     def load_transactions(self):
         """Fetches a page of transactions and renders them as rows."""

@@ -963,7 +963,6 @@ class ToolTip:
             self.tip_window.destroy()
             self.tip_window = None
 
-
 class TransactionRow(ctk.CTkFrame):
     def __init__(self, master, main_app, data, char_limit, ent_char_limit):
         super().__init__(master, fg_color="gray15")
@@ -2127,11 +2126,20 @@ class AIStagingRow(ctk.CTkFrame):
         self.desc_entry.grid(row=0, column=8, padx=5, sticky="ew")
 
         # 8. Discard Button
-        ctk.CTkButton(self, text="✕", width=30, height=24, fg_color="transparent", text_color="gray50",
-                      hover_color="#b13e3e",
-                      command=self.discard_row).grid(row=0, column=9, padx=(5, 10))
+        self.btn_discard = ctk.CTkButton(self, text="✕", width=30, height=24, fg_color="transparent",
+                                         text_color="gray50", hover_color="#b13e3e", command=self.discard_row)
+        self.btn_discard.grid(row=0, column=9, padx=(5, 10))
+
+        def on_x_hover(event):
+            # Red
+            self.configure(fg_color="#332424")
+
+        def on_x_leave(event):
+            self.configure(fg_color="gray20")
 
         # Binds
+        self.btn_discard.bind("<Enter>", on_x_hover, add="+")
+        self.btn_discard.bind("<Leave>", on_x_leave, add="+")
         self.ven_entry.bind("<KeyRelease>", lambda e: self.validate())
         self.amt_entry.bind("<KeyRelease>", lambda e: self.validate())
         self.desc_entry.bind("<KeyRelease>", lambda e: self.validate())
@@ -2747,12 +2755,13 @@ class FinanceApp(ctk.CTk):
         self.ai_year_combo.pack(side="left", padx=(5, 20))
 
         ctk.CTkLabel(drop_row, text="Default Currency:", font=("JetBrains Mono", 11, "bold")).pack(side="left")
-        self.ai_curr_combo = ctk.CTkComboBox(drop_row, values=active_currencies, width=80)
+        self.ai_curr_combo = ctk.CTkComboBox(drop_row, values=active_currencies, state="readonly", width=80)
         if "EUR" in active_currencies: self.ai_curr_combo.set("EUR")
         self.ai_curr_combo.pack(side="left", padx=(5, 20))
 
         ctk.CTkLabel(drop_row, text="Tag Project:", font=("JetBrains Mono", 11, "bold")).pack(side="left")
-        self.ai_proj_combo = ctk.CTkComboBox(drop_row, values=active_projects, width=150)
+        self.ai_proj_combo = ctk.CTkComboBox(drop_row, values=active_projects, state="readonly", width=150)
+        self.ai_proj_combo.set("None")
         self.ai_proj_combo.pack(side="left", padx=(5, 20))
 
         self.btn_start_ai = ctk.CTkButton(drop_row, text="⚡ Start Parsing", fg_color="#1f538d", width=120,
@@ -2787,6 +2796,11 @@ class FinanceApp(ctk.CTk):
         """Validates inputs, disables UI, and spins up the background worker."""
         if not self.ai_full_filepath:
             self.ai_status_lbl.configure(text="Error: Please select a file first.", text_color="#FF6B6B")
+            return
+
+        year_val = self.ai_year_combo.get().strip()
+        if len(year_val) != 4 or not year_val.isdigit():
+            self.ai_status_lbl.configure(text="Error: Please enter a valid 4-digit year.", text_color="#FF6B6B")
             return
 
         self.ai_cancel_event.clear()

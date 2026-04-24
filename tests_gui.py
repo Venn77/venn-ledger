@@ -2768,9 +2768,17 @@ class FinanceApp(ctk.CTk):
         self.btn_clear_ai = ctk.CTkButton(cmd_bar, text="↺ Clear Session", fg_color="gray40", hover_color="gray50",
                                           width=120, font=("JetBrains Mono", 12, "bold"), command=self._reset_ai_view)
 
-        self.ai_status_lbl = ctk.CTkLabel(self.ai_frame, text="", text_color="#5AC8FA",
+        self.progress_container = ctk.CTkFrame(self.ai_frame, fg_color="transparent", height=50)
+        self.progress_container.pack_propagate(False)
+        self.progress_container.pack(fill="x", pady=(0, 10))
+
+        self.ai_status_lbl = ctk.CTkLabel(self.progress_container, text="", text_color="#5AC8FA",
                                           font=("JetBrains Mono", 12))
         self.ai_status_lbl.pack(pady=(0, 5))
+
+        self.ai_progress_bar = ctk.CTkProgressBar(self.progress_container, mode="determinate", height=8, fg_color="gray20",
+                                                  progress_color="#1f538d")
+        self.ai_progress_bar.set(0)
 
         self.ai_staging_frame = ctk.CTkFrame(self.ai_frame, fg_color="transparent")
         self.ai_staging_frame.pack(fill="both", expand=True)
@@ -2850,6 +2858,10 @@ class FinanceApp(ctk.CTk):
         self.btn_cancel_ai.configure(state="normal")
         self.ai_status_lbl.configure(text="Connecting to Mistral 7B... Please wait.", text_color="#5AC8FA")
 
+        self.ai_progress_bar.pack(fill="x", padx=150)
+        self.ai_progress_bar.configure(progress_color="#1f538d")
+        self.ai_progress_bar.set(0)
+
         currency = self.ai_curr_combo.get()
         year = self.ai_year_combo.get()
         project = self.ai_proj_combo.get()
@@ -2859,11 +2871,22 @@ class FinanceApp(ctk.CTk):
         thread.daemon = True
         thread.start()
 
+    def _update_ai_progress(self, current_line, total_lines, current_tx, total_tx):
+        """Runs on main thread: Updates the visual progress bar and text."""
+        if total_lines > 0:
+            self.ai_progress_bar.set(current_line / total_lines)
+        if total_tx > 0 and current_tx > 0:
+            self.ai_status_lbl.configure(
+                text=f"Parsing transaction {current_tx} of {total_tx}...",
+                text_color="#5AC8FA"
+            )
+
     def _cancel_ai_thread(self):
         """Triggers the threading event to stop the parser loop."""
         self.ai_cancel_event.set()
         self.btn_cancel_ai.configure(state="disabled")
         self.ai_status_lbl.configure(text="Cancelling... waiting for current line to finish.", text_color="orange")
+        self.ai_progress_bar.configure(progress_color="orange")
 
     def _run_ai_parser_backend(self, filepath, currency, year, project):
         """Runs in the background."""
@@ -2879,10 +2902,15 @@ class FinanceApp(ctk.CTk):
             # 3. Get active categories
             active_cats = session.query(Category).filter_by(active_bool=True).all()
 
-            # 4. Invoke LLM
-            parsed_results = get_structured_data(combined_str, currency, active_cats, cancel_event=self.ai_cancel_event)
+            # 4. Define the callback
+            def progress_cb(c_line, t_lines, c_tx, t_tx):
+                self.after(0, self._update_ai_progress, c_line, t_lines, c_tx, t_tx)
 
-            # 5. Pass results back to the main GUI thread
+            # 5. Invoke LLM
+            parsed_results = get_structured_data(combined_str, currency, active_cats, cancel_event=self.ai_cancel_event,
+                                                 progress_callback=progress_cb)
+
+            # 6. Pass results back to the main GUI thread
             self.after(0, self._on_ai_parsing_complete, parsed_results, year, project)
 
         except Exception as e:
@@ -2919,6 +2947,8 @@ class FinanceApp(ctk.CTk):
         self.ai_filepath_var.set("No file selected...")
         self.file_tooltip.text = "Please select a text file."
 
+        self.ai_progress_bar.pack_forget()
+
         for widget in self.grid_container.winfo_children():
             widget.destroy()
         for widget in self.preview_container.winfo_children():
@@ -2947,15 +2977,14 @@ class FinanceApp(ctk.CTk):
         color = "orange" if "cancelled" in error_msg.lower() else "#FF6B6B"
         self.ai_status_lbl.configure(text=f"Stopped: {error_msg}", text_color=color)
 
+        self.ai_progress_bar.pack_forget()
+
     def _on_ai_parsing_complete(self, parsed_results, year, project):
         """Runs on main thread: Receives data and build the staging grid."""
-        self.ai_year_combo.configure(state="normal")
-        self.ai_curr_combo.configure(state="normal")
-        self.ai_proj_combo.configure(state="normal")
-        self.btn_browse.configure(state="normal")
-
         self.btn_cancel_ai.pack_forget()
         self.btn_clear_ai.pack(side="left")
+
+        self.ai_progress_bar.pack_forget()
 
         if not parsed_results:
             self.ai_status_lbl.configure(text="No valid transactions found.", text_color="#FF6B6B")

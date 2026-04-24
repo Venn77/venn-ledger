@@ -188,7 +188,7 @@ Before finalizing the JSON:
 </verification_protocol>
 """
 
-def get_structured_data(combined_text, default_currency, categories, cancel_event=None):
+def get_structured_data(combined_text, default_currency, categories, cancel_event=None, progress_callback=None):
     """
     Invokes a local LLM (e.g. Mistral) to convert
     text lines into JSON objects.
@@ -200,8 +200,10 @@ def get_structured_data(combined_text, default_currency, categories, cancel_even
         ollama.list()
     except Exception:
         raise ConnectionError("Cannot connect to Ollama. Is the desktop app running?")
-    # 1. Clean lines
+    # 1. Clean lines and count
     lines = [l.strip() for l in combined_text.split('\n') if l.strip()]
+    total_lines = len(lines)
+    total_tx = sum(1 for l in lines if not (re.match(r'(\d{2}/\d{2})', l) and l.endswith(':')))
 
     # 2. Initialize date and prepare categories
     current_date = "00/00"
@@ -223,8 +225,9 @@ def get_structured_data(combined_text, default_currency, categories, cancel_even
     }
 
     final_results = []
+    current_tx = 0
 
-    for line in lines:
+    for idx, line in enumerate(lines):
         # 0. Check for cancellation
         if cancel_event and cancel_event.is_set():
             raise InterruptedError("Parsing cancelled by user.")
@@ -233,9 +236,17 @@ def get_structured_data(combined_text, default_currency, categories, cancel_even
         date_match = re.match(r'(\d{2}/\d{2})', line)
         if date_match and line.endswith(':'):
             current_date = date_match.group(1)
+            # Initiate progress reporting
+            if progress_callback:
+                progress_callback(idx + 1, total_lines, current_tx, total_tx)
             continue
 
-        # 2. Extract the category
+        # 2. Report back the progress
+        current_tx += 1
+        if progress_callback:
+            progress_callback(idx + 1, total_lines, current_tx, total_tx)
+
+        # 3. Extract the category
         expected_cat = None
         line_to_process = line
         first_word = line.split()[0]
@@ -259,7 +270,7 @@ def get_structured_data(combined_text, default_currency, categories, cancel_even
                 print(f"Skipping: No category match for {line}")
                 continue
 
-        # 3. LLM loop
+        # 4. LLM loop
         try:
             user_content = f"FIXED CATEGORY: {expected_cat}\nLINE: {line_to_process}"
 

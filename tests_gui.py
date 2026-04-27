@@ -1,4 +1,5 @@
 import customtkinter as ctk
+import tkinter as tk
 from models import (
     session, Account, Expense, Gain, Category,
     PaymentMethod, Vendor, Currency, Project,
@@ -916,7 +917,7 @@ class ToolTip:
         if self.tip_window or not self.text:
             return
 
-        self.tip_window = ctk.CTkToplevel(self.widget)
+        self.tip_window = tk.Toplevel(self.widget)
         self.tip_window.wm_overrideredirect(True)
         self.tip_window.attributes("-topmost", True)
 
@@ -2577,7 +2578,7 @@ class FinanceApp(ctk.CTk):
         self.selected_account_id = None
 
         self.current_page = 0
-        self.page_size = 40
+        self.page_size = 25
         self.total_pages = 0
         self.jump_entry = None
         self.search_timer = None
@@ -2679,10 +2680,13 @@ class FinanceApp(ctk.CTk):
         for btn in [self.btn_view_ledger, self.btn_view_ai, self.btn_view_settings]:
             btn.configure(fg_color="transparent")
 
+        self.update_idletasks()
+
     def show_transactions_view(self):
         self._hide_all_views()
         self.main_frame.grid()
         self.btn_view_ledger.configure(fg_color="#1f538d")
+        self.load_transactions()
 
     def show_settings_view(self):
         self._hide_all_views()
@@ -3338,6 +3342,8 @@ class FinanceApp(ctk.CTk):
 
         for widget in self.scroll_frame.winfo_children():
             widget.destroy()
+
+        self.update_idletasks()
 
         query = self.get_unified_transaction_query(session)
 

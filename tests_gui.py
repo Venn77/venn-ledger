@@ -2071,6 +2071,7 @@ class AIStagingRow(ctk.CTkFrame):
         # 0. Status Indicator
         self.status_lbl = ctk.CTkLabel(self, text="⚫", width=30, font=("Segoe UI", 14))
         self.status_lbl.grid(row=0, column=0, padx=5, pady=5)
+        self.status_tooltip = ToolTip(self.status_lbl, "Initializing...")
 
         # 1. Date
         ctk.CTkLabel(self, text=data['date'], width=45, font=("JetBrains Mono", 11, "bold")).grid(row=0, column=1,
@@ -2096,6 +2097,7 @@ class AIStagingRow(ctk.CTkFrame):
         self.fx_var = ctk.StringVar()
         self.fx_entry = ctk.CTkEntry(self, textvariable=self.fx_var, width=60, height=24, placeholder_text="FX")
         self.fx_entry.grid(row=0, column=5, padx=5)
+        self.fx_tooltip = ToolTip(self.fx_entry, "")
 
         self._calculate_fx(self.currency_combo.get(), initial_load=True)
 
@@ -2151,9 +2153,7 @@ class AIStagingRow(ctk.CTkFrame):
 
     def _set_fx_tooltip(self, text):
         """Sets the FX rate tooltip."""
-        self.fx_entry.unbind("<Enter>")
-        self.fx_entry.unbind("<Leave>")
-        ToolTip(self.fx_entry, text)
+        self.fx_tooltip.text = text
 
     def _on_fx_manual_edit(self, event):
         """Flags the FX source as Manual if the user types in it."""
@@ -2249,25 +2249,22 @@ class AIStagingRow(ctk.CTkFrame):
 
         raw_line = f"\n\nRaw Line: {self.data.get('line', '')}"
 
-        self.status_lbl.unbind("<Enter>")
-        self.status_lbl.unbind("<Leave>")
-
         # Apply Colors
         if errors:
             self.status_lbl.configure(text="🔴", text_color="#FF6B6B")
             self.is_valid = False
             self.status_type = "red"
-            ToolTip(self.status_lbl, " | ".join(errors) + raw_line)
+            self.status_tooltip.text = " | ".join(errors) + raw_line
         elif warnings:
             self.status_lbl.configure(text="🟡", text_color="#FFD60A")
             self.is_valid = True
             self.status_type = "yellow"
-            ToolTip(self.status_lbl, " | ".join(warnings) + raw_line)
+            self.status_tooltip.text = " | ".join(warnings) + raw_line
         else:
             self.status_lbl.configure(text="🟢", text_color="#4CD964")
             self.is_valid = True
             self.status_type = "green"
-            ToolTip(self.status_lbl, "Ready to import." + raw_line)
+            self.status_tooltip.text = "Ready to import." + raw_line
 
         if hasattr(self.grid_ref, 'check_master_validation'):
             self.grid_ref.check_master_validation()
@@ -2954,6 +2951,11 @@ class FinanceApp(ctk.CTk):
         for widget in self.preview_container.winfo_children():
             widget.destroy()
 
+        self.grid_container.update_idletasks()
+        self.preview_container.update_idletasks()
+
+        self.btn_import_all.configure(text="✅ Import All", state="disabled", fg_color="#4CD964", text_color="black")
+
         self.staging_header.pack_forget()
         self.preview_container.pack_forget()
         self.grid_container.pack_forget()
@@ -3006,8 +3008,13 @@ class FinanceApp(ctk.CTk):
         for widget in self.grid_container.winfo_children():
             widget.destroy()
 
+        self.grid_container.update_idletasks()
+        self.preview_container.update_idletasks()
+
         grid = AIStagingGrid(self.grid_container, parsed_results, year, project, self, self.btn_import_all)
         grid.pack(fill="both", expand=True)
+
+        self.btn_import_all.configure(command=grid.execute_import)
 
         print("--- THREAD COMPLETE. DATA RECEIVED IN GUI ---")
         for res in parsed_results:

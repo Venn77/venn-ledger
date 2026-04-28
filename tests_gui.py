@@ -2765,6 +2765,7 @@ class FinanceApp(ctk.CTk):
         self.current_search_text = ""
         self.nav_timer = None
         self.type_timer = None
+        self.page_timer = None
 
         self.on_date_filter_change("This Month")
 
@@ -3807,17 +3808,36 @@ class FinanceApp(ctk.CTk):
                       command=lambda: self.after(20,self.reset_scroll_to_top)
                       ).pack(pady=(0, 20))
 
+    def _schedule_page_render(self):
+        """Debounces pagination to prevent DB/Render lag on rapid clicks."""
+        if self.page_timer:
+            self.after_cancel(self.page_timer)
+        self.page_timer = self.after(300, self._execute_page_render)
+
+    def _execute_page_render(self):
+        """Fires the actual database query and redraws the UI."""
+        self.page_timer = None
+        self.load_transactions()
+        if self.current_page == self.total_pages - 1:
+            self.reset_scroll_to_top()
+
     def next_page(self):
         if self.current_page < self.total_pages - 1:
             self.current_page += 1
-            self.load_transactions()
-            if self.current_page == self.total_pages - 1:
-                self.reset_scroll_to_top()
+            if self.jump_entry:
+                self.jump_entry.delete(0, "end")
+                self.jump_entry.insert(0, str(self.current_page + 1))
+
+            self._schedule_page_render()
 
     def prev_page(self):
         if self.current_page > 0:
             self.current_page -= 1
-            self.load_transactions()
+            if self.jump_entry:
+                self.jump_entry.delete(0, "end")
+                self.jump_entry.insert(0, str(self.current_page + 1))
+
+            self._schedule_page_render()
 
     def go_to_first_page(self):
         if self.current_page != 0:

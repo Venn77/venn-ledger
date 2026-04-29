@@ -1,4 +1,4 @@
-from models import (
+from database.models import (
     calculate_conversion,
     Category, Vendor, Account, PaymentMethod,
     Project, Expense, ExchangeRate, Transfer,

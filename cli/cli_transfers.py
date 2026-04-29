@@ -1,7 +1,8 @@
-from models import session, Account
-from io_utils import get_valid_float, clean_date
+from database.models import session, Account
+from utils.io_utils import get_valid_float, clean_date
+from core import manager as finance_manager
 from decimal import Decimal, ROUND_HALF_UP
-import finance_manager, datetime
+import datetime
 
 
 def get_account_choice(prompt, accounts):

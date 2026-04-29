@@ -1,4 +1,4 @@
-from models import session, Currency, Project, Account, Stream, Payer
+from database.models import session, Currency, Project, Account, Stream, Payer
 from decimal import Decimal, ROUND_HALF_UP
 import datetime, difflib, re
 

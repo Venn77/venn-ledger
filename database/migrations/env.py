@@ -5,7 +5,13 @@ from sqlalchemy import pool
 
 from alembic import context
 
-from models import Base
+import sys
+from pathlib import Path
+
+root_path = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(root_path))
+
+from database.models import Base
 
 
 # this is the Alembic Config object, which provides

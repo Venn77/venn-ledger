@@ -6,7 +6,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
 
-engine = create_engine('sqlite:///tracker.db', echo=False)
+engine = create_engine('sqlite:///database/tracker.db', echo=False)
 Session = sessionmaker(bind=engine)
 Base = declarative_base()
 session = Session()

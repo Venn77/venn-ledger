@@ -1,5 +1,5 @@
 from sqlalchemy import func
-from models import session, Account, Expense, Gain, Transfer, PaymentMethod
+from database.models import session, Account, Expense, Gain, Transfer, PaymentMethod
 from decimal import Decimal, ROUND_HALF_UP
 
 

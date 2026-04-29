@@ -1,11 +1,12 @@
-from models import session, Project, Stream, Payer
-from io_utils import (
+from database.models import session, Project, Stream, Payer
+from utils.io_utils import (
             get_active_account, get_valid_float, clean_date,
             extract_exchange_rate, get_active_project, get_active_stream,
             get_active_payer
             )
+from core import manager as finance_manager
 from decimal import Decimal, ROUND_HALF_UP
-import finance_manager, datetime
+import datetime
 
 
 def run_gain_ui():

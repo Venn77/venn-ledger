@@ -1,7 +1,7 @@
-from models import session, PaymentMethod
-from io_utils import get_active_currency, get_valid_float, clean_date
-import finance_manager, datetime
-
+from database.models import session, PaymentMethod
+from utils.io_utils import get_active_currency, get_valid_float, clean_date
+import datetime
+from core import manager as finance_manager
 
 if __name__ == "__main__":
 

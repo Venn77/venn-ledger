@@ -1,8 +1,9 @@
-from models import session, Category, PaymentMethod, Vendor, Project
-from io_utils import (get_active_currency, get_valid_year, get_valid_float, get_active_project,
+from database.models import session, Category, PaymentMethod, Vendor, Project
+from utils.io_utils import (get_active_currency, get_valid_year, get_valid_float, get_active_project,
                         get_best_match, extract_exchange_rate)
-from ai_parser import chunk_file_by_day, get_structured_data
-import finance_manager, datetime
+from core.ai_parser import chunk_file_by_day, get_structured_data
+import datetime
+from core import manager as finance_manager
 
 
 def validate_and_save_batch(results, default_currency, year, project, categories, payment_methods, vendors):

@@ -182,32 +182,44 @@ class TransactionManager:
 
         return new_gain
 
-    def check_for_duplicate(self, amount, entity_name, date_str, transaction_type="expense", origin_id=None, destination_id=None, amount_dest=None):
+    def check_for_duplicate(self, amount, entity_name, date_str, transaction_type="expense", origin_id=None, destination_id=None, amount_dest=None, exclude_id=None):
         """Returns True if a transaction with same amount, entity (vendor/payer) / account (origin/destination), and date exists."""
         target_date = date_str.split(" ")[0]
 
         if transaction_type == "expense":
-            exists = self.session.query(Expense).join(Vendor).filter(
+            query = self.session.query(Expense).join(Vendor).filter(
                 Expense.amount == amount,
                 Vendor.name == entity_name,
                 func.date(Expense.timestamp) == target_date
-            ).first()
+            )
+            if exclude_id:
+                query = query.filter(Expense.id != exclude_id)
+
+            exists = query.first()
 
         elif transaction_type == "gain":
-            exists = self.session.query(Gain).join(Payer).filter(
+            query = self.session.query(Gain).join(Payer).filter(
                 Gain.amount == amount,
                 Payer.name == entity_name,
                 func.date(Gain.timestamp) == target_date
-            ).first()
+            )
+            if exclude_id:
+                query = query.filter(Gain.id != exclude_id)
+
+            exists = query.first()
 
         elif transaction_type == "transfer":
-            exists = self.session.query(Transfer).filter(
+            query = self.session.query(Transfer).filter(
                 Transfer.amount_origin == amount,
                 Transfer.amount_destination == amount_dest,
                 Transfer.origin_account_id == origin_id,
                 Transfer.destination_account_id == destination_id,
                 func.date(Transfer.timestamp) == target_date
-            ).first()
+            )
+            if exclude_id:
+                query = query.filter(Transfer.id != exclude_id)
+
+            exists = query.first()
 
         else:
             exists = None

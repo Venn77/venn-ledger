@@ -1708,7 +1708,9 @@ class AddExpenseWindow(BaseTransactionWindow):
         current_category = self.category_combo.get().strip()
         current_vendor = self.vendor_combo.get().strip()
 
-        is_duplicate = self.manager.check_for_duplicate(current_amt, current_vendor, self.date_var.get())
+        exclude_id = self.transaction_data.get("id") if self.is_edit_mode and self.transaction_data else None
+
+        is_duplicate = self.manager.check_for_duplicate(amount=current_amt, entity_name=current_vendor, date_str=self.date_var.get(), exclude_id=exclude_id)
         if is_duplicate:
             return "⚠ Potential duplicate detected!", True
 
@@ -1822,7 +1824,9 @@ class AddGainWindow(BaseTransactionWindow):
         current_stream = self.stream_combo.get().strip()
         current_payer = self.payer_combo.get().strip()
 
-        is_duplicate = self.manager.check_for_duplicate(current_amt, current_payer, self.date_var.get(), transaction_type="gain")
+        exclude_id = self.transaction_data.get("id") if self.is_edit_mode and self.transaction_data else None
+
+        is_duplicate = self.manager.check_for_duplicate(amount=current_amt, entity_name=current_payer, date_str=self.date_var.get(), transaction_type="gain", exclude_id=exclude_id)
         if is_duplicate:
             return "⚠ Potential duplicate detected!", True
 
@@ -2020,6 +2024,8 @@ class AddTransferWindow(BaseTransactionWindow):
         if not self.origin_acc or not self.dest_acc:
             return "", False
 
+        exclude_id = self.transaction_data.get("id") if self.is_edit_mode and self.transaction_data else None
+
         is_duplicate = self.manager.check_for_duplicate(
             amount=amt_orig,
             entity_name=None,
@@ -2027,7 +2033,8 @@ class AddTransferWindow(BaseTransactionWindow):
             transaction_type="transfer",
             origin_id=self.origin_acc.id,
             destination_id=self.dest_acc.id,
-            amount_dest=amt_dest
+            amount_dest=amt_dest,
+            exclude_id=exclude_id
         )
 
         if is_duplicate:

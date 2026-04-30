@@ -1,4 +1,4 @@
-from database.models import session, Project, Stream, Payer
+from database.models import Session, Project, Stream, Payer
 from utils.io_utils import (
             get_active_account, get_valid_float, clean_date,
             extract_exchange_rate, get_active_project, get_active_stream,
@@ -11,23 +11,21 @@ import datetime
 
 def run_gain_ui():
     """Executes gains UI for one operation."""
-    manager = finance_manager.TransactionManager(session)
-
     # START: Add gain
     # 1. Select Account
-    account = get_active_account("\nSelect the account: ")
+    account = get_active_account("\nSelect the account: ", db_session)
 
     # 2. Select Stream
-    stream_str = get_active_stream("\nChoose Stream to use (or 's' for None): ")
-    stream = session.query(Stream).filter_by(id=stream_str).first()
+    stream_str = get_active_stream("\nChoose Stream to use (or 's' for None): ", db_session)
+    stream = db_session.query(Stream).filter_by(id=stream_str).first()
     if stream:
         stream_name = stream.name
     else:
         stream_name = None
 
     # 3. Select Payer
-    payer_str = get_active_payer("\nChoose Payer to use (or 's' for None): ")
-    payer = session.query(Payer).filter_by(id=payer_str).first()
+    payer_str = get_active_payer("\nChoose Payer to use (or 's' for None): ", db_session)
+    payer = db_session.query(Payer).filter_by(id=payer_str).first()
     if payer:
         payer_name = payer.name
     else:
@@ -81,8 +79,8 @@ def run_gain_ui():
             fx_rate = get_valid_float(f"Enter the exchange rate ('EUR' -> '{account.currency_code}'): ")
 
     # 8. Resolve project
-    project_str = get_active_project("\nChoose Project to use (or 's' for None): ")
-    project = session.query(Project).filter_by(id=project_str).first()
+    project_str = get_active_project("\nChoose Project to use (or 's' for None): ", db_session)
+    project = db_session.query(Project).filter_by(id=project_str).first()
     if project:
         project_name = project.name
     else:
@@ -119,4 +117,21 @@ def run_gain_ui():
     # END: Add gain
 
 if __name__ == "__main__":
-    run_gain_ui()
+
+    db_session = Session()
+
+    manager = finance_manager.TransactionManager(db_session)
+
+    try:
+
+        run_gain_ui()
+
+    except Exception as error:
+        print(f"Error: {error}")
+
+    finally:
+        try:
+            db_session.close()
+            print("Database session closed successfully.")
+        except Exception as error:
+            print(f"Error during shutdown: {error}")

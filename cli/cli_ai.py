@@ -1,9 +1,10 @@
-from database.models import session, Category, PaymentMethod, Vendor, Project
+from database.models import Session, Category, PaymentMethod, Vendor, Project
 from utils.io_utils import (get_active_currency, get_valid_year, get_valid_float, get_active_project,
                         get_best_match, extract_exchange_rate)
 from core.ai_parser import chunk_file_by_day, get_structured_data
 import datetime
 from core import manager as finance_manager
+from pathlib import Path
 
 
 def validate_and_save_batch(results, default_currency, year, project, categories, payment_methods, vendors):
@@ -44,7 +45,7 @@ def validate_and_save_batch(results, default_currency, year, project, categories
                     print("   Skipping item.")
                     continue
 
-        pm_obj = session.query(PaymentMethod).filter_by(name=pm_name).first()
+        pm_obj = db_session.query(PaymentMethod).filter_by(name=pm_name).first()
 
         if not pm_obj:
             print(f"   ! ERROR: Payment method '{pm_name}' is invalid. Skipping item.")
@@ -119,7 +120,6 @@ def validate_and_save_batch(results, default_currency, year, project, categories
                 if choice == 'y':
                     vendor_name = match
                 else:
-                    # TransactionManager class should be creating the vendor when it takes a non-existing choice.
                     print(f"   ! Vendor '{vendor_name}' is new. It will be created.")
             else:
                 print(f"   ! Vendor '{vendor_name}' is not in DB.")
@@ -130,11 +130,10 @@ def validate_and_save_batch(results, default_currency, year, project, categories
                 if index.isdigit() and int(index) < len(sorted_vendors):
                     vendor_name = sorted_vendors[int(index)]
                 else:
-                    # TransactionManager class should be creating the vendor when it takes a non-existing choice.
                     print(f"   ! Vendor '{vendor_name}' is new. It will be created.")
 
         # 5. Resolve project
-        project_name = session.query(Project).filter_by(id=project).first()
+        project_name = db_session.query(Project).filter_by(id=project).first()
         if project_name:
             project_name = project_name.name
         else:
@@ -158,8 +157,8 @@ def validate_and_save_batch(results, default_currency, year, project, categories
                     timestamp=dt
                 )
                 print("  ✓ Saved.")
-                ac_categories = session.query(Category).filter_by(active_bool=True).order_by(Category.id.desc()).all()
-                ac_vendors = session.query(Vendor).filter_by(active_bool=True).all()
+                ac_categories = db_session.query(Category).filter_by(active_bool=True).order_by(Category.id.desc()).all()
+                ac_vendors = db_session.query(Vendor).filter_by(active_bool=True).all()
                 categories = [c.name for c in ac_categories]
                 vendors = [v.name for v in ac_vendors]
             except Exception as e:
@@ -171,16 +170,23 @@ def validate_and_save_batch(results, default_currency, year, project, categories
 
 
 if __name__ == "__main__":
-    filename = "my_expenses.txt"
 
-    manager = finance_manager.TransactionManager(session)
+    script_dir = Path(__file__).parent
+
+    project_root = script_dir.parent
+
+    filename = project_root / "my_expenses.txt"
+
+    db_session = Session()
+
+    manager = finance_manager.TransactionManager(db_session)
 
     try:
         daily_chunks = chunk_file_by_day(filename)
 
         print(f"Successfully identified {len(daily_chunks)} days of transactions.")
 
-        currency_str = get_active_currency("\nSelect the currency: ")
+        currency_str = get_active_currency("\nSelect the currency: ", db_session)
 
         print(currency_str)
 
@@ -188,13 +194,13 @@ if __name__ == "__main__":
 
         print(year_str)
 
-        project_str = get_active_project("\nChoose number to use (or 's' for None): ")
+        project_str = get_active_project("\nChoose number to use (or 's' for None): ", db_session)
 
         print(project_str)
 
-        active_categories = session.query(Category).filter_by(active_bool=True).order_by(Category.id.desc()).all()
+        active_categories = db_session.query(Category).filter_by(active_bool=True).order_by(Category.id.desc()).all()
 
-        active_payment_methods = session.query(PaymentMethod).filter_by(active_bool=True).all()
+        active_payment_methods = db_session.query(PaymentMethod).filter_by(active_bool=True).all()
 
         payment_methods_str = ", ".join([str(payment_method.name) for payment_method in active_payment_methods])
 
@@ -218,8 +224,8 @@ if __name__ == "__main__":
                 for res in parsed_results:
                     print(f"[{res.get('date')}] {res.get('vendor')}: {res.get('amount')} {res.get('currency')} [{res.get('category')}] [{res.get('payment_method')}] [{res.get('description')}]")
                 # Process and save to DB
-                active_categories = session.query(Category).filter_by(active_bool=True).order_by(Category.id.desc()).all()
-                active_vendors = session.query(Vendor).filter_by(active_bool=True).all()
+                active_categories = db_session.query(Category).filter_by(active_bool=True).order_by(Category.id.desc()).all()
+                active_vendors = db_session.query(Vendor).filter_by(active_bool=True).all()
                 cat_names = [c.name for c in active_categories]
                 pm_names = [p.name for p in active_payment_methods]
                 ven_names = [v.name for v in active_vendors]
@@ -231,5 +237,12 @@ if __name__ == "__main__":
 
     except FileNotFoundError:
         print(f"File not found: {filename}. Check the path!")
+
+    finally:
+        try:
+            db_session.close()
+            print("Database session closed successfully.")
+        except Exception as error:
+            print(f"Error during shutdown: {error}")
 
 

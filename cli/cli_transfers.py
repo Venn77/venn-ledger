@@ -1,4 +1,4 @@
-from database.models import session, Account
+from database.models import Session, Account
 from utils.io_utils import get_valid_float, clean_date
 from core import manager as finance_manager
 from decimal import Decimal, ROUND_HALF_UP
@@ -25,8 +25,7 @@ def get_account_choice(prompt, accounts):
 
 def run_transfer_ui():
     """Executes transfer UI for one operation."""
-    manager = finance_manager.TransactionManager(session)
-    active_accounts = session.query(Account).filter_by(active_bool=True).order_by(Account.name.asc()).all()
+    active_accounts = db_session.query(Account).filter_by(active_bool=True).order_by(Account.name.asc()).all()
 
     if len(active_accounts) < 2:
         print("   ! Error: You need at least two accounts to perform a transfer.")
@@ -84,6 +83,22 @@ def run_transfer_ui():
 
 
 if __name__ == "__main__":
-    run_transfer_ui()
+    db_session = Session()
+
+    manager = finance_manager.TransactionManager(db_session)
+
+    try:
+
+        run_transfer_ui()
+
+    except Exception as error:
+        print(f"Error: {error}")
+
+    finally:
+        try:
+            db_session.close()
+            print("Database session closed successfully.")
+        except Exception as error:
+            print(f"Error during shutdown: {error}")
 
 

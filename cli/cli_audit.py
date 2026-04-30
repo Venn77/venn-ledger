@@ -1,5 +1,5 @@
 from sqlalchemy import func
-from database.models import session, Account, Expense, Gain, Transfer, PaymentMethod
+from database.models import Session, Account, Expense, Gain, Transfer, PaymentMethod
 from decimal import Decimal, ROUND_HALF_UP
 
 
@@ -7,24 +7,24 @@ def run_global_audit():
     print(f"{'Account Name':<20} | {'Stored Bal':>12} | {'Calc Bal':>12} | {'Status':<10}")
     print("-" * 70)
 
-    accounts = session.query(Account).order_by(Account.name.asc()).all()
+    accounts = db_session.query(Account).order_by(Account.name.asc()).all()
 
     for acc in accounts:
         # 1. Sum of Gains (Inflow)
-        total_gains = session.query(func.sum(Gain.amount)).filter_by(account_id=acc.id).scalar() or 0
+        total_gains = db_session.query(func.sum(Gain.amount)).filter_by(account_id=acc.id).scalar() or 0
 
         # 2. Sum of Expenses (Outflow)
         total_expenses = (
-                session.query(func.sum(Expense.amount))
+                db_session.query(func.sum(Expense.amount))
                 .join(PaymentMethod)
                 .filter(PaymentMethod.account_id == acc.id)
                 .scalar() or 0
             )
 
         # 3. Sum of Transfers
-        transfers_in = session.query(func.sum(Transfer.amount_destination)).filter_by(
+        transfers_in = db_session.query(func.sum(Transfer.amount_destination)).filter_by(
             destination_account_id=acc.id).scalar() or 0
-        transfers_out = session.query(func.sum(Transfer.amount_origin)).filter_by(
+        transfers_out = db_session.query(func.sum(Transfer.amount_origin)).filter_by(
             origin_account_id=acc.id).scalar() or 0
 
         # Theoretical Balance calculation
@@ -45,4 +45,18 @@ def run_global_audit():
 
 
 if __name__ == "__main__":
-    run_global_audit()
+
+    db_session = Session()
+
+    try:
+        run_global_audit()
+
+    except Exception as e:
+        print(f"Error during execution: {e}")
+
+    finally:
+        try:
+            db_session.close()
+            print("Database session closed successfully.")
+        except Exception as error:
+            print(f"Error during shutdown: {error}")

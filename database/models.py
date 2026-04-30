@@ -1,3 +1,4 @@
+import os
 from decimal import Decimal, ROUND_HALF_UP
 from sqlalchemy import (
     create_engine, Column, Integer, Float, String,
@@ -6,10 +7,13 @@ from sqlalchemy import (
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
 
-engine = create_engine('sqlite:///database/tracker.db', echo=False)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+DB_PATH = os.path.join(BASE_DIR, "tracker.db")
+
+engine = create_engine(f"sqlite:///{DB_PATH}", echo=False)
 Session = sessionmaker(bind=engine)
 Base = declarative_base()
-session = Session()
 
 
 def calculate_conversion(item):
@@ -226,44 +230,46 @@ class Transfer(Base):
 if __name__ == '__main__':
     Base.metadata.create_all(engine)
     print("Database and tables created successfully!")
+    # Example session for standalone script:
+    # local_session = Session()
     # new_currency = Currency(code="EUR", name="Euro")
-    # session.add(new_currency)
+    # local_session.add(new_currency)
     # new_currency2 = Currency(code="ARS", name="Argentina Peso")
-    # session.add(new_currency2)
+    # local_session.add(new_currency2)
     # new_fx_rate = ExchangeRate(currency_code=new_currency2.code, fx_multiplier=1850.0, timestamp=datetime.datetime.now())
-    # session.add(new_fx_rate)
-    # session.commit()
+    # local_session.add(new_fx_rate)
+    # local_session.commit()
     # new_fx_rate2 = ExchangeRate(currency_code=new_currency2.code, fx_multiplier=1750.0,
     #                            timestamp=datetime.datetime.now())
-    # session.add(new_fx_rate2)
+    # local_session.add(new_fx_rate2)
     # new_category = Category(name="420")
-    # session.add(new_category)
+    # local_session.add(new_category)
     # new_vendor = Vendor(name="Planta Santa")
-    # session.add(new_vendor)
+    # local_session.add(new_vendor)
     # new_accounts = (
     #     Account(currency_code=new_currency.code, name="Santander ES", description="Main account", balance=1000),
     #     Account(currency_code=new_currency.code, name="Cash (EUR)", description="Cash in EUR", balance=100)
     # )
-    # session.add_all(new_accounts)
-    # session.commit()
+    # local_session.add_all(new_accounts)
+    # local_session.commit()
     # new_payment_methods = (
     #     PaymentMethod(name="Santander Debit", account_id=new_accounts[0].id),
     #     PaymentMethod(name="Santander Bizum", account_id=new_accounts[0].id),
     #     PaymentMethod(name="Cash (EUR)", account_id=new_accounts[1].id)
     # )
-    # session.add_all(new_payment_methods)
-    # session.commit()
+    # local_session.add_all(new_payment_methods)
+    # local_session.commit()
     # new_projects = (
     #     Project(name="Japan 2025", description="September/October trip with gf"),
     #     Project(name="Italy 2025", description="December trip with gf")
     # )
-    # session.add_all(new_projects)
-    # session.commit()
-    # cat = session.query(Category).filter_by(name="420").first()
-    # ven = session.query(Vendor).filter_by(name="Planta Santa").first()
-    # pay = session.query(PaymentMethod).filter_by(name="Cash (EUR)").first()
+    # local_session.add_all(new_projects)
+    # local_session.commit()
+    # cat = local_session.query(Category).filter_by(name="420").first()
+    # ven = local_session.query(Vendor).filter_by(name="Planta Santa").first()
+    # pay = local_session.query(PaymentMethod).filter_by(name="Cash (EUR)").first()
     # rate_entry = (
-    #     session.query(ExchangeRate).filter_by(currency_code="ARS")
+    #     local_session.query(ExchangeRate).filter_by(currency_code="ARS")
     #                                .order_by(ExchangeRate.timestamp.desc())
     #                                .first()
     #               )
@@ -271,7 +277,7 @@ if __name__ == '__main__':
     #                       category_id=cat.id, vendor_id=ven.id,
     #                       payment_method_id=pay.id, description="Fasito", timestamp=datetime.datetime.now())
     # new_expense.calculate_conversion()
-    # session.add(new_expense)
-    # session.commit()
+    # local_session.add(new_expense)
+    # local_session.commit()
 
 

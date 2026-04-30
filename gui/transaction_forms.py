@@ -1,7 +1,7 @@
 import customtkinter as ctk
 import datetime
 from database.models import (
-    session, Currency, Project, Category, Vendor,
+    Currency, Project, Category, Vendor,
     PaymentMethod, Account, Stream, Payer
 )
 from gui.widgets import SearchableComboBox, ToolTip
@@ -9,9 +9,10 @@ from gui.dialogs import open_calendar
 
 
 class BaseTransactionWindow(ctk.CTkToplevel):
-    def __init__(self, parent, manager, title, transaction_data = None):
+    def __init__(self, parent, manager, title, transaction_data = None, db_session = None):
         super().__init__(parent)
         self.title(title)
+        self.db_session = db_session
         self.center_relative_to_parent(width=450, height=585)
 
         self.minsize(450, 585)
@@ -58,7 +59,7 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         self.amount_entry = ctk.CTkEntry(self)
 
         currencies = [c.code for c in
-                      session.query(Currency).filter_by(active_bool=True).order_by(Currency.code.asc()).all()]
+                      self.db_session.query(Currency).filter_by(active_bool=True).order_by(Currency.code.asc()).all()]
         self.lbl_currency = ctk.CTkLabel(self, text="Currency", font=("JetBrains Mono", 13, "bold"), anchor="w")
         self.currency_menu = ctk.CTkOptionMenu(self, values=currencies, variable=self.currency_var,
                                                command=self.on_currency_change)
@@ -76,7 +77,7 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         self.lbl_desc = ctk.CTkLabel(self, text="Description", font=("JetBrains Mono", 13, "bold"), anchor="w")
         self.desc_entry = ctk.CTkEntry(self)
 
-        projects = [p.name for p in session.query(Project).filter_by(active_bool=True).order_by(Project.name.asc()).all()]
+        projects = [p.name for p in self.db_session.query(Project).filter_by(active_bool=True).order_by(Project.name.asc()).all()]
         self.lbl_project = ctk.CTkLabel(self, text="Project", font=("JetBrains Mono", 13, "bold"), anchor="w")
         self.project_menu = ctk.CTkOptionMenu(self, values=projects, variable=self.project_var)
 
@@ -481,9 +482,9 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         pass
 
 class AddExpenseWindow(BaseTransactionWindow):
-    def __init__(self, parent, manager, transaction_data=None):
+    def __init__(self, parent, manager, transaction_data=None, db_session=None):
         title = "Edit Expense" if transaction_data and transaction_data.get("id") else "New Expense"
-        super().__init__(parent, manager, title, transaction_data)
+        super().__init__(parent, manager, title, transaction_data, db_session=db_session)
 
         self.cat_placeholder = "Search or type Category..."
         self.ven_placeholder = "Search or type Vendor..."
@@ -491,7 +492,7 @@ class AddExpenseWindow(BaseTransactionWindow):
         # Category
         self.lbl_category = ctk.CTkLabel(self, text="Category", font=("JetBrains Mono", 13, "bold"), anchor="w")
         self.all_categories = [c.name for c in
-                               session.query(Category).filter_by(active_bool=True).order_by(Category.name.asc()).all()]
+                               self.db_session.query(Category).filter_by(active_bool=True).order_by(Category.name.asc()).all()]
         self.category_combo = SearchableComboBox(self, placeholder=self.cat_placeholder, values=self.all_categories,
                                                  command=lambda _: self.validate_form())
         self.category_combo.inject_value(self.mem.get("category"))
@@ -501,7 +502,7 @@ class AddExpenseWindow(BaseTransactionWindow):
         # Vendor
         self.lbl_vendor = ctk.CTkLabel(self, text="Vendor", font=("JetBrains Mono", 13, "bold"), anchor="w")
         self.all_vendors = [v.name for v in
-                            session.query(Vendor).filter_by(active_bool=True).order_by(Vendor.name.asc()).all()]
+                            self.db_session.query(Vendor).filter_by(active_bool=True).order_by(Vendor.name.asc()).all()]
         self.vendor_combo = SearchableComboBox(self, placeholder=self.ven_placeholder, values=self.all_vendors,
                                                command=lambda _: self.validate_form())
         self.vendor_combo.inject_value(self.mem.get("entity"))
@@ -539,7 +540,7 @@ class AddExpenseWindow(BaseTransactionWindow):
     def on_currency_change(self, selected_currency):
         """Filters Payment Methods based on the account's currency."""
         valid_pms = (
-            session.query(PaymentMethod)
+            self.db_session.query(PaymentMethod)
             .join(Account).filter(Account.currency_code == selected_currency, PaymentMethod.active_bool == True)
             .order_by(PaymentMethod.name.asc())
             .all()
@@ -597,9 +598,9 @@ class AddExpenseWindow(BaseTransactionWindow):
         )
 
 class AddGainWindow(BaseTransactionWindow):
-    def __init__(self, parent, manager, transaction_data=None):
+    def __init__(self, parent, manager, transaction_data=None, db_session=None):
         title = "Edit Gain" if transaction_data and transaction_data.get("id") else "New Gain"
-        super().__init__(parent, manager, title, transaction_data)
+        super().__init__(parent, manager, title, transaction_data, db_session=db_session)
 
         self.stream_placeholder = "Search or type Stream..."
         self.payer_placeholder = "Search or type Payer..."
@@ -607,7 +608,7 @@ class AddGainWindow(BaseTransactionWindow):
         # Stream
         self.lbl_stream = ctk.CTkLabel(self, text="Stream", font=("JetBrains Mono", 13, "bold"), anchor="w")
         self.all_streams = [s.name for s in
-                               session.query(Stream).filter_by(active_bool=True).order_by(Stream.name.asc()).all()]
+                               self.db_session.query(Stream).filter_by(active_bool=True).order_by(Stream.name.asc()).all()]
         self.stream_combo = SearchableComboBox(self, placeholder=self.stream_placeholder, values=self.all_streams,
                                                  command=lambda _: self.validate_form())
         self.stream_combo.inject_value(self.mem.get("stream"))
@@ -617,7 +618,7 @@ class AddGainWindow(BaseTransactionWindow):
         # Payer
         self.lbl_payer = ctk.CTkLabel(self, text="Payer", font=("JetBrains Mono", 13, "bold"), anchor="w")
         self.all_payers = [p.name for p in
-                            session.query(Payer).filter_by(active_bool=True).order_by(Payer.name.asc()).all()]
+                            self.db_session.query(Payer).filter_by(active_bool=True).order_by(Payer.name.asc()).all()]
         self.payer_combo = SearchableComboBox(self, placeholder=self.payer_placeholder, values=self.all_payers,
                                                command=lambda _: self.validate_form())
         self.payer_combo.inject_value(self.mem.get("entity"))
@@ -655,7 +656,7 @@ class AddGainWindow(BaseTransactionWindow):
     def on_currency_change(self, selected_currency):
         """Filters Accounts based on the selected currency."""
         valid_accounts = (
-            session.query(Account)
+            self.db_session.query(Account)
             .filter(Account.currency_code == selected_currency, Account.active_bool == True)
             .order_by(Account.name.asc())
             .all()
@@ -701,7 +702,7 @@ class AddGainWindow(BaseTransactionWindow):
     def execute_db_submission(self, base_data):
         stream = "" if self.stream_combo.get().strip() == self.stream_placeholder else self.stream_combo.get().strip()
         payer = "" if self.payer_combo.get().strip() == self.payer_placeholder else self.payer_combo.get().strip()
-        acc_id = session.query(Account).filter_by(name=self.acc_menu.get()).first().id
+        acc_id = self.db_session.query(Account).filter_by(name=self.acc_menu.get()).first().id
         g_id = self.transaction_data.get("id") if self.is_edit_mode and self.transaction_data else None
 
         self.manager.add_gain(
@@ -713,13 +714,14 @@ class AddGainWindow(BaseTransactionWindow):
         )
 
 class AddTransferWindow(BaseTransactionWindow):
-    def __init__(self, parent, manager, transaction_data=None):
-        active_accounts = session.query(Account).filter_by(active_bool=True).order_by(Account.name.asc()).all()
+    def __init__(self, parent, manager, transaction_data=None, db_session=None):
+        self.db_session = db_session
+        active_accounts = self.db_session.query(Account).filter_by(active_bool=True).order_by(Account.name.asc()).all()
         self.account_map = {acc.name: acc for acc in active_accounts}
         self.all_acc_names = list(self.account_map.keys())
 
         title = "Edit Transfer" if transaction_data and transaction_data.get("id") else "New Transfer"
-        super().__init__(parent, manager, title, transaction_data)
+        super().__init__(parent, manager, title, transaction_data, db_session=db_session)
 
         self.origin_acc = None
         self.dest_acc = None

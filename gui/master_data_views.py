@@ -12,7 +12,7 @@ class SimpleMasterDataGrid(ctk.CTkFrame):
     """Renders a dynamic grid for simple CRUD operations on db."""
     def __init__(self, parent, db_session, model, title, has_desc=False):
         super().__init__(parent, fg_color="transparent")
-        self.session = db_session
+        self.db_session = db_session
         self.model = model
         self.title = title
         self.has_desc = has_desc
@@ -31,7 +31,7 @@ class SimpleMasterDataGrid(ctk.CTkFrame):
         for widget in self.scroll.winfo_children():
             widget.destroy()
 
-        items = self.session.query(self.model).order_by(self.model.name).all()
+        items = self.db_session.query(self.model).order_by(self.model.name).all()
         for item in items:
             row = ctk.CTkFrame(self.scroll, fg_color="gray20", corner_radius=6)
             row.pack(fill="x", pady=2, padx=2)
@@ -65,23 +65,23 @@ class SimpleMasterDataGrid(ctk.CTkFrame):
                 side="right", padx=10)
 
     def toggle_status(self, item_id):
-        item = self.session.get(self.model, item_id)
+        item = self.db_session.get(self.model, item_id)
         if item:
             item.active_bool = not item.active_bool
-            self.session.commit()
+            self.db_session.commit()
             self.load_data()
 
     def add_new(self):
         def _save(new_name, new_desc):
             try:
-                existing_item = self.session.query(self.model).filter_by(name=new_name).first()
+                existing_item = self.db_session.query(self.model).filter_by(name=new_name).first()
 
                 if existing_item:
                     if not existing_item.active_bool:
                         existing_item.active_bool = True
                         if self.has_desc and hasattr(existing_item, 'description'):
                             existing_item.description = new_desc
-                        self.session.commit()
+                        self.db_session.commit()
                         self.load_data()
                         return True, ""
                     else:
@@ -92,15 +92,15 @@ class SimpleMasterDataGrid(ctk.CTkFrame):
                 else:
                     new_item = self.model(name=new_name)
 
-                self.session.add(new_item)
-                self.session.commit()
+                self.db_session.add(new_item)
+                self.db_session.commit()
                 self.load_data()
                 return True, ""
             except IntegrityError:
-                self.session.rollback()
+                self.db_session.rollback()
                 return False, "Database error."
             except Exception as e:
-                self.session.rollback()
+                self.db_session.rollback()
                 return False, str(e)
 
         SimpleDataDialog(self, f"Add {self.model.__name__}", has_desc=self.has_desc, on_submit=_save)
@@ -110,7 +110,7 @@ class SimpleMasterDataGrid(ctk.CTkFrame):
 
         def _update(new_name, new_desc):
             try:
-                existing_item = self.session.query(self.model).filter_by(name=new_name).first()
+                existing_item = self.db_session.query(self.model).filter_by(name=new_name).first()
                 if existing_item and existing_item.id != item.id:
                     status = "active" if existing_item.active_bool else "deactivated"
                     return False, f"Name already used by a {status} item."
@@ -119,14 +119,14 @@ class SimpleMasterDataGrid(ctk.CTkFrame):
                 if self.has_desc and hasattr(item, 'description'):
                     item.description = new_desc
 
-                self.session.commit()
+                self.db_session.commit()
                 self.load_data()
                 return True, ""
             except IntegrityError:
-                self.session.rollback()
+                self.db_session.rollback()
                 return False, "Database error."
             except Exception as e:
-                self.session.rollback()
+                self.db_session.rollback()
                 return False, str(e)
 
         SimpleDataDialog(self, f"Edit {self.model.__name__}", initial_name=item.name, initial_desc=initial_desc,
@@ -136,7 +136,7 @@ class CurrencyGrid(ctk.CTkFrame):
     """Renders a dynamic grid for CRUD operations on currencies table."""
     def __init__(self, parent, db_session):
         super().__init__(parent, fg_color="transparent")
-        self.session = db_session
+        self.db_session = db_session
 
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", pady=(0, 10))
@@ -149,7 +149,7 @@ class CurrencyGrid(ctk.CTkFrame):
 
     def load_data(self):
         for widget in self.scroll.winfo_children(): widget.destroy()
-        items = self.session.query(Currency).order_by(Currency.code).all()
+        items = self.db_session.query(Currency).order_by(Currency.code).all()
         for item in items:
             row = ctk.CTkFrame(self.scroll, fg_color="gray20", corner_radius=6)
             row.pack(fill="x", pady=2, padx=2)
@@ -175,16 +175,16 @@ class CurrencyGrid(ctk.CTkFrame):
                                                                                                          padx=10)
 
     def toggle(self, code):
-        item = self.session.get(Currency, code)
+        item = self.db_session.get(Currency, code)
         item.active_bool = not item.active_bool
-        self.session.commit()
+        self.db_session.commit()
         self.load_data()
 
     def add_new(self):
         def _save(code, name):
-            if self.session.get(Currency, code): return False, "Currency Code already exists."
-            self.session.add(Currency(code=code, name=name))
-            self.session.commit()
+            if self.db_session.get(Currency, code): return False, "Currency Code already exists."
+            self.db_session.add(Currency(code=code, name=name))
+            self.db_session.commit()
             self.load_data()
             return True, ""
 
@@ -193,7 +193,7 @@ class CurrencyGrid(ctk.CTkFrame):
     def edit(self, item):
         def _update(code, name):
             item.name = name
-            self.session.commit()
+            self.db_session.commit()
             self.load_data()
             return True, ""
 
@@ -204,7 +204,7 @@ class ExchangeRateGrid(ctk.CTkFrame):
     """Renders a dynamic grid for CRUD operations on exchange_rates table."""
     def __init__(self, parent, db_session):
         super().__init__(parent, fg_color="transparent")
-        self.session = db_session
+        self.db_session = db_session
 
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", pady=(0, 10))
@@ -217,7 +217,7 @@ class ExchangeRateGrid(ctk.CTkFrame):
 
     def load_data(self):
         for widget in self.scroll.winfo_children(): widget.destroy()
-        rates = self.session.query(ExchangeRate).filter(ExchangeRate.currency_code != "EUR").order_by(
+        rates = self.db_session.query(ExchangeRate).filter(ExchangeRate.currency_code != "EUR").order_by(
             ExchangeRate.timestamp.desc()).limit(500).all()
         for r in rates:
             row = ctk.CTkFrame(self.scroll, fg_color="gray20", corner_radius=6)
@@ -235,7 +235,7 @@ class ExchangeRateGrid(ctk.CTkFrame):
                           command=lambda i=r.id: self.delete(i)).pack(side="right", padx=10)
 
     def delete(self, rate_id):
-        rate = self.session.get(ExchangeRate, rate_id)
+        rate = self.db_session.get(ExchangeRate, rate_id)
         context_text = f"[{rate.timestamp.strftime('%Y-%m-%d')}] {rate.currency_code} | {rate.fx_multiplier}" if rate else ""
         popup = ctk.CTkToplevel(self)
         popup.title("Confirm")
@@ -258,8 +258,8 @@ class ExchangeRateGrid(ctk.CTkFrame):
 
         def _confirm():
             if rate:
-                self.session.delete(rate)
-                self.session.commit()
+                self.db_session.delete(rate)
+                self.db_session.commit()
                 self.load_data()
             popup.destroy()
 
@@ -269,14 +269,14 @@ class ExchangeRateGrid(ctk.CTkFrame):
                       command=_confirm).pack(side="left", padx=5)
 
     def add_new(self):
-        act_currencies = [c.code for c in self.session.query(Currency).filter_by(active_bool=True).all() if
+        act_currencies = [c.code for c in self.db_session.query(Currency).filter_by(active_bool=True).all() if
                         c.code != "EUR"]
         if not act_currencies:
             return
 
         def _save(code, rate, timestamp):
-            self.session.add(ExchangeRate(currency_code=code, fx_multiplier=rate, timestamp=timestamp))
-            self.session.commit()
+            self.db_session.add(ExchangeRate(currency_code=code, fx_multiplier=rate, timestamp=timestamp))
+            self.db_session.commit()
             self.load_data()
             return True, ""
 
@@ -285,7 +285,7 @@ class ExchangeRateGrid(ctk.CTkFrame):
 class AccountGrid(ctk.CTkFrame):
     def __init__(self, parent, db_session):
         super().__init__(parent, fg_color="transparent")
-        self.session = db_session
+        self.db_session = db_session
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", pady=(0, 10))
         ctk.CTkLabel(header, text="Accounts", font=("JetBrains Mono", 16, "bold")).pack(side="left")
@@ -297,7 +297,7 @@ class AccountGrid(ctk.CTkFrame):
 
     def load_data(self):
         for widget in self.scroll.winfo_children(): widget.destroy()
-        items = self.session.query(Account).order_by(Account.name).all()
+        items = self.db_session.query(Account).order_by(Account.name).all()
         for item in items:
             row = ctk.CTkFrame(self.scroll, fg_color="gray20", corner_radius=6)
             row.pack(fill="x", pady=2, padx=2)
@@ -350,19 +350,19 @@ class AccountGrid(ctk.CTkFrame):
         acc.active_bool = not acc.active_bool
         if not acc.active_bool:
             for pm in acc.payment_methods: pm.active_bool = False
-        self.session.commit()
+        self.db_session.commit()
         self.load_data()
 
         self.event_generate("<<DataChanged>>")
 
     def add_new(self):
-        currencies = [c.code for c in self.session.query(Currency).filter_by(active_bool=True).all()]
+        currencies = [c.code for c in self.db_session.query(Currency).filter_by(active_bool=True).all()]
         if not currencies: return
 
         def _save(name, descr, curr, bal):
-            if self.session.query(Account).filter_by(name=name).first(): return False, "Name already exists."
-            self.session.add(Account(name=name, description=descr, currency_code=curr, balance=bal, initial_balance=bal))
-            self.session.commit()
+            if self.db_session.query(Account).filter_by(name=name).first(): return False, "Name already exists."
+            self.db_session.add(Account(name=name, description=descr, currency_code=curr, balance=bal, initial_balance=bal))
+            self.db_session.commit()
             self.load_data()
             return True, ""
 
@@ -370,11 +370,11 @@ class AccountGrid(ctk.CTkFrame):
 
     def edit(self, acc):
         def _update(name, descr):
-            existing = self.session.query(Account).filter_by(name=name).first()
+            existing = self.db_session.query(Account).filter_by(name=name).first()
             if existing and existing.id != acc.id: return False, "Name in use."
             acc.name = name
             acc.description = descr
-            self.session.commit()
+            self.db_session.commit()
             self.load_data()
             return True, ""
 
@@ -384,7 +384,7 @@ class AccountGrid(ctk.CTkFrame):
 class PMGrid(ctk.CTkFrame):
     def __init__(self, parent, db_session):
         super().__init__(parent, fg_color="transparent")
-        self.session = db_session
+        self.db_session = db_session
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", pady=(0, 10))
         ctk.CTkLabel(header, text="Payment Methods", font=("JetBrains Mono", 16, "bold")).pack(side="left")
@@ -396,7 +396,7 @@ class PMGrid(ctk.CTkFrame):
 
     def load_data(self, _event=None):
         for widget in self.scroll.winfo_children(): widget.destroy()
-        items = self.session.query(PaymentMethod).join(Account).order_by(Account.name, PaymentMethod.name).all()
+        items = self.db_session.query(PaymentMethod).join(Account).order_by(Account.name, PaymentMethod.name).all()
         for item in items:
             row = ctk.CTkFrame(self.scroll, fg_color="gray20", corner_radius=6)
             row.pack(fill="x", pady=2, padx=2)
@@ -425,36 +425,36 @@ class PMGrid(ctk.CTkFrame):
                                                                                                          padx=10)
 
     def toggle(self, item_id):
-        item = self.session.get(PaymentMethod, item_id)
+        item = self.db_session.get(PaymentMethod, item_id)
         item.active_bool = not item.active_bool
-        self.session.commit()
+        self.db_session.commit()
         self.load_data()
 
     def add_new(self):
-        act_accounts = [a.name for a in self.session.query(Account).filter_by(active_bool=True).all()]
+        act_accounts = [a.name for a in self.db_session.query(Account).filter_by(active_bool=True).all()]
         if not act_accounts: return
 
         def _save(name, acc_name):
-            if self.session.query(PaymentMethod).filter_by(name=name).first(): return False, "Name in use."
-            acc = self.session.query(Account).filter_by(name=acc_name).first()
-            self.session.add(PaymentMethod(name=name, account_id=acc.id))
-            self.session.commit()
+            if self.db_session.query(PaymentMethod).filter_by(name=name).first(): return False, "Name in use."
+            acc = self.db_session.query(Account).filter_by(name=acc_name).first()
+            self.db_session.add(PaymentMethod(name=name, account_id=acc.id))
+            self.db_session.commit()
             self.load_data()
             return True, ""
 
         PMDialog(self, act_accounts, on_submit=_save)
 
     def edit(self, item):
-        act_accounts = [a.name for a in self.session.query(Account).filter_by(active_bool=True).all()]
+        act_accounts = [a.name for a in self.db_session.query(Account).filter_by(active_bool=True).all()]
         if item.account.name not in act_accounts: act_accounts.append(item.account.name)
 
         def _update(name, acc_name):
-            existing = self.session.query(PaymentMethod).filter_by(name=name).first()
+            existing = self.db_session.query(PaymentMethod).filter_by(name=name).first()
             if existing and existing.id != item.id: return False, "Name in use."
-            acc = self.session.query(Account).filter_by(name=acc_name).first()
+            acc = self.db_session.query(Account).filter_by(name=acc_name).first()
             item.name = name
             item.account_id = acc.id
-            self.session.commit()
+            self.db_session.commit()
             self.load_data()
             return True, ""
 

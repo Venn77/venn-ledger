@@ -1,4 +1,4 @@
-from database.models import session, Currency, Project, Account, Stream, Payer
+from database.models import Currency, Project, Account, Stream, Payer
 from decimal import Decimal, ROUND_HALF_UP
 import datetime, difflib, re
 
@@ -8,9 +8,6 @@ def clean_date(date_str):
     Makes sure the date is a valid format.
     Ex: YYYY-MM-DD HH:MM.
     """
-    # if not date_str or date_str.strip() == "":
-    #     return None
-
     try:
         return datetime.datetime.strptime(date_str, "%Y-%m-%d %H:%M")
     except ValueError:
@@ -38,9 +35,9 @@ def extract_exchange_rate(description):
             return None
     return None
 
-def get_active_account(prompt):
+def get_active_account(prompt, db_session):
     """Returns a selected active account."""
-    active_accounts = session.query(Account).filter_by(active_bool=True).order_by(Account.name.asc()).all()
+    active_accounts = db_session.query(Account).filter_by(active_bool=True).order_by(Account.name.asc()).all()
     print("\nAvailable Accounts:\n")
     print(f"     {'Account Name':<20} | {'Currency':>12} | {'Balance':>12}")
     print("-" * 60)
@@ -58,10 +55,10 @@ def get_active_account(prompt):
                   \rPlease choose from 0 to {len(active_accounts)-1}.
                   \r**********************""")
 
-def get_active_currency(prompt):
+def get_active_currency(prompt, db_session):
     """Returns a selected active currency."""
     # Must ensure currency is selected from available ones.
-    active_curs = session.query(Currency).filter_by(active_bool=True).order_by(Currency.name.asc()).all()
+    active_curs = db_session.query(Currency).filter_by(active_bool=True).order_by(Currency.name.asc()).all()
     print("\nAvailable Currencies:\n")
     for idx, c in enumerate(active_curs):
         print(f" [{idx}] {c.code}")
@@ -75,9 +72,9 @@ def get_active_currency(prompt):
                   \rPlease choose from the 0 to {len(active_curs)-1}.
                   \r**********************""")
 
-def get_active_payer(prompt):
+def get_active_payer(prompt, db_session):
     """Returns a selected active payer."""
-    active_payers = session.query(Payer).filter_by(active_bool=True).order_by(Payer.name.asc()).all()
+    active_payers = db_session.query(Payer).filter_by(active_bool=True).order_by(Payer.name.asc()).all()
     print("\nAvailable Payers:\n")
     for idx, p in enumerate(active_payers):
         print(f" [{idx}] {p.name}")
@@ -93,9 +90,9 @@ def get_active_payer(prompt):
                   \rPlease choose from 0 to {len(active_payers)-1}.
                   \r**********************""")
 
-def get_active_project(prompt):
+def get_active_project(prompt, db_session):
     """Returns a selected active project."""
-    active_projects = session.query(Project).filter_by(active_bool=True).order_by(Project.name.asc()).all()
+    active_projects = db_session.query(Project).filter_by(active_bool=True).order_by(Project.name.asc()).all()
     print("\nAvailable Projects:\n")
     for idx, p in enumerate(active_projects):
         print(f" [{idx}] {p.name}")
@@ -111,9 +108,9 @@ def get_active_project(prompt):
                   \rPlease choose from 0 to {len(active_projects)-1}.
                   \r**********************""")
 
-def get_active_stream(prompt):
+def get_active_stream(prompt, db_session):
     """Returns a selected active stream."""
-    active_streams = session.query(Stream).filter_by(active_bool=True).order_by(Stream.name.asc()).all()
+    active_streams = db_session.query(Stream).filter_by(active_bool=True).order_by(Stream.name.asc()).all()
     print("\nAvailable Streams:\n")
     for idx, s in enumerate(active_streams):
         print(f" [{idx}] {s.name}")

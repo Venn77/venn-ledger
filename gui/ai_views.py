@@ -1,7 +1,7 @@
 import customtkinter as ctk
 import datetime, gc
 from database.models import (
-    session, Category, Vendor, Currency, PaymentMethod
+    Category, Vendor, Currency, PaymentMethod
 )
 from utils.currency_utils import extract_exchange_rate
 from gui.widgets import ToolTip, SearchableComboBox
@@ -9,12 +9,13 @@ from gui.widgets import ToolTip, SearchableComboBox
 
 class AIStagingRow(ctk.CTkFrame):
     """Represents one parsed transaction in a single row, with real-time validation."""
-    def __init__(self, parent, data, active_cats, active_pms, active_vendors, active_currencies, app_ref, year, grid_ref):
+    def __init__(self, parent, data, active_cats, active_pms, active_vendors, active_currencies, app_ref, year, grid_ref, db_session=None):
         super().__init__(parent, fg_color="gray20", corner_radius=6)
         self.data = data
         self.app = app_ref
         self.year = year
         self.grid_ref = grid_ref
+        self.db_session = db_session
 
         self.cat_names = [c.name for c in active_cats]
         self.pm_names = [p.name for p in active_pms]
@@ -261,12 +262,13 @@ class AIStagingRow(ctk.CTkFrame):
 
 class AIStagingGrid(ctk.CTkFrame):
     """Holds all parsed rows and manages pagination and final DB commit."""
-    def __init__(self, parent, parsed_results, year, project, app_ref, import_btn):
+    def __init__(self, parent, parsed_results, year, project, app_ref, import_btn, db_session=None):
         super().__init__(parent, fg_color="transparent")
         self.app = app_ref
         self.year = year
         self.project = project
         self.import_btn = import_btn
+        self.db_session = db_session
 
         self.parsed_results = parsed_results
 
@@ -274,10 +276,10 @@ class AIStagingGrid(ctk.CTkFrame):
         self.page_size = 25
         self.rows = []
 
-        self.active_cats = session.query(Category).filter_by(active_bool=True).all()
-        self.active_pms = session.query(PaymentMethod).filter_by(active_bool=True).all()
-        self.active_vendors = session.query(Vendor).filter_by(active_bool=True).all()
-        self.active_currencies = session.query(Currency).filter_by(active_bool=True).all()
+        self.active_cats = self.db_session.query(Category).filter_by(active_bool=True).order_by(Category.name.asc()).all()
+        self.active_pms = self.db_session.query(PaymentMethod).filter_by(active_bool=True).order_by(PaymentMethod.name.asc()).all()
+        self.active_vendors = self.db_session.query(Vendor).filter_by(active_bool=True).order_by(Vendor.name.asc()).all()
+        self.active_currencies = self.db_session.query(Currency).filter_by(active_bool=True).order_by(Currency.name.asc()).all()
 
         self._pre_validate_all()
 
@@ -423,7 +425,7 @@ class AIStagingGrid(ctk.CTkFrame):
 
         for res in page_data:
             row = AIStagingRow(self.scroll, res, self.active_cats, self.active_pms, self.active_vendors,
-                               self.active_currencies, self.app, self.year, grid_ref=self)
+                               self.active_currencies, self.app, self.year, grid_ref=self, db_session=self.db_session)
             row.pack(fill="x", pady=2, padx=5)
             self.rows.append(row)
 

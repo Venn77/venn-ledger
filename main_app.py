@@ -1,6 +1,6 @@
 import customtkinter as ctk
 from database.models import (
-    session, Account, Expense, Gain, Category,
+    Session, Account, Expense, Gain, Category,
     PaymentMethod, Vendor, Currency, Project,
     Transfer, Payer, Stream
 )
@@ -31,7 +31,8 @@ class FinanceApp(ctk.CTk):
         self.minsize(1440, 700)
         self.maxsize(1440,980)
         ctk.set_appearance_mode("dark")
-        self.manager = finance_manager.TransactionManager(session)
+        self.db_session = Session()
+        self.manager = finance_manager.TransactionManager(self.db_session)
         self.cal_window = None
         self.current_view_date = datetime.datetime.now().replace(day=1)
         self.show_expenses_var = ctk.BooleanVar(value=True)
@@ -289,10 +290,10 @@ class FinanceApp(ctk.CTk):
         self.tab_accounts.grid_columnconfigure((0, 1), weight=1, uniform="tab_col")
         self.tab_accounts.grid_rowconfigure(0, weight=1)
 
-        self.acc_grid = AccountGrid(self.tab_accounts, session)
+        self.acc_grid = AccountGrid(self.tab_accounts, self.db_session)
         self.acc_grid.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
 
-        self.pm_grid = PMGrid(self.tab_accounts, session)
+        self.pm_grid = PMGrid(self.tab_accounts, self.db_session)
         self.pm_grid.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
 
         self.acc_grid.bind("<<DataChanged>>", self.pm_grid.load_data)
@@ -301,37 +302,37 @@ class FinanceApp(ctk.CTk):
         self.tab_categories.grid_columnconfigure((0, 1), weight=1, uniform="tab_col")
         self.tab_categories.grid_rowconfigure(0, weight=1)
 
-        self.cat_grid = SimpleMasterDataGrid(self.tab_categories, session, Category, "Categories (Expenses)")
+        self.cat_grid = SimpleMasterDataGrid(self.tab_categories, self.db_session, Category, "Categories (Expenses)")
         self.cat_grid.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
 
-        self.stream_grid = SimpleMasterDataGrid(self.tab_categories, session, Stream, "Streams (Gains)")
+        self.stream_grid = SimpleMasterDataGrid(self.tab_categories, self.db_session, Stream, "Streams (Gains)")
         self.stream_grid.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
 
         # Vendors & Payers Tab
         self.tab_entities.grid_columnconfigure((0, 1), weight=1, uniform="tab_col")
         self.tab_entities.grid_rowconfigure(0, weight=1)
 
-        self.vendor_grid = SimpleMasterDataGrid(self.tab_entities, session, Vendor, "Vendors (Outbound)")
+        self.vendor_grid = SimpleMasterDataGrid(self.tab_entities, self.db_session, Vendor, "Vendors (Outbound)")
         self.vendor_grid.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
 
-        self.payer_grid = SimpleMasterDataGrid(self.tab_entities, session, Payer, "Payers (Inbound)")
+        self.payer_grid = SimpleMasterDataGrid(self.tab_entities, self.db_session, Payer, "Payers (Inbound)")
         self.payer_grid.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
 
         # Projects Tab
         self.tab_projects.grid_columnconfigure(0, weight=1)
         self.tab_projects.grid_rowconfigure(0, weight=1)
 
-        self.proj_grid = SimpleMasterDataGrid(self.tab_projects, session, Project, "Projects", has_desc=True)
+        self.proj_grid = SimpleMasterDataGrid(self.tab_projects, self.db_session, Project, "Projects", has_desc=True)
         self.proj_grid.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
 
         # Currencies & FX Tab
         self.tab_currencies.grid_columnconfigure((0, 1), weight=1, uniform="tab_col")
         self.tab_currencies.grid_rowconfigure(0, weight=1)
 
-        self.curr_grid = CurrencyGrid(self.tab_currencies, session)
+        self.curr_grid = CurrencyGrid(self.tab_currencies, self.db_session)
         self.curr_grid.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
 
-        self.fx_grid = ExchangeRateGrid(self.tab_currencies, session)
+        self.fx_grid = ExchangeRateGrid(self.tab_currencies, self.db_session)
         self.fx_grid.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
 
         self.settings_frame.grid_remove()
@@ -401,8 +402,8 @@ class FinanceApp(ctk.CTk):
         self.btn_browse.pack(side="left", padx=(5, 15))
 
         # Dropdowns
-        active_currencies = [c.code for c in session.query(Currency).filter_by(active_bool=True).all()]
-        active_projects = ["None"] + [p.name for p in session.query(Project).filter_by(active_bool=True).all()]
+        active_currencies = [c.code for c in self.db_session.query(Currency).filter_by(active_bool=True).all()]
+        active_projects = ["None"] + [p.name for p in self.db_session.query(Project).filter_by(active_bool=True).all()]
         current_year = str(datetime.datetime.now().year)
         years = [str(y) for y in range(int(current_year) - 2, int(current_year) + 3)]
 
@@ -566,15 +567,15 @@ class FinanceApp(ctk.CTk):
             for day in daily_chunks:
                 combined_str += f"{day['header']}\n{day['data']}\n"
 
-            # 3. Get active categories
-            active_cats = session.query(Category).filter_by(active_bool=True).all()
+            # 3. Get categories
+            cats = self.db_session.query(Category).all()
 
             # 4. Define the callback
             def progress_cb(c_line, t_lines, c_tx, t_tx):
                 self.after(0, self._update_ai_progress, c_line, t_lines, c_tx, t_tx)
 
             # 5. Invoke LLM
-            parsed_results = get_structured_data(combined_str, currency, active_cats, cancel_event=self.ai_cancel_event,
+            parsed_results = get_structured_data(combined_str, currency, cats, cancel_event=self.ai_cancel_event,
                                                  progress_callback=progress_cb)
 
             # 6. Pass results back to the main GUI thread
@@ -698,7 +699,7 @@ class FinanceApp(ctk.CTk):
         self.grid_container.update_idletasks()
         self.preview_container.update_idletasks()
 
-        grid = AIStagingGrid(self.grid_container, parsed_results, year, project, self, self.btn_import_all)
+        grid = AIStagingGrid(self.grid_container, parsed_results, year, project, self, self.btn_import_all, self.db_session)
         grid.pack(fill="both", expand=True)
 
         self.btn_import_all.configure(command=grid.execute_import)
@@ -894,7 +895,7 @@ class FinanceApp(ctk.CTk):
         for widget in self.acc_scroll.winfo_children():
             widget.destroy()
 
-        accounts = {a.id: a for a in session.query(Account).order_by(Account.name.asc()).all()}
+        accounts = {a.id: a for a in self.db_session.query(Account).order_by(Account.name.asc()).all()}
         saved_order = self.load_account_order()
 
         ordered_ids = [aid for aid in saved_order if aid in accounts]
@@ -986,7 +987,7 @@ class FinanceApp(ctk.CTk):
                 config = json.load(f)
 
         config["account_order"] = order_list
-        with open("config.json", "w") as f:
+        with open("config/config.json", "w") as f:
             json.dump(config, f)
 
     def handle_account_click(self, account_id):
@@ -1028,7 +1029,7 @@ class FinanceApp(ctk.CTk):
 
         self.update_idletasks()
 
-        query = self.get_unified_transaction_query(session)
+        query = self.get_unified_transaction_query(self.db_session)
 
         selection = self.date_filter_var.get()
 
@@ -1126,7 +1127,7 @@ class FinanceApp(ctk.CTk):
 
         # 3a. TRANSFERS (Outbound)
         origin_account = aliased(Account)
-        q3_out = (session.query(
+        q3_out = (current_session.query(
             Transfer.id.label("id"),
             Transfer.timestamp.label("ts"),
             Transfer.amount_origin.label("amount"),
@@ -1145,7 +1146,7 @@ class FinanceApp(ctk.CTk):
 
         # 3b. TRANSFERS (Inbound)
         dest_account = aliased(Account)
-        q3_in = (session.query(
+        q3_in = (current_session.query(
             Transfer.id.label("id"),
             Transfer.timestamp.label("ts"),
             Transfer.amount_destination.label("amount"),
@@ -1180,7 +1181,7 @@ class FinanceApp(ctk.CTk):
         self.transaction_counter_lbl.configure(text=count_text)
 
         if total_count > 0:
-            (in_eur, in_dict), (out_eur, out_dict), net_bal = self.calculate_totals(current_query)
+            (in_eur, in_dict), (out_eur, out_dict), net_bal = self.calculate_totals(current_query, self.db_session)
 
             in_brk = " | ".join([f"{amt:,.2f} {c}" for c, amt in in_dict.items()]) or "0.00 EUR"
             self.in_lbl.configure(text=f"In: {in_brk}  (Combined: ≈ {in_eur:,.2f} EUR)")
@@ -1199,14 +1200,14 @@ class FinanceApp(ctk.CTk):
         self.render_pagination_controls()
 
     @staticmethod
-    def calculate_totals(base_query):
+    def calculate_totals(base_query, current_session):
         """
         Calculates In, Out, and Balance.
         Ignores Transfers.
         """
         sub = base_query.subquery()
 
-        totals_eur = session.query(
+        totals_eur = current_session.query(
             func.sum(case((sub.c.type == 'gain', sub.c.eur_val), else_=0)).label("in_eur"),
             func.sum(case((sub.c.type == 'expense', sub.c.eur_val), else_=0)).label("out_eur")
         ).one()
@@ -1215,7 +1216,7 @@ class FinanceApp(ctk.CTk):
         out_eur = totals_eur[1] or 0
         net_balance = in_eur - out_eur
 
-        raw_breakdown = (session.query(
+        raw_breakdown = (current_session.query(
             sub.c.type,
             sub.c.currency,
             func.sum(sub.c.amount)
@@ -1359,8 +1360,7 @@ class FinanceApp(ctk.CTk):
             self.jump_entry.delete(0, "end")
             self.jump_entry.insert(0, str(self.current_page + 1))
 
-    @staticmethod
-    def _prepare_transaction_data(row_data, is_edit=False):
+    def _prepare_transaction_data(self, row_data, is_edit=False):
         """Maps a unified SQL row into the dictionary for the forms."""
         data = {
             "amount": row_data.amount,
@@ -1384,7 +1384,7 @@ class FinanceApp(ctk.CTk):
             data["entity"] = row_data.entity
             data["acc"] = row_data.pm_or_acc
         elif "transfer" in row_data.type:
-            t = session.get(Transfer, row_data.id)
+            t = self.db_session.get(Transfer, row_data.id)
             data["amount"] = t.amount_origin
             data["dest_amount"] = t.amount_destination
             data["orig_acc"] = t.origin_account.name
@@ -1396,11 +1396,11 @@ class FinanceApp(ctk.CTk):
         """Strips the ID and opens the form as a new entry."""
         mapped_data = self._prepare_transaction_data(row_data, is_edit=False)
         if row_data.type == "expense":
-            AddExpenseWindow(self, self.manager, transaction_data=mapped_data)
+            AddExpenseWindow(self, self.manager, transaction_data=mapped_data, db_session=self.db_session)
         elif row_data.type == "gain":
-            AddGainWindow(self, self.manager, transaction_data=mapped_data)
+            AddGainWindow(self, self.manager, transaction_data=mapped_data, db_session=self.db_session)
         elif "transfer" in row_data.type:
-            AddTransferWindow(self, self.manager, transaction_data=mapped_data)
+            AddTransferWindow(self, self.manager, transaction_data=mapped_data, db_session=self.db_session)
 
     def open_edit_transaction(self, row_data):
         """
@@ -1409,11 +1409,11 @@ class FinanceApp(ctk.CTk):
         """
         mapped_data = self._prepare_transaction_data(row_data, is_edit=True)
         if row_data.type == "expense":
-            AddExpenseWindow(self, self.manager, transaction_data=mapped_data)
+            AddExpenseWindow(self, self.manager, transaction_data=mapped_data, db_session=self.db_session)
         elif row_data.type == "gain":
-            AddGainWindow(self, self.manager, transaction_data=mapped_data)
+            AddGainWindow(self, self.manager, transaction_data=mapped_data, db_session=self.db_session)
         elif "transfer" in row_data.type:
-            AddTransferWindow(self, self.manager, transaction_data=mapped_data)
+            AddTransferWindow(self, self.manager, transaction_data=mapped_data, db_session=self.db_session)
 
     def delete_transaction_prompt(self, transaction_id, transaction_type, context_text="", on_cancel=None):
         """Generates a popup to confirm deletion before modifying the DB."""
@@ -1458,7 +1458,7 @@ class FinanceApp(ctk.CTk):
     def on_closing(self):
         """Ensures the DB session is safely closed before quitting."""
         try:
-            session.close()
+            self.db_session.close()
             print("Database session closed successfully.")
         except Exception as e:
             print(f"Error closing database session: {e}")
@@ -1466,13 +1466,13 @@ class FinanceApp(ctk.CTk):
             self.destroy()
 
     def open_add_expense(self):
-        AddExpenseWindow(self, self.manager)
+        AddExpenseWindow(self, self.manager, db_session=self.db_session)
 
     def open_add_gain(self):
-        AddGainWindow(self, self.manager)
+        AddGainWindow(self, self.manager, db_session=self.db_session)
 
     def open_add_transfer(self):
-        AddTransferWindow(self, self.manager)
+        AddTransferWindow(self, self.manager, db_session=self.db_session)
 
 
 if __name__ == "__main__":

@@ -191,7 +191,7 @@ class CurrencyGrid(ctk.CTkFrame):
         CurrencyDialog(self, "Add Currency", on_submit=_save)
 
     def edit(self, item):
-        def _update(code, name):
+        def _update(_code, name):
             item.name = name
             self.db_session.commit()
             self.load_data()

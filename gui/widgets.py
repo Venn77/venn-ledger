@@ -1,5 +1,7 @@
 import customtkinter as ctk
 import tkinter as tk
+import datetime
+from utils.currency_utils import extract_exchange_rate
 
 
 class ToolTip:
@@ -143,6 +145,258 @@ class SearchableComboBox(ctk.CTkComboBox):
         """Resets the combobox to its placeholder state."""
         self.set(self.placeholder)
         self._entry.configure(foreground="gray")
+
+class AIStagingRow(ctk.CTkFrame):
+    """Represents one parsed transaction in a single row, with real-time validation."""
+    def __init__(self, parent, data, active_cats, active_pms, active_vendors, active_currencies, app_ref, year, grid_ref):
+        super().__init__(parent, fg_color="gray20", corner_radius=6)
+        self.data = data
+        self.app = app_ref
+        self.year = year
+        self.grid_ref = grid_ref
+
+        self.cat_names = [c.name for c in active_cats]
+        self.pm_names = [p.name for p in active_pms]
+        self.ven_names = [v.name for v in active_vendors]
+        self.curr_names = [c.code for c in active_currencies]
+
+        self.pm_dict = {p.name: p.account.currency_code for p in active_pms}
+
+        # Expand Vendor & Description
+        self.grid_columnconfigure(2, weight=1)
+        self.grid_columnconfigure(8, weight=2)
+
+        # 0. Status Indicator
+        self.status_lbl = ctk.CTkLabel(self, text="⚫", width=30, font=("Segoe UI", 14))
+        self.status_lbl.grid(row=0, column=0, padx=5, pady=5)
+        self.status_tooltip = ToolTip(self.status_lbl, "Initializing...")
+
+        # 1. Date
+        ctk.CTkLabel(self, text=data['date'], width=45, font=("JetBrains Mono", 11, "bold")).grid(row=0, column=1,
+                                                                                                  padx=5, sticky="w")
+
+        # 2. Vendor
+        self.ven_var = ctk.StringVar(value=data['vendor'])
+        self.ven_entry = ctk.CTkEntry(self, textvariable=self.ven_var, height=24)
+        self.ven_entry.grid(row=0, column=2, padx=5, sticky="ew")
+
+        # 3. Amount
+        self.amt_var = ctk.StringVar(value=str(data['amount']))
+        self.amt_entry = ctk.CTkEntry(self, textvariable=self.amt_var, width=70, height=24)
+        self.amt_entry.grid(row=0, column=3, padx=5)
+
+        # 4. Currency
+        self.currency_combo = ctk.CTkComboBox(self, values=self.curr_names, width=70, height=24, state="readonly",
+                                          command=self._on_currency_change)
+        self.currency_combo.set(data['currency'] if data['currency'] in self.curr_names else "EUR")
+        self.currency_combo.grid(row=0, column=4, padx=5)
+
+        # 4. FX Rate
+        self.fx_var = ctk.StringVar()
+        self.fx_entry = ctk.CTkEntry(self, textvariable=self.fx_var, width=60, height=24, placeholder_text="FX")
+        self.fx_entry.grid(row=0, column=5, padx=5)
+        self.fx_tooltip = ToolTip(self.fx_entry, "")
+
+        self._calculate_fx(self.currency_combo.get(), initial_load=True)
+
+        # 5. Category (Combo)
+        self.cat_combo = SearchableComboBox(self, placeholder="Category...", values=self.cat_names, width=110, height=24,
+                                         command=lambda _: self.validate())
+        self.cat_combo.inject_value(data['category'])
+        self.cat_combo.grid(row=0, column=6, padx=5, sticky="ew")
+
+        self.cat_combo.configure(command=lambda _: self.validate())
+        # noinspection PyProtectedMember
+        self.cat_combo._entry.bind("<KeyRelease>", lambda e: self.validate(), add="+")
+
+        # 6. Payment Method (Combo)
+        valid_pms = [name for name, c_code in self.pm_dict.items() if c_code == self.currency_combo.get()]
+        self.pm_combo = ctk.CTkComboBox(self, values=valid_pms if valid_pms else ["None"], width=130, height=24,
+                                        state="readonly", command=lambda _: self.validate())
+
+        if data['payment_method'] in valid_pms:
+            self.pm_combo.set(data['payment_method'])
+        else:
+            self.pm_combo.set("--- Select ---")
+        self.pm_combo.grid(row=0, column=7, padx=5, sticky="ew")
+
+        # 7. Description (Editable)
+        self.desc_var = ctk.StringVar(value=data['description'])
+        self.desc_entry = ctk.CTkEntry(self, textvariable=self.desc_var, height=24)
+        self.desc_entry.grid(row=0, column=8, padx=5, sticky="ew")
+
+        # 8. Discard Button
+        self.btn_discard = ctk.CTkButton(self, text="✕", width=30, height=24, fg_color="transparent",
+                                         text_color="gray50", hover_color="#b13e3e", command=self.discard_row)
+        self.btn_discard.grid(row=0, column=9, padx=(5, 10))
+
+        def on_x_hover(event):
+            # Red
+            self.configure(fg_color="#332424")
+
+        def on_x_leave(event):
+            self.configure(fg_color="gray20")
+
+        # Binds
+        self.btn_discard.bind("<Enter>", on_x_hover, add="+")
+        self.btn_discard.bind("<Leave>", on_x_leave, add="+")
+        self.ven_entry.bind("<KeyRelease>", lambda e: self.validate())
+        self.amt_entry.bind("<KeyRelease>", lambda e: self.validate())
+        self.desc_entry.bind("<KeyRelease>", lambda e: self.validate())
+        self.fx_entry.bind("<KeyRelease>", self._on_fx_manual_edit)
+
+        self.is_valid = False
+        self.status_type = ""
+        self.validate()
+
+    def _set_fx_tooltip(self, text):
+        """Sets the FX rate tooltip."""
+        self.fx_tooltip.text = text
+
+    def _on_fx_manual_edit(self, event):
+        """Flags the FX source as Manual if the user types in it."""
+        self._set_fx_tooltip("Source: Manual Entry")
+        self.validate()
+
+    def _calculate_fx(self, curr_code, initial_load=False):
+        """Determines the FX rate and sets the appropriate Tooltip."""
+        self.fx_var.set("")
+
+        if curr_code == "EUR":
+            self.fx_entry.configure(state="normal", fg_color="gray15", text_color="gray50", font=("JetBrains Mono", 11))
+            self.fx_var.set("EUR Base")
+            self.fx_entry.configure(state="disabled")
+            self._set_fx_tooltip("EUR is the Base Currency")
+            return
+
+        self.fx_entry.configure(state="normal", fg_color=["#F9F9FA", "#343638"], text_color="white", font=("JetBrains Mono", 12))
+
+        if initial_load:
+            if 'fx_rate' in self.data:
+                saved_val = str(self.data['fx_rate'])
+                self.fx_var.set(saved_val)
+                if saved_val.strip() == "":
+                    self._set_fx_tooltip("Source: Manual Entry Required")
+                else:
+                    self._set_fx_tooltip("Source: Saved Entry")
+                return
+
+            extracted_fx = extract_exchange_rate(self.data['description'])
+            if extracted_fx:
+                self.fx_var.set(str(extracted_fx))
+                self._set_fx_tooltip("Source: Extracted from Description")
+                return
+
+        day_str, month_str = self.data['date'].split('/')
+        target_dt = datetime.datetime(int(self.year), int(month_str), int(day_str), 12, 0, 0, 0)
+        fx_data = self.app.manager.get_historical_fx_rate(curr_code, target_dt)
+
+        if fx_data:
+            db_fx, db_ts = fx_data
+            self.fx_var.set(str(db_fx))
+            self._set_fx_tooltip(f"Source: Historical DB\nLogged: {db_ts.strftime('%Y-%m-%d')}")
+        else:
+            self._set_fx_tooltip("Source: Manual Entry Required")
+
+    def _on_currency_change(self, new_curr):
+        self.data['currency'] = new_curr
+
+        valid_pms = [name for name, c_code in self.pm_dict.items() if c_code == new_curr]
+        self.pm_combo.configure(values=valid_pms if valid_pms else ["None"])
+
+        if self.pm_combo.get() not in valid_pms:
+            self.pm_combo.set("--- Select ---")
+
+        self._calculate_fx(new_curr, initial_load=False)
+        self.validate()
+
+    def discard_row(self):
+        """Marks the item as discarded in memory and marks it discarded in memory."""
+        self.data['discarded'] = True
+
+        self.btn_discard.unbind("<Enter>")
+        self.btn_discard.unbind("<Leave>")
+
+        self.destroy()
+        if hasattr(self.grid_ref, 'update_pagination_state'):
+            self.app.after(10, self.grid_ref.update_pagination_state)
+
+    def validate(self):
+        """Checks DB integrity and updates the status light, and syncs back to master memory."""
+        warnings = []
+        errors = []
+
+        self.data['description'] = self.desc_var.get().strip()
+
+        # Check Amount
+        raw_amt = self.amt_var.get().strip()
+        self.data['amount'] = raw_amt
+        try:
+            float(raw_amt)
+        except ValueError:
+            errors.append("Invalid Amount.")
+
+        # Check FX
+        if self.currency_combo.get() != "EUR":
+            raw_fx = self.fx_var.get().strip()
+            self.data['fx_rate'] = raw_fx
+            try:
+                rate = float(raw_fx)
+                if rate <= 0: raise ValueError
+            except ValueError:
+                errors.append("Missing/Invalid FX Rate.")
+
+        # Check Vendor
+        ven_val = self.ven_var.get().strip()
+        self.data['vendor'] = ven_val
+        if not ven_val:
+            warnings.append("Will be imported with no Vendor.")
+        elif ven_val not in self.ven_names:
+            warnings.append("New Vendor will be created.")
+
+        # Check Category
+        cat_val = self.cat_combo.get().strip()
+        if hasattr(self.cat_combo, 'placeholder') and cat_val == self.cat_combo.placeholder:
+            cat_val = ""
+        self.data['category'] = cat_val
+
+        if not cat_val:
+            warnings.append("Will be imported with no Category.")
+        elif cat_val not in self.cat_names:
+            warnings.append("New Category will be created.")
+
+        # Check Payment Method & Currency Link
+        pm_val = self.pm_combo.get()
+        self.data['payment_method'] = pm_val
+        valid_pms = [name for name, c_code in self.pm_dict.items() if c_code == self.currency_combo.get()]
+
+        if pm_val not in valid_pms:
+            errors.append("Select a matching Payment Method.")
+
+        raw_line = f"\n\nRaw Line: {self.data.get('line', '')}"
+
+        # Apply Colors
+        if errors:
+            self.status_lbl.configure(text="🔴", text_color="#FF6B6B")
+            self.is_valid = False
+            self.data['is_valid'] = False
+            self.data['status_type'] = "red"
+            self.status_tooltip.text = " | ".join(errors) + raw_line
+        elif warnings:
+            self.status_lbl.configure(text="🟡", text_color="#FFD60A")
+            self.is_valid = True
+            self.data['is_valid'] = True
+            self.data['status_type'] = "yellow"
+            self.status_tooltip.text = " | ".join(warnings) + raw_line
+        else:
+            self.status_lbl.configure(text="🟢", text_color="#4CD964")
+            self.is_valid = True
+            self.data['is_valid'] = True
+            self.data['status_type'] = "green"
+            self.status_tooltip.text = "Ready to import." + raw_line
+
+        if hasattr(self.grid_ref, 'check_master_validation'):
+            self.grid_ref.check_master_validation()
 
 class TransactionRow(ctk.CTkFrame):
     def __init__(self, master, main_app, data, char_limit, ent_char_limit):

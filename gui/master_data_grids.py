@@ -16,11 +16,18 @@ class SimpleMasterDataGrid(ctk.CTkFrame):
         self.model = model
         self.title = title
         self.has_desc = has_desc
+        self.current_results = None
+        self.total_items = None
 
         header_frame = ctk.CTkFrame(self, fg_color="transparent")
         header_frame.pack(fill="x", pady=(0, 10))
         ctk.CTkLabel(header_frame, text=title, font=("JetBrains Mono", 16, "bold")).pack(side="left")
         ctk.CTkButton(header_frame, text="+ Add New", width=130, command=self.add_new).pack(side="right")
+
+        self.loading_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.loading_lbl = ctk.CTkLabel(self.loading_frame, text="Loading...", font=("JetBrains Mono", 16, "bold"),
+                                        text_color="#5AC8FA")
+        self.loading_lbl.pack(pady=50)
 
         self.scroll = ctk.CTkScrollableFrame(self)
         self.scroll.pack(fill="both", expand=True)
@@ -28,11 +35,31 @@ class SimpleMasterDataGrid(ctk.CTkFrame):
         self.load_data()
 
     def load_data(self):
+        if hasattr(self, '_render_job') and self._render_job:
+            self.after_cancel(self._render_job)
+
+        self.scroll.pack_forget()
+        self.loading_frame.pack(fill="both", expand=True)
+        self.loading_lbl.configure(text="Fetching data...")
+
         for widget in self.scroll.winfo_children():
             widget.destroy()
 
-        items = self.db_session.query(self.model).order_by(self.model.name).all()
-        for item in items:
+        self.current_results = self.db_session.query(self.model).order_by(self.model.name).all()
+        self.total_items = len(self.current_results)
+
+        if self.total_items > 0:
+            self._render_batch(start_idx=0, batch_size=25)
+        else:
+            self._finish_loading()
+
+    def _render_batch(self, start_idx, batch_size):
+        end_idx = min(start_idx + batch_size, len(self.current_results))
+
+        self.loading_lbl.configure(text=f"Loading... {end_idx} / {self.total_items}")
+
+        for idx in range(start_idx, end_idx):
+            item = self.current_results[idx]
             row = ctk.CTkFrame(self.scroll, fg_color="gray20", corner_radius=6)
             row.pack(fill="x", pady=2, padx=2)
 
@@ -63,6 +90,15 @@ class SimpleMasterDataGrid(ctk.CTkFrame):
             status_color = "#4CD964" if item.active_bool else "gray50"
             ctk.CTkLabel(row, text=status_text, text_color=status_color, width=60, font=("JetBrains Mono", 11)).pack(
                 side="right", padx=10)
+
+        if end_idx < self.total_items:
+            self._render_job = self.after(10, self._render_batch, end_idx, batch_size)
+        else:
+            self._finish_loading()
+
+    def _finish_loading(self):
+        self.loading_frame.pack_forget()
+        self.scroll.pack(fill="both", expand=True)
 
     def toggle_status(self, item_id):
         item = self.db_session.get(self.model, item_id)
@@ -205,21 +241,49 @@ class ExchangeRateGrid(ctk.CTkFrame):
     def __init__(self, parent, db_session):
         super().__init__(parent, fg_color="transparent")
         self.db_session = db_session
+        self.current_results = None
+        self.total_items = None
 
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", pady=(0, 10))
         ctk.CTkLabel(header, text="Exchange Rates", font=("JetBrains Mono", 16, "bold")).pack(side="left")
         ctk.CTkButton(header, text="+ Log New Rate", width=130, command=self.add_new).pack(side="right")
 
+        self.loading_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.loading_lbl = ctk.CTkLabel(self.loading_frame, text="Loading...", font=("JetBrains Mono", 16, "bold"),
+                                        text_color="#5AC8FA")
+        self.loading_lbl.pack(pady=50)
+
         self.scroll = ctk.CTkScrollableFrame(self)
         self.scroll.pack(fill="both", expand=True)
         self.load_data()
 
     def load_data(self):
+        if hasattr(self, '_render_job') and self._render_job:
+            self.after_cancel(self._render_job)
+
+        self.scroll.pack_forget()
+        self.loading_frame.pack(fill="both", expand=True)
+        self.loading_lbl.configure(text="Fetching data...")
+
         for widget in self.scroll.winfo_children(): widget.destroy()
-        rates = self.db_session.query(ExchangeRate).filter(ExchangeRate.currency_code != "EUR").order_by(
+
+        self.current_results = self.db_session.query(ExchangeRate).filter(ExchangeRate.currency_code != "EUR").order_by(
             ExchangeRate.timestamp.desc()).limit(500).all()
-        for r in rates:
+        self.total_items = len(self.current_results)
+
+        if self.total_items > 0:
+            self._render_batch(start_idx=0, batch_size=25)
+        else:
+            self._finish_loading()
+
+    def _render_batch(self, start_idx, batch_size):
+        end_idx = min(start_idx + batch_size, len(self.current_results))
+
+        self.loading_lbl.configure(text=f"Loading... {end_idx} / {self.total_items}")
+
+        for idx in range(start_idx, end_idx):
+            r = self.current_results[idx]
             row = ctk.CTkFrame(self.scroll, fg_color="gray20", corner_radius=6)
             row.pack(fill="x", pady=2, padx=2)
 
@@ -233,6 +297,15 @@ class ExchangeRateGrid(ctk.CTkFrame):
             ctk.CTkButton(row, text="✕", width=30, height=24, fg_color="transparent", text_color="gray50",
                           hover_color="#8b2525",
                           command=lambda i=r.id: self.delete(i)).pack(side="right", padx=10)
+
+        if end_idx < self.total_items:
+            self._render_job = self.after(10, self._render_batch, end_idx, batch_size)
+        else:
+            self._finish_loading()
+
+    def _finish_loading(self):
+        self.loading_frame.pack_forget()
+        self.scroll.pack(fill="both", expand=True)
 
     def delete(self, rate_id):
         rate = self.db_session.get(ExchangeRate, rate_id)

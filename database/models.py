@@ -1,7 +1,7 @@
 import os
 from decimal import Decimal, ROUND_HALF_UP
 from sqlalchemy import (
-    create_engine, Column, Integer, Float, String,
+    create_engine, event, Column, Integer, Float, String,
     Boolean, DateTime, func, ForeignKey, UniqueConstraint
 )
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
@@ -15,6 +15,12 @@ engine = create_engine(f"sqlite:///{DB_PATH}", echo=False)
 Session = sessionmaker(bind=engine)
 Base = declarative_base()
 
+@event.listens_for(engine, "connect")
+def set_sqlite_pragma(dbapi_connection, _connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA synchronous=NORMAL")
+    cursor.close()
 
 def calculate_conversion(item):
     """Returns converted amount in EUR with two decimals."""

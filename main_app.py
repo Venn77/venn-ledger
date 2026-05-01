@@ -365,6 +365,8 @@ class FinanceApp(ctk.CTk):
         try:
             self.db_session.close()
             print("Database session closed successfully.")
+            self.db_session.get_bind().dispose()
+            print("Database connection fully severed.")
         except Exception as e:
             print(f"Error closing database session: {e}")
         finally:

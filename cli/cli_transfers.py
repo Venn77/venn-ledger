@@ -98,6 +98,8 @@ if __name__ == "__main__":
         try:
             db_session.close()
             print("Database session closed successfully.")
+            db_session.get_bind().dispose()
+            print("Database connection fully severed.")
         except Exception as error:
             print(f"Error during shutdown: {error}")
 

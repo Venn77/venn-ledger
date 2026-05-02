@@ -1,4 +1,5 @@
 import customtkinter as ctk
+import matplotlib.pyplot as plt
 from typing import Any
 from database.models import Session, Account, Transfer
 from core import manager as finance_manager
@@ -7,6 +8,7 @@ from gui.transaction_forms import AddExpenseWindow, AddGainWindow, AddTransferWi
 from gui.transactions_view import TransactionsView
 from gui.settings_view import SettingsView
 from gui.ai_view import AIImportView
+from gui.dashboard_view import DashboardView
 
 
 class FinanceApp(ctk.CTk):
@@ -31,6 +33,7 @@ class FinanceApp(ctk.CTk):
         self.views: dict[str, Any] = {
             "transactions": None,
             "ai": None,
+            "dashboard": None,
             "settings": None
         }
 
@@ -50,10 +53,10 @@ class FinanceApp(ctk.CTk):
         self.sidebar.grid(row=0, column=0, sticky="nsew")
 
         self.logo = ctk.CTkLabel(self.sidebar, text="FINANCE", font=("JetBrains Mono", 24, "bold"))
-        self.logo.pack(pady=30, padx=20)
+        self.logo.pack(pady=15, padx=20)
 
         self.add_exp_btn = ctk.CTkButton(self.sidebar, text="+ Add Expense", command=self.open_add_expense)
-        self.add_exp_btn.pack(pady=(20, 4), padx=20)
+        self.add_exp_btn.pack(pady=(15, 4), padx=20)
 
         self.add_gain_btn = ctk.CTkButton(self.sidebar, text="+ Add Gain", command=self.open_add_gain)
         self.add_gain_btn.pack(pady=(4, 4), padx=20)
@@ -79,6 +82,10 @@ class FinanceApp(ctk.CTk):
                                          anchor="w", command=lambda: self.switch_view("ai"))
         self.btn_view_ai.pack(fill="x", pady=2)
 
+        self.btn_view_dashboard = ctk.CTkButton(self.nav_group, text="📈 Dashboard",
+                                         anchor="w", command=lambda: self.switch_view("dashboard"))
+        self.btn_view_dashboard.pack(fill="x", pady=2)
+
         self.btn_view_settings = ctk.CTkButton(self.nav_group, text="⚙️ Master Data",
                                                anchor="w", command=lambda: self.switch_view("settings"))
         self.btn_view_settings.pack(fill="x", pady=2)
@@ -91,13 +98,15 @@ class FinanceApp(ctk.CTk):
 
     def switch_view(self, view_name):
         """Hides all views, builds the requested one if missing, and shows it."""
-        for btn in [self.btn_view_ledger, self.btn_view_ai, self.btn_view_settings]:
+        for btn in [self.btn_view_ledger, self.btn_view_ai, self.btn_view_dashboard, self.btn_view_settings]:
             btn.configure(fg_color="transparent")
 
         if view_name == "transactions":
             self.btn_view_ledger.configure(fg_color="#1f538d")
         elif view_name == "ai":
             self.btn_view_ai.configure(fg_color="#1f538d")
+        elif view_name == "dashboard":
+            self.btn_view_dashboard.configure(fg_color="#1f538d")
         elif view_name == "settings":
             self.btn_view_settings.configure(fg_color="#1f538d")
 
@@ -111,6 +120,8 @@ class FinanceApp(ctk.CTk):
                 self.views[view_name] = TransactionsView(self, self.manager, self.db_session)
             elif view_name == "ai":
                 self.views[view_name] = AIImportView(self, self.manager, self.db_session)
+            elif view_name == "dashboard":
+                self.views[view_name] = DashboardView(self, self.manager, self.db_session)
             elif view_name == "settings":
                 self.views[view_name] = SettingsView(self, self.manager, self.db_session)
 
@@ -367,9 +378,11 @@ class FinanceApp(ctk.CTk):
             print("Database session closed successfully.")
             self.db_session.get_bind().dispose()
             print("Database connection fully severed.")
+            plt.close('all')
         except Exception as e:
             print(f"Error closing database session: {e}")
         finally:
+            self.quit()
             self.destroy()
 
     def open_add_expense(self):
@@ -384,6 +397,7 @@ class FinanceApp(ctk.CTk):
 
 if __name__ == "__main__":
     app = FinanceApp()
+    app.after(0, lambda: app.state('zoomed'))
     app.mainloop()
 
 

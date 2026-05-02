@@ -23,9 +23,11 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         self.mem = self.manager.last_used.copy()
         if transaction_data:
             self.mem.update(transaction_data)
-
+        # noinspection PyTypeChecker
         self.after(50, lambda: self.attributes('-topmost', True))
+        # noinspection PyTypeChecker
         self.after(75, lambda: self.attributes('-topmost', False))
+        # noinspection PyTypeChecker
         self.after(100, self.force_focus)
 
         self.grid_columnconfigure(0, weight=0, minsize=120)
@@ -226,6 +228,7 @@ class BaseTransactionWindow(ctk.CTkToplevel):
 
             if target.winfo_ismapped():
                 state = "normal"
+                # noinspection PyBroadException
                 try:
                     state = w.cget("state")
                 except:
@@ -279,13 +282,13 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         if self.fx_entry.get() != self.fx_placeholder:
             self.fx_tooltip.text = "Manual rate entered"
 
-    def _handle_date_change(self, *args):
+    def _handle_date_change(self, _var_name, _index, _mode):
         """Ensures correct execution sequence when the user changes the Date."""
         self.update_fx_list()
         if hasattr(self, 'error_label'):
             self.validate_form()
 
-    def _handle_currency_change(self, *args):
+    def _handle_currency_change(self, _var_name, _index, _mode):
         """Ensures correct execution sequence when the user changes the Currency."""
         self.update_fx_list()
         self.on_currency_change(self.currency_var.get())
@@ -299,6 +302,7 @@ class BaseTransactionWindow(ctk.CTkToplevel):
 
     def get_current_time_part(self):
         """Extracts the HH:MM:SS part from the current entry, falling back to session_time."""
+        # noinspection PyBroadException
         try:
             return self.date_var.get().split(" ")[1] if " " in self.date_var.get() else self.session_time
         except:
@@ -382,13 +386,14 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         self.update_fx_list()
         self.force_focus()
 
-    def schedule_validation(self, *args):
+    def schedule_validation(self, *_):
         """Debounces the validation until user is done typing."""
         if self._val_timer:
             self.after_cancel(self._val_timer)
+        # noinspection PyTypeChecker
         self._val_timer = self.after(500, self.validate_form)
 
-    def validate_form(self, *args):
+    def validate_form(self, *_):
         """Checks if all required fields are filled to enable the Save button."""
         self.error_label.configure(text="", text_color="orange")
         self.save_btn.configure(state="normal", fg_color="green", text_color="white")
@@ -445,6 +450,7 @@ class BaseTransactionWindow(ctk.CTkToplevel):
 
             self.save_btn.configure(text="✔ Added!", fg_color="darkgreen", state="disabled")
             self.error_label.configure(text="Saved successfully", text_color="green")
+            # noinspection PyTypeChecker
             self.after(1000, self.finalize_and_refresh)
 
         except Exception as e:
@@ -456,7 +462,9 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         main_app = self.master
         self.destroy()
         if hasattr(main_app, "refresh_accounts") and hasattr(main_app, "load_transactions"):
+            # noinspection PyTypeChecker
             main_app.after(10, main_app.refresh_accounts)
+            # noinspection PyTypeChecker
             main_app.after(50, main_app.load_transactions)
 
     # Abstract Methods

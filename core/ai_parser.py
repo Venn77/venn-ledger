@@ -170,7 +170,7 @@ FIXED CATEGORY: Household Supplies
 LINE: Amazon 13.99 santander iAmoy replacement brush & filters f/Deebot Slim2 vaccuum cleaner
 
 Output:
-{{"amount": 13.99, "currency": "{default_currency}", "category": "Household Supplies", "vendor": "Amazon", "payment_method": "Santander Debit", "description": "iAmoy replacement brush & filters f/Deebot Slim2 vaccuum cleaner"}}
+{{"amount": 13.99, "currency": "{default_currency}", "category": "Household Supplies", "vendor": "Amazon", "payment_method": "Santander Debit", "description": "iAmoy replacement brush & filters f/Deebot Slim2 vacuum cleaner"}}
 
 Input:
 FIXED CATEGORY: Breakfast

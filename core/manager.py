@@ -93,14 +93,18 @@ class TransactionManager:
         else:
             new_expense = Expense()
 
+        cat_id = category.id if category and hasattr(category, 'id') else None
+        ven_id = vendor.id if vendor and hasattr(vendor, 'id') else None
+        proj_id = project.id if project and hasattr(project, 'id') else None
+
         # 5. Update Fields
         new_expense.amount = amount
         new_expense.currency_code = currency_code
         new_expense.fx_rate = fx_rate
-        new_expense.category_id = category.id if category else None
-        new_expense.vendor_id = vendor.id if vendor else None
+        new_expense.category_id = cat_id
+        new_expense.vendor_id = ven_id
         new_expense.payment_method_id = pm.id
-        new_expense.project_id = project.id if project else None
+        new_expense.project_id = proj_id
         new_expense.description = description
         new_expense.timestamp = timestamp or datetime.datetime.now()
 
@@ -149,14 +153,18 @@ class TransactionManager:
         else:
             new_gain = Gain()
 
+        str_id = stream.id if stream and hasattr(stream, 'id') else None
+        pay_id = payer.id if payer and hasattr(payer, 'id') else None
+        proj_id = project.id if project and hasattr(project, 'id') else None
+
         # 5. Update Fields
         new_gain.amount = amount
         new_gain.currency_code = currency_code
         new_gain.fx_rate = fx_rate
-        new_gain.stream_id = stream.id if stream else None
-        new_gain.payer_id = payer.id if payer else None
+        new_gain.stream_id = str_id
+        new_gain.payer_id = pay_id
         new_gain.account_id = account_id
-        new_gain.project_id = project.id if project else None
+        new_gain.project_id = proj_id
         new_gain.description = description
         new_gain.timestamp = timestamp or datetime.datetime.now()
 

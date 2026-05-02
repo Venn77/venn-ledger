@@ -1,4 +1,5 @@
 import customtkinter as ctk
+from typing import Literal, Any
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import datetime
@@ -35,7 +36,7 @@ class DashboardView(ctk.CTkFrame):
 
         plt.style.use('dark_background')
         self.bg_color = '#2b2b2b'
-
+        # noinspection PyTypeChecker
         self.after(50, self.build_dashboard)
 
     def _on_range_change(self, _selected_value):
@@ -183,7 +184,7 @@ class DashboardView(ctk.CTkFrame):
         x = range(len(labels))
         width = 0.35
 
-        max_val = max(max(incomes + [0]), max(expenses + [0]))
+        max_val = float(max(max(incomes + [0]), max(expenses + [0])))
         min_h = max_val * 0.015 if max_val > 0 else 0
 
         vis_incomes = [max(val, min_h) if val > 0 else 0 for val in incomes]
@@ -205,7 +206,7 @@ class DashboardView(ctk.CTkFrame):
 
         @cursor.connect("add")
         def on_add(sel):
-            idx = int(round(sel.index))
+            idx = int(round(float(sel.index)))
 
             if sel.artist == bars_in:
                 real_val = incomes[idx]
@@ -259,18 +260,21 @@ class DashboardView(ctk.CTkFrame):
                             color="white", zorder=5)
         annot.set_visible(False)
 
-        def hover(event):
-            if event.inaxes == ax:
+        def hover(event: Any):
+            if event.inaxes == ax and event.xdata is not None and event.ydata is not None:
                 for i, wedge in enumerate(wedges):
                     cont, ind = wedge.contains(event)
                     if cont:
-                        annot.xy = (event.xdata, event.ydata)
+                        x_val = float(event.xdata)
+                        y_val = float(event.ydata)
 
-                        x_offset = -20 if event.xdata > 0 else 20
-                        ha = 'right' if event.xdata > 0 else 'left'
+                        annot.xy = (x_val, y_val)
 
-                        y_offset = -20 if event.ydata > 0 else 20
-                        va = 'top' if event.ydata > 0 else 'bottom'
+                        x_offset = -20 if x_val > 0 else 20
+                        ha: Literal["left", "right"] = 'right' if x_val > 0 else 'left'
+
+                        y_offset = -20 if y_val > 0 else 20
+                        va: Literal["top", "bottom"] = 'top' if y_val > 0 else 'bottom'
 
                         annot.set_position((x_offset, y_offset))
                         annot.set_horizontalalignment(ha)
@@ -288,7 +292,9 @@ class DashboardView(ctk.CTkFrame):
                                 text += "\n..."
 
                         annot.set_text(text)
-                        annot.get_bbox_patch().set_edgecolor(slice_colors[i])
+                        bbox = annot.get_bbox_patch()
+                        if bbox:
+                            bbox.set_edgecolor(slice_colors[i])
                         annot.set_visible(True)
                         canvas.draw_idle()
                         return
@@ -314,7 +320,7 @@ class DashboardView(ctk.CTkFrame):
         ax.spines['right'].set_visible(False)
         ax.grid(axis='y', alpha=0.2)
 
-        min_nw = min(net_worths)
+        min_nw = float(min(net_worths))
         if min_nw > 0:
             ax.set_ylim(bottom=min_nw * 0.95)
 
@@ -326,7 +332,7 @@ class DashboardView(ctk.CTkFrame):
 
         @cursor.connect("add")
         def on_add(sel):
-            idx = int(round(sel.index))
+            idx = int(round(float(sel.index)))
             month_label = labels[idx]
             val = net_worths[idx]
 

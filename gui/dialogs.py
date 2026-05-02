@@ -13,8 +13,9 @@ def open_calendar(parent, target_var, include_time=False):
     parent.cal_window = ctk.CTkToplevel(parent)
     parent.cal_window.title("Select Date")
     parent.cal_window.attributes("-topmost", True)
-
+    # noinspection PyTypeChecker
     parent.cal_window.after(10, lambda: ctk.set_appearance_mode("dark"))
+    # noinspection PyTypeChecker
     parent.cal_window.after(90, lambda: force_focus(parent.cal_window))
 
     try:

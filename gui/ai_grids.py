@@ -82,6 +82,7 @@ class AIStagingGrid(ctk.CTkFrame):
             if curr != "EUR":
                 fx = extract_exchange_rate(data.get('description', ''))
                 if not fx:
+                    # noinspection PyBroadException
                     try:
                         day_str, month_str = data['date'].split('/')
                         target_dt = datetime.datetime(int(self.year), int(month_str), int(day_str), 12, 0, 0, 0)
@@ -104,6 +105,7 @@ class AIStagingGrid(ctk.CTkFrame):
         """Debouncer: Cancels the previous timer and sets a new one to draw the page."""
         if self.render_timer:
             self.after_cancel(self.render_timer)
+        # noinspection PyTypeChecker
         self.render_timer = self.after(300, self.render_page)
 
     def update_pagination_state(self):

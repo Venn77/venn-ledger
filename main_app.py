@@ -397,6 +397,7 @@ class FinanceApp(ctk.CTk):
 
 if __name__ == "__main__":
     app = FinanceApp()
+    # noinspection PyTypeChecker
     app.after(0, lambda: app.state('zoomed'))
     app.mainloop()
 

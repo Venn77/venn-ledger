@@ -462,6 +462,7 @@ class TransactionsView(ctk.CTkFrame):
         btn_last.pack(side="left", padx=2)
 
         # Back to Top Button
+        # noinspection PyTypeChecker
         ctk.CTkButton(self.grid_component, text="▲ Back to Top", width=120, height=24,
                       fg_color="transparent", text_color="gray60", hover_color="gray25",
                       command=lambda: self.after(20,self.reset_scroll_to_top)
@@ -471,6 +472,7 @@ class TransactionsView(ctk.CTkFrame):
         """Debounces pagination to prevent DB/Render lag on rapid clicks."""
         if self.page_timer:
             self.after_cancel(self.page_timer)
+        # noinspection PyTypeChecker
         self.page_timer = self.after(300, self._execute_page_render)
 
     def _execute_page_render(self):
@@ -623,7 +625,7 @@ class TransactionsView(ctk.CTkFrame):
 
         if hasattr(self, 'search_timer') and self.search_timer:
             self.after_cancel(self.search_timer)
-
+        # noinspection PyTypeChecker
         self.search_timer = self.after(500, self.execute_search)
 
     def execute_search(self):
@@ -683,6 +685,7 @@ class TransactionsView(ctk.CTkFrame):
         """Debounces DB calls to allow rapid clicking."""
         if self.nav_timer:
             self.after_cancel(self.nav_timer)
+        # noinspection PyTypeChecker
         self.nav_timer = self.after(300, self._execute_nav_load)
 
     def _execute_nav_load(self):
@@ -695,6 +698,7 @@ class TransactionsView(ctk.CTkFrame):
         """Debounces DB calls to allow rapid clicking."""
         if self.type_timer:
             self.after_cancel(self.type_timer)
+        # noinspection PyTypeChecker
         self.type_timer = self.after(600, self._execute_type_filter)
 
     def _execute_type_filter(self):

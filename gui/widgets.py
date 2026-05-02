@@ -83,6 +83,7 @@ class SearchableComboBox(ctk.CTkComboBox):
         self._entry.bind("<Down>", self._on_down_key)
 
         # Initialize Color
+        # noinspection PyTypeChecker
         self.after(300, self._check_and_set_color)
 
     def _dropdown_callback(self, value):
@@ -90,7 +91,7 @@ class SearchableComboBox(ctk.CTkComboBox):
         super()._dropdown_callback(value)
         self._check_and_set_color()
 
-    def _check_and_set_color(self, *args):
+    def _check_and_set_color(self, *_):
         """Sets placeholder color to gray."""
         if self.get() == self.placeholder:
             self._entry.configure(foreground="gray")
@@ -124,6 +125,7 @@ class SearchableComboBox(ctk.CTkComboBox):
 
     def _on_down_key(self, _event):
         """Manually opens the filtered list when the user hits the Down arrow."""
+        # noinspection PyBroadException
         try:
             if self.get() == self.placeholder:
                 self.set("")
@@ -230,11 +232,11 @@ class AIStagingRow(ctk.CTkFrame):
                                          text_color="gray50", hover_color="#b13e3e", command=self.discard_row)
         self.btn_discard.grid(row=0, column=9, padx=(5, 10))
 
-        def on_x_hover(event):
+        def on_x_hover(_event):
             # Red
             self.configure(fg_color="#332424")
 
-        def on_x_leave(event):
+        def on_x_leave(_event):
             self.configure(fg_color="gray20")
 
         # Binds
@@ -253,7 +255,7 @@ class AIStagingRow(ctk.CTkFrame):
         """Sets the FX rate tooltip."""
         self.fx_tooltip.text = text
 
-    def _on_fx_manual_edit(self, event):
+    def _on_fx_manual_edit(self, _event):
         """Flags the FX source as Manual if the user types in it."""
         self._set_fx_tooltip("Source: Manual Entry")
         self.validate()
@@ -475,6 +477,7 @@ class TransactionRow(ctk.CTkFrame):
             if not self.winfo_exists(): return
 
             if self.is_locked:
+                # noinspection PyTypeChecker
                 self.after(100, check_hover)
                 return
 
@@ -490,6 +493,7 @@ class TransactionRow(ctk.CTkFrame):
                 curr = getattr(curr, 'master', None)
 
             if is_inside:
+                # noinspection PyTypeChecker
                 self.after(100, check_hover)
             else:
                 self._is_hovered = False
@@ -506,6 +510,7 @@ class TransactionRow(ctk.CTkFrame):
                     r.btn_copy.pack(side="left", padx=2)
                     r.btn_edit.pack(side="left", padx=2)
                     r.btn_del.pack(side="left", padx=2)
+                # noinspection PyTypeChecker
                 r.after(50, check_hover)
 
         self.on_enter_action = on_enter

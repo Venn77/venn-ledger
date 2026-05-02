@@ -37,7 +37,7 @@ class SettingsView(ctk.CTkFrame):
         = self.vendor_grid = self.payer_grid\
         = self.proj_grid = self.curr_grid\
         = self.fx_grid = None
-
+        # noinspection PyTypeChecker
         self.after(50, self.on_tab_change)
 
     def on_tab_change(self):

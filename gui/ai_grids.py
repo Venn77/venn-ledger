@@ -3,7 +3,7 @@ import datetime, gc
 from database.models import (
     Category, Vendor, Currency, PaymentMethod
 )
-from utils.currency_utils import extract_exchange_rate
+from utils.io_utils import extract_exchange_rate
 from gui.widgets import AIStagingRow
 
 

@@ -255,9 +255,6 @@ class TransactionsView(ctk.CTkFrame):
 
         ent_char_limit = char_limit - 17
 
-        # for row_data in results:
-        #     TransactionRow(self.scroll_frame, self, row_data, char_limit, ent_char_limit)
-
         self.grid_component.render_rows(results, char_limit, ent_char_limit)
 
         self.update_pagination_ui(total_count, query)

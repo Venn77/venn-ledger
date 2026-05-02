@@ -1,7 +1,7 @@
 import customtkinter as ctk
 import tkinter as tk
 import datetime
-from utils.currency_utils import extract_exchange_rate
+from utils.io_utils import extract_exchange_rate
 
 
 class ToolTip:

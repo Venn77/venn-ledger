@@ -1,8 +1,12 @@
 import customtkinter as ctk
-from database.models import Category, Stream, Vendor, Payer, Project
+from database.models import Category, Stream, Vendor, Payer, Project, DB_PATH
 from gui.master_data_grids import (
     SimpleMasterDataGrid, CurrencyGrid, ExchangeRateGrid, AccountGrid, PMGrid
 )
+from gui.dialogs import show_popup
+from customtkinter import filedialog
+import datetime
+from utils.fs_utils import export_data_to_csv, backup_sqlite_db
 
 class SettingsView(ctk.CTkFrame):
     def __init__(self, parent, manager, db_session):
@@ -17,6 +21,22 @@ class SettingsView(ctk.CTkFrame):
 
         self.settings_tabview = ctk.CTkTabview(self, command=self.on_tab_change)
         self.settings_tabview.pack(fill="both", expand=True, padx=10, pady=10)
+
+        self.data_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.data_frame.pack(fill="x", pady=(20, 0), padx=10)
+
+        ctk.CTkLabel(self.data_frame, text="BKP Tools", font=("JetBrains Mono", 16, "bold")).pack(anchor="w",
+                                                                                                     pady=(0, 10))
+
+        self.btn_frame = ctk.CTkFrame(self.data_frame, fg_color="transparent")
+        self.btn_frame.pack(anchor="w")
+
+        ctk.CTkButton(self.btn_frame, text="Export to CSV", width=150, fg_color="#1f538d", hover_color="#14375e",
+                      command=self.ui_export_csv).pack(side="left", padx=(0, 10))
+
+        ctk.CTkButton(self.btn_frame, text="Backup Database", width=150, fg_color="#4CD964", text_color="black",
+                      hover_color="#3cb050",
+                      command=self.ui_backup_database).pack(side="left")
 
         self.tab_accounts = self.settings_tabview.add("Accounts & Payment Methods")
         self.tab_currencies = self.settings_tabview.add("Currencies & FX")
@@ -106,4 +126,44 @@ class SettingsView(ctk.CTkFrame):
             self.fx_grid = ExchangeRateGrid(self.tab_currencies, self.db_session)
             self.fx_grid.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
 
+    def ui_export_csv(self):
+        """UI wrapper for the CSV export process."""
+        default_name = f"VennExpense_Export_{datetime.date.today().strftime('%Y%m%d')}.csv"
+        filepath = filedialog.asksaveasfilename(
+            defaultextension=".csv",
+            initialfile=default_name,
+            title="Export Data",
+            filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")]
+        )
 
+        if not filepath:
+            return
+
+        success, message = export_data_to_csv(self.db_session, filepath)
+
+        if success:
+            show_popup(self,"Export Successful", message, is_error=False)
+        else:
+            show_popup(self,"Export Failed", message, is_error=True)
+
+    def ui_backup_database(self):
+        """UI wrapper for the SQLite backup process."""
+        default_name = f"VennExpense_Backup_{datetime.date.today().strftime('%Y%m%d')}.db"
+        filepath = filedialog.asksaveasfilename(
+            defaultextension=".db",
+            initialfile=default_name,
+            title="Backup Database",
+            filetypes=[("SQLite Database", "*.db"), ("All Files", "*.*")]
+        )
+
+        if not filepath:
+            return
+
+        source_db = DB_PATH
+
+        success, message = backup_sqlite_db(self.db_session, source_db, filepath)
+
+        if success:
+            show_popup(self,"Backup Successful", message, is_error=False)
+        else:
+            show_popup(self,"Backup Failed", message, is_error=True)

@@ -5,7 +5,7 @@ from database.models import Expense, Gain, Transfer
 
 
 def export_data_to_csv(db_session, filepath):
-    """Pure logic to export database contents to a detailed CSV file."""
+    """Gathers all transactions, sorts them by latest, and exports to a CSV file."""
     try:
         expenses = db_session.query(Expense).all()
         gains = db_session.query(Gain).all()
@@ -13,7 +13,6 @@ def export_data_to_csv(db_session, filepath):
 
         all_transactions = []
 
-        # --- 1. Process Expenses ---
         for e in expenses:
             entity = e.vendor.name if e.vendor else "Unknown Vendor"
             cat_stream = e.category.name if e.category else "Uncategorized"
@@ -36,7 +35,6 @@ def export_data_to_csv(db_session, filepath):
                 e.description or ""
             ])
 
-        # --- 2. Process Gains ---
         for g in gains:
             entity = g.payer.name if g.payer else "Unknown Payer"
             cat_stream = g.stream.name if g.stream else "Uncategorized"
@@ -59,7 +57,6 @@ def export_data_to_csv(db_session, filepath):
                 g.description or ""
             ])
 
-        # --- 3. Process Transfers ---
         for t in transfers:
             acc_pm = f"{t.origin_account.name} -> {t.destination_account.name}" if (
                         t.origin_account and t.destination_account) else "Unknown Transfer"
@@ -71,28 +68,25 @@ def export_data_to_csv(db_session, filepath):
                 "Internal",
                 "Transfer",
                 acc_pm,
-                "",  # No project for transfers currently
+                "",
                 f"{t.amount_origin:.2f}",
                 currency,
-                "",  # No specific FX rate stored directly on Transfer
-                f"{t.amount_destination:.2f}",  # You can log destination amount here
+                "",
+                f"{t.amount_destination:.2f}",
                 "No",
                 t.description or ""
             ])
 
-        # --- 4. Sort and Write ---
-        # Sort by date (Index 1), newest first
+        # Sorts by date (index 1), newest first
         all_transactions.sort(key=lambda x: x[1], reverse=True)
 
         with open(filepath, mode='w', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
-            # Write the header row
             writer.writerow([
                 "Type", "Date", "Entity (Vendor/Payer)", "Category/Stream",
                 "Account/PM", "Project", "Original Amount", "Currency",
                 "FX Rate", "Amount (EUR/Dest)", "Split", "Description"
             ])
-            # Write the data
             writer.writerows(all_transactions)
 
         return True, f"Successfully exported {len(all_transactions)} transactions!"
@@ -101,13 +95,11 @@ def export_data_to_csv(db_session, filepath):
         return False, f"An error occurred during export:\n{e}"
 
 def backup_sqlite_db(db_session, source_db_path, dest_filepath):
-    """Pure logic to force a WAL checkpoint and copy the database file."""
+    """Forces a WAL checkpoint and copies the database file."""
     try:
-        # Force SQLite to merge the WAL file into the main database
         db_session.execute(text("PRAGMA wal_checkpoint(TRUNCATE);"))
         db_session.commit()
 
-        # Safely copy the updated main database file
         shutil.copy2(source_db_path, dest_filepath)
 
         return True, "Your database has been safely backed up."

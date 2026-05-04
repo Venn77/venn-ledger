@@ -1,12 +1,15 @@
 import customtkinter as ctk
-from database.models import Category, Stream, Vendor, Payer, Project, DB_PATH
+from config import CONFIG_DIR, DB_PATH, TOKEN_PATH
+from database.models import Category, Stream, Vendor, Payer, Project
 from gui.master_data_grids import (
     SimpleMasterDataGrid, CurrencyGrid, ExchangeRateGrid, AccountGrid, PMGrid
 )
 from gui.dialogs import show_popup
 from customtkinter import filedialog
-import datetime
+import datetime, os, threading
 from utils.fs_utils import export_data_to_csv, backup_sqlite_db
+from utils.cld_utils import upload_to_drive
+
 
 class SettingsView(ctk.CTkFrame):
     def __init__(self, parent, manager, db_session):
@@ -38,6 +41,10 @@ class SettingsView(ctk.CTkFrame):
                       hover_color="#3cb050",
                       command=self.ui_backup_database).pack(side="left")
 
+        ctk.CTkButton(self.btn_frame, text="Backup to Drive", width=150, fg_color="#FF9F0A", text_color="black",
+                      hover_color="#cc7f08",
+                      command=self.ui_cloud_backup).pack(side="left", padx=(10, 0))
+
         self.tab_accounts = self.settings_tabview.add("Accounts & Payment Methods")
         self.tab_currencies = self.settings_tabview.add("Currencies & FX")
         self.tab_categories = self.settings_tabview.add("Categories & Streams")
@@ -56,7 +63,8 @@ class SettingsView(ctk.CTkFrame):
         = self.cat_grid = self.stream_grid\
         = self.vendor_grid = self.payer_grid\
         = self.proj_grid = self.curr_grid\
-        = self.fx_grid = None
+        = self.fx_grid = self.loading_popup\
+        = self._backup_cancelled = None
         # noinspection PyTypeChecker
         self.after(50, self.on_tab_change)
 
@@ -70,8 +78,7 @@ class SettingsView(ctk.CTkFrame):
             self.loaded_tabs[current_tab] = True
 
     def build_tab_content(self, tab_name):
-        """Instantiates the  MD grids for the requested tab."""
-
+        """Instantiates the MD grids for the requested tab."""
         if tab_name == "Accounts & Payment Methods":
 
             self.tab_accounts.grid_columnconfigure((0, 1), weight=1, uniform="tab_col")
@@ -167,3 +174,71 @@ class SettingsView(ctk.CTkFrame):
             show_popup(self,"Backup Successful", message, is_error=False)
         else:
             show_popup(self,"Backup Failed", message, is_error=True)
+
+    def ui_cloud_backup(self):
+        """UI wrapper for the Google Drive backup process."""
+        self._backup_cancelled = False
+
+        if not os.path.exists(TOKEN_PATH):
+            show_popup(
+                self,
+                title="First Time Setup",
+                message="To back up to Google Drive, a browser window will open so you can log in.\n\nProceed?",
+                show_cancel=True,
+                ok_command=lambda: self._start_cloud_backup_process(waiting_for_auth=True)
+            )
+        else:
+            self._start_cloud_backup_process(waiting_for_auth=False)
+
+    def _start_cloud_backup_process(self, waiting_for_auth=False):
+        """Performs local db backup before initiating cloud backup."""
+        def abort_backup():
+            self._backup_cancelled = True
+
+        title = "Authenticating..." if waiting_for_auth else "Cloud Backup"
+        msg = "Waiting for Google Login in your browser..." if waiting_for_auth else "Uploading database to Drive..."
+
+        self.loading_popup = show_popup(self, title, msg, show_ok=False, show_cancel=waiting_for_auth, cancel_command=abort_backup)
+        self.update()
+
+        filename = f"VennExpense_CloudBackup_{datetime.date.today().strftime('%Y%m%d')}.db"
+        temp_filepath = os.path.join(CONFIG_DIR, filename)
+
+        success, message = backup_sqlite_db(self.app.db_session, DB_PATH, temp_filepath)
+
+        if not success:
+            if hasattr(self, 'loading_popup') and self.loading_popup.winfo_exists():
+                self.loading_popup.destroy()
+                delattr(self, 'loading_popup')
+                self.update()
+
+            show_popup(self, "Error", f"Failed to prepare database:\n{message}", is_error=True)
+            return
+
+        threading.Thread(target=self._cloud_backup_worker, args=(temp_filepath, filename), daemon=True).start()
+
+    def _cloud_backup_worker(self, temp_filepath, filename):
+        """Handles cloud backup operations in a separate thread."""
+        cloud_success, cloud_msg = upload_to_drive(temp_filepath, filename)
+
+        if os.path.exists(temp_filepath):
+            os.remove(temp_filepath)
+
+        self.after(0, self._cloud_backup_finish, cloud_success, cloud_msg)
+
+    def _cloud_backup_finish(self, success, message):
+        """Reports back results to the main thread."""
+        if getattr(self, '_backup_cancelled', False):
+            return
+
+        if hasattr(self, 'loading_popup') and self.loading_popup.winfo_exists():
+            self.loading_popup.destroy()
+            delattr(self, 'loading_popup')
+            self.update()
+
+        if success:
+            show_popup(self, "Success", message, is_error=False)
+        else:
+            show_popup(self, "Cloud Error", message, is_error=True)
+
+

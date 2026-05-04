@@ -1,15 +1,11 @@
-import os
 from decimal import Decimal, ROUND_HALF_UP
 from sqlalchemy import (
     create_engine, event, Column, Integer, Float, String,
     Boolean, DateTime, func, ForeignKey, UniqueConstraint
 )
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
+from config import DB_PATH
 
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-DB_PATH = os.path.join(BASE_DIR, "tracker.db")
 
 engine = create_engine(f"sqlite:///{DB_PATH}", echo=False)
 Session = sessionmaker(bind=engine)

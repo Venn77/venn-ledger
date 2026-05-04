@@ -1,9 +1,10 @@
 import customtkinter as ctk
 import matplotlib.pyplot as plt
+import json, os
 from typing import Any
+from config import CONFIG_PATH
 from database.models import Session, Account, Transfer
 from core import manager as finance_manager
-import json, os
 from gui.transaction_forms import AddExpenseWindow, AddGainWindow, AddTransferWindow
 from gui.transactions_view import TransactionsView
 from gui.settings_view import SettingsView
@@ -221,8 +222,8 @@ class FinanceApp(ctk.CTk):
     def load_account_order():
         """Loads the account ID order from a local JSON file."""
         try:
-            if os.path.exists("config/config.json"):
-                with open("config/config.json", "r") as f:
+            if os.path.exists(CONFIG_PATH):
+                with open(CONFIG_PATH, "r") as f:
                     return json.load(f).get("account_order", [])
         except (json.decoder.JSONDecodeError, IOError):
             return[]
@@ -232,12 +233,12 @@ class FinanceApp(ctk.CTk):
     def save_account_order(order_list):
         """Saves the current list of account IDs to JSON."""
         config = {}
-        if os.path.exists("config/config.json"):
-            with open("config/config.json", "r") as f:
+        if os.path.exists(CONFIG_PATH):
+            with open(CONFIG_PATH, "r") as f:
                 config = json.load(f)
 
         config["account_order"] = order_list
-        with open("config/config.json", "w") as f:
+        with open(CONFIG_PATH, "w") as f:
             json.dump(config, f)
 
     def handle_account_click(self, account_id):

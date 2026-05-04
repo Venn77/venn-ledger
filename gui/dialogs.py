@@ -52,43 +52,56 @@ def open_calendar(parent, target_var, include_time=False):
 
     ctk.CTkButton(parent.cal_window, text="Confirm", command=set_date).pack(pady=10)
 
-def show_popup(self, title, message, is_error=False):
-    """Shows a dark-mode popup message."""
-    popup = ctk.CTkToplevel(self)
-    popup.title(title)
+def show_popup(parent, title, message, is_error=False, show_ok=True, show_cancel=False, ok_command=None, cancel_command=None):
+    """
+    Shows a dark-mode popup message.
+    May include OK, Continue, or Cancel actions.
+    """
+    root_window = parent.winfo_toplevel()
 
-    popup.overrideredirect(True)
-    popup.attributes("-topmost", True)
+    if is_error:
+        border_color = "#FF6B6B"
+    elif not show_ok and not show_cancel:
+        border_color = "#5AC8FA" # Blue for loading
+    elif show_cancel:
+        border_color = "#FF9F0A" # Orange for warnings/prompts
+    else:
+        border_color = "#4CD964" # Green for success
 
-    p_width = 400
-    p_height = 160
+    popup = ctk.CTkFrame(root_window, width=400, height=180, corner_radius=0, fg_color=border_color)
+    popup.place(relx=0.5, rely=0.5, anchor="center")
+    popup.pack_propagate(False)
 
-    self.update_idletasks()
-
-    parent_x = self.winfo_rootx()
-    parent_y = self.winfo_rooty()
-    parent_width = self.winfo_width()
-    parent_height = self.winfo_height()
-
-    pos_x = parent_x + (parent_width // 2) - (p_width // 2)
-    pos_y = parent_y + (parent_height // 2) - (p_height // 2)
-
-    popup.geometry(f"{p_width}x{p_height}+{pos_x}+{pos_y}")
-
-    border_color = "#FF6B6B" if is_error else "#4CD964"
-    popup.configure(fg_color=border_color)
+    popup.focus_set()
+    popup.grab_set()
 
     main_container = ctk.CTkFrame(popup, corner_radius=0)
     main_container.pack(fill="both", expand=True, padx=1, pady=1)
 
     ctk.CTkLabel(main_container, text=title, font=("JetBrains Mono", 16, "bold"), text_color=border_color).pack(
         pady=(15, 5))
-    ctk.CTkLabel(main_container, text=message, font=("JetBrains Mono", 12), wraplength=350).pack(pady=(0, 20))
+    ctk.CTkLabel(main_container, text=message, font=("JetBrains Mono", 12), wraplength=350).pack(pady=(0, 15))
 
-    ctk.CTkButton(main_container, text="OK", width=100, fg_color="#1f538d", hover_color="#14375e",
-                  command=popup.destroy).pack()
+    btn_frame = ctk.CTkFrame(main_container, fg_color="transparent")
+    btn_frame.pack(pady=(0, 10))
 
-    popup.grab_set()
+    def cleanup_and_execute(command_to_run):
+        """Releases the app lock and destroys the internal frame."""
+        popup.grab_release()
+        popup.destroy()
+        if command_to_run:
+            command_to_run()
+
+    if show_cancel:
+        ctk.CTkButton(btn_frame, text="Cancel", width=100, fg_color="gray40", hover_color="gray50",
+                      command=lambda: cleanup_and_execute(cancel_command)).pack(side="left", padx=10)
+
+    if show_ok:
+        btn_text = "Continue" if show_cancel else "OK"
+        ctk.CTkButton(btn_frame, text=btn_text, width=100, fg_color="#1f538d", hover_color="#14375e",
+                      command=lambda: cleanup_and_execute(ok_command)).pack(side="left", padx=10)
+
+    return popup
 
 class SimpleDataDialog(ctk.CTkToplevel):
     """Generic popup form for creating/editing Master Data."""

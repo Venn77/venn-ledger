@@ -442,7 +442,7 @@ class AccountGrid(ctk.CTkFrame):
         AccountDialog(self, currencies, on_submit=_save)
 
     def edit(self, acc):
-        def _update(name, descr):
+        def _update(name, descr, _curr, _bal):
             existing = self.db_session.query(Account).filter_by(name=name).first()
             if existing and existing.id != acc.id: return False, "Name in use."
             acc.name = name

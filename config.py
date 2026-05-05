@@ -2,6 +2,7 @@ import os
 
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 
+ASSETS_DIR = os.path.join(PROJECT_ROOT, "assets")
 DB_DIR = os.path.join(PROJECT_ROOT, "database")
 CONFIG_DIR = os.path.join(PROJECT_ROOT, "config")
 

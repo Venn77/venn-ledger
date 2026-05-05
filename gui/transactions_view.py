@@ -253,7 +253,7 @@ class TransactionsView(ctk.CTkFrame):
 
         char_limit = self.get_dynamic_char_limit()
 
-        ent_char_limit = char_limit - 17
+        ent_char_limit = char_limit - 7
 
         self.grid_component.render_rows(results, char_limit, ent_char_limit)
 

@@ -423,7 +423,7 @@ class TransactionRow(ctk.CTkFrame):
             display_ent = data.entity[:ent_char_limit].strip() + "..."
         else:
             display_ent = data.entity
-        lbl_ent = self._add_lbl(display_ent or "Unknown", width=150, anchor="w", bold=True)
+        lbl_ent = self._add_lbl(display_ent or "Unknown", width=180, anchor="w", bold=True)
         if data.entity: ToolTip(lbl_ent, data.entity)
         # Category
         self._add_lbl(data.category, width=120)

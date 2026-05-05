@@ -8,6 +8,7 @@ from customtkinter import filedialog
 from gui.widgets import ToolTip
 from gui.ai_grids import AIStagingGrid
 
+
 class AIImportView(ctk.CTkFrame):
     def __init__(self, parent, manager, db_session):
         super().__init__(parent, fg_color="transparent")

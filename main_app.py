@@ -5,6 +5,7 @@ from typing import Any
 from config import CONFIG_PATH
 from database.models import Session, Account, Transfer
 from core import manager as finance_manager
+from utils.icon_manager import get_icon
 from gui.transaction_forms import AddExpenseWindow, AddGainWindow, AddTransferWindow
 from gui.transactions_view import TransactionsView
 from gui.settings_view import SettingsView
@@ -26,6 +27,11 @@ class FinanceApp(ctk.CTk):
         self.reorder_mode = None
         self.selected_account_id = None
         self.filter_account_id = None
+        self.bar_chart_icon = get_icon("bar_chart.png", size=(18, 18), light_filename="bar_chart_lm.png")
+        self.bolt_icon = get_icon("bolt.png", size=(18, 18), light_filename="bolt_lm.png")
+        self.trending_up_icon = get_icon("trending_up.png", size=(18, 18), light_filename="trending_up_lm.png")
+        self.settings_icon = get_icon("settings.png", size=(18, 18), light_filename="settings_lm.png")
+        self.reorder_icon = get_icon("swap_vert.png", size=(15, 15), light_filename="swap_vert_lm.png")
 
         # 1. Grid Configuration
         self.grid_columnconfigure(1, weight=1)
@@ -68,26 +74,26 @@ class FinanceApp(ctk.CTk):
         self.nw_frame = ctk.CTkFrame(self.sidebar, fg_color="gray15", corner_radius=8)
         self.nw_frame.pack(fill="x", pady=(0, 15), padx=15)
 
-        self.reorder_btn = ctk.CTkButton(self.sidebar, text="⇅ Reorder Accounts", fg_color="transparent",
+        self.reorder_btn = ctk.CTkButton(self.sidebar, text="Reorder Accounts", image=self.reorder_icon, compound="left", fg_color="transparent",
                                          border_width=1, command=self.toggle_reorder_mode)
         self.reorder_btn.pack(pady=(10, 5), padx=20, fill="x")
 
         self.nav_group = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         self.nav_group.pack(side="bottom", fill="x", pady=20, padx=15)
 
-        self.btn_view_ledger = ctk.CTkButton(self.nav_group, text="📊 Transactions",
+        self.btn_view_ledger = ctk.CTkButton(self.nav_group, text="Transactions", image=self.bar_chart_icon, compound="left",
                                              anchor="w", command=lambda: self.switch_view("transactions"))
         self.btn_view_ledger.pack(fill="x", pady=2)
 
-        self.btn_view_ai = ctk.CTkButton(self.nav_group, text="⚡ AI Import",
+        self.btn_view_ai = ctk.CTkButton(self.nav_group, text="AI Import", image=self.bolt_icon, compound="left",
                                          anchor="w", command=lambda: self.switch_view("ai"))
         self.btn_view_ai.pack(fill="x", pady=2)
 
-        self.btn_view_dashboard = ctk.CTkButton(self.nav_group, text="📈 Dashboard",
+        self.btn_view_dashboard = ctk.CTkButton(self.nav_group, text="Dashboard", image=self.trending_up_icon, compound="left",
                                          anchor="w", command=lambda: self.switch_view("dashboard"))
         self.btn_view_dashboard.pack(fill="x", pady=2)
 
-        self.btn_view_settings = ctk.CTkButton(self.nav_group, text="⚙️ Master Data",
+        self.btn_view_settings = ctk.CTkButton(self.nav_group, text="Master Data", image=self.settings_icon, compound="left",
                                                anchor="w", command=lambda: self.switch_view("settings"))
         self.btn_view_settings.pack(fill="x", pady=2)
 

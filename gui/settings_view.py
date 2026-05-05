@@ -9,6 +9,7 @@ from customtkinter import filedialog
 import datetime, os, threading
 from utils.fs_utils import export_data_to_csv, backup_sqlite_db
 from utils.cld_utils import upload_to_drive
+from utils.icon_manager import get_icon
 
 
 class SettingsView(ctk.CTkFrame):
@@ -17,6 +18,10 @@ class SettingsView(ctk.CTkFrame):
         self.app = parent
         self.manager = manager
         self.db_session = db_session
+
+        self.drive_icon = get_icon("gdrive.png", size=(18, 18))
+        self.csv_icon = get_icon("csv.png")
+        self.backup_db_icon = get_icon("file_save.png", size=(18, 18))
 
         self.settings_header = ctk.CTkLabel(self, text="Master Data Management",
                                             font=("JetBrains Mono", 22, "bold"))
@@ -34,14 +39,14 @@ class SettingsView(ctk.CTkFrame):
         self.btn_frame = ctk.CTkFrame(self.data_frame, fg_color="transparent")
         self.btn_frame.pack(anchor="w")
 
-        ctk.CTkButton(self.btn_frame, text="Export to CSV", width=150, fg_color="#1f538d", hover_color="#14375e",
+        ctk.CTkButton(self.btn_frame, text="Export to CSV", image=self.csv_icon, anchor="center", width=150, fg_color="#1f538d", hover_color="#14375e",
                       command=self.ui_export_csv).pack(side="left", padx=(0, 10))
 
-        ctk.CTkButton(self.btn_frame, text="Backup Database", width=150, fg_color="#4CD964", text_color="black",
+        ctk.CTkButton(self.btn_frame, text="Backup Database", image=self.backup_db_icon, anchor="center", width=150, fg_color="#4CD964", text_color="black",
                       hover_color="#3cb050",
                       command=self.ui_backup_database).pack(side="left")
 
-        ctk.CTkButton(self.btn_frame, text="Backup to Drive", width=150, fg_color="#FF9F0A", text_color="black",
+        ctk.CTkButton(self.btn_frame, text="Backup to Drive", image=self.drive_icon, anchor="center", width=150, fg_color="#FF9F0A", text_color="black",
                       hover_color="#cc7f08",
                       command=self.ui_cloud_backup).pack(side="left", padx=(10, 0))
 

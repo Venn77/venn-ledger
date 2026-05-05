@@ -281,18 +281,20 @@ class TransactionManager:
 
             if transfer_id:
                 new_transfer = self.db_session.get(Transfer, transfer_id)
+                new_transfer.description = desc
                 old_origin_account = new_transfer.origin_account
                 old_origin_account.balance = self._safe_add(old_origin_account.balance, new_transfer.amount_origin)
                 old_destination_account = new_transfer.destination_account
                 old_destination_account.balance = self._safe_sub(old_destination_account.balance, new_transfer.amount_destination)
+
             else:
                 new_transfer = Transfer()
+                new_transfer.description = full_desc
 
             new_transfer.origin_account_id = origin_id
             new_transfer.destination_account_id = destination_id
             new_transfer.amount_origin = amount_orig
             new_transfer.amount_destination = amount_dest
-            new_transfer.description = full_desc
             new_transfer.timestamp = ts or datetime.datetime.now()
 
             # Update balances

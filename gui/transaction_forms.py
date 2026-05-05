@@ -460,12 +460,18 @@ class BaseTransactionWindow(ctk.CTkToplevel):
     def finalize_and_refresh(self):
         """Kills the popup and triggers the main app reload."""
         main_app = self.master
-        self.destroy()
-        if hasattr(main_app, "refresh_accounts") and hasattr(main_app, "load_transactions"):
+
+        if hasattr(main_app, "refresh_accounts"):
             # noinspection PyTypeChecker
             main_app.after(10, main_app.refresh_accounts)
-            # noinspection PyTypeChecker
-            main_app.after(50, main_app.load_transactions)
+
+        if hasattr(main_app, "views") and main_app.views.get("transactions"):
+            tx_view = main_app.views["transactions"]
+            if hasattr(tx_view, "load_transactions"):
+                # noinspection PyTypeChecker
+                main_app.after(50, tx_view.load_transactions)
+
+        self.destroy()
 
     # Abstract Methods
     def layout_specific_widgets(self):

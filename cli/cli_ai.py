@@ -1,7 +1,7 @@
 from database.models import Session, Category, PaymentMethod, Vendor, Project
 from utils.io_utils import (get_active_currency, get_valid_year, get_valid_float, get_active_project,
                         get_best_match, extract_exchange_rate)
-from core.ai_parser import chunk_file_by_day, get_structured_data
+from core.ai_parser import chunk_file_by_day, get_structured_data, get_row_prompt, get_skip_terms
 import datetime
 from core import manager as finance_manager
 from pathlib import Path
@@ -182,13 +182,13 @@ if __name__ == "__main__":
     manager = finance_manager.TransactionManager(db_session)
 
     try:
-        daily_chunks = chunk_file_by_day(filename)
-
-        print(f"Successfully identified {len(daily_chunks)} days of transactions.")
+        skip_terms = get_skip_terms()
 
         currency_str = get_active_currency("\nSelect the currency: ", db_session)
 
         print(currency_str)
+
+        system_prompt = get_row_prompt(currency_str)
 
         year_str = get_valid_year("\nEnter year (e.g., 2025): ")
 
@@ -197,6 +197,10 @@ if __name__ == "__main__":
         project_str = get_active_project("\nChoose number to use (or 's' for None): ", db_session)
 
         print(project_str)
+
+        daily_chunks = chunk_file_by_day(filename, skip_terms)
+
+        print(f"Successfully identified {len(daily_chunks)} days of transactions.")
 
         active_categories = db_session.query(Category).filter_by(active_bool=True).order_by(Category.id.desc()).all()
 
@@ -216,7 +220,7 @@ if __name__ == "__main__":
 
             print(f"\n--- Processing Batch (Days {idx+1} to {idx + len(batch)}) ---")
 
-            parsed_results = get_structured_data(combined_str, currency_str, active_categories)
+            parsed_results = get_structured_data(combined_str, active_categories, system_prompt)
 
             if parsed_results:
                 # Show count

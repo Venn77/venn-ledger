@@ -3,7 +3,13 @@ import threading, datetime
 from database.models import (
     Category, Currency, Project
 )
-from core.ai_parser import chunk_file_by_day, get_structured_data
+from core.ai_parser import (
+    DEFAULT_PROMPT_TEMPLATE, DEFAULT_SKIP_TERMS_TEXT,
+    chunk_file_by_day, get_structured_data,
+    get_skip_terms, get_row_prompt
+)
+from utils.fs_utils import open_text_config
+from utils.icon_manager import get_icon
 from customtkinter import filedialog
 from gui.widgets import ToolTip
 from gui.ai_grids import AIStagingGrid
@@ -15,10 +21,43 @@ class AIImportView(ctk.CTkFrame):
         self.app = parent
         self.manager = manager
         self.db_session = db_session
+        self.edit_skip_icon = get_icon("block_white.png", size=(14, 14))
+        self.edit_rules_icon = get_icon("settings_white.png", size=(14, 14))
 
-        self.ai_header = ctk.CTkLabel(self, text="AI Transaction Parser",
+        header_row = ctk.CTkFrame(self, fg_color="transparent")
+        header_row.pack(fill="x", pady=(0, 10))
+
+        self.ai_header = ctk.CTkLabel(header_row, text="AI Transaction Parser",
                                       font=("JetBrains Mono", 22, "bold"))
-        self.ai_header.pack(anchor="w", pady=(0, 10))
+        self.ai_header.pack(side="left", anchor="w")
+
+        self.btn_edit_skip = ctk.CTkButton(
+            header_row,
+            text="Skip Terms",
+            image=self.edit_skip_icon,
+            width=110,
+            height=24,
+            font=("JetBrains Mono", 11),
+            fg_color="gray25",
+            hover_color="gray35",
+            command=lambda: open_text_config("ai_skip_terms.txt", DEFAULT_SKIP_TERMS_TEXT)
+        )
+        self.btn_edit_skip.pack(side="right", padx=(5, 0))
+        ToolTip(self.btn_edit_skip, "Edit terms the parser should ignore (e.g. Transfer, Withdrawal)")
+
+        self.btn_edit_rules = ctk.CTkButton(
+            header_row,
+            text="Parser Rules",
+            image=self.edit_rules_icon,
+            width=110,
+            height=24,
+            font=("JetBrains Mono", 11),
+            fg_color="gray25",
+            hover_color="gray35",
+            command=lambda: open_text_config("ai_prompt_template.txt", DEFAULT_PROMPT_TEMPLATE)
+        )
+        self.btn_edit_rules.pack(side="right", padx=5)
+        ToolTip(self.btn_edit_rules, "Edit the LLM System Prompt and examples")
 
         self.ai_config_frame = ctk.CTkFrame(self, fg_color="gray15", corner_radius=8)
         self.ai_config_frame.pack(fill="x", pady=(0, 15), padx=2)
@@ -206,8 +245,11 @@ class AIImportView(ctk.CTkFrame):
     def _run_ai_parser_backend(self, filepath, currency, year, project):
         """Runs in the background."""
         try:
+            current_skip_terms = get_skip_terms()
+            current_system_prompt = get_row_prompt(currency)
+
             # 1. Chunk the file
-            daily_chunks = chunk_file_by_day(filepath)
+            daily_chunks = chunk_file_by_day(filepath, current_skip_terms)
 
             # 2. Combine chunks into a single string for parsing
             combined_str = ""
@@ -222,8 +264,8 @@ class AIImportView(ctk.CTkFrame):
                 self.after(0, self._update_ai_progress, c_line, t_lines, c_tx, t_tx)
 
             # 5. Invoke LLM
-            parsed_results = get_structured_data(combined_str, currency, cats, cancel_event=self.ai_cancel_event,
-                                                 progress_callback=progress_cb)
+            parsed_results = get_structured_data(combined_str, cats, system_prompt=current_system_prompt,
+                                                 cancel_event=self.ai_cancel_event, progress_callback=progress_cb)
 
             # 6. Pass results back to the main GUI thread
             self.after(0, self._on_ai_parsing_complete, parsed_results, year, project)

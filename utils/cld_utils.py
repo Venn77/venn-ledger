@@ -37,7 +37,13 @@ def upload_to_drive(filepath, filename):
             creds.refresh(Request())
         else:
             if not os.path.exists(CREDENTIALS_PATH):
-                return False, "Missing credentials.json! Please download it from Google Cloud Console."
+                error_msg = (
+                    "Missing credentials.json!\n\n"
+                    "Please download your OAuth 2.0 Client ID from Google Cloud Console "
+                    "and place the 'credentials.json' file in the following folder:\n\n"
+                    f"{CREDENTIALS_PATH}"
+                )
+                return False, error_msg
 
             flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_PATH, SCOPES)
             creds = flow.run_local_server(port=0)

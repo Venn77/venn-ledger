@@ -1,6 +1,8 @@
 import csv
 import shutil
+import os, sys, subprocess
 from sqlalchemy import text
+from config import USER_CONFIG_DIR
 from database.models import Expense, Gain, Transfer
 
 
@@ -106,3 +108,26 @@ def backup_sqlite_db(db_session, source_db_path, dest_filepath):
 
     except Exception as e:
         return False, f"An error occurred during backup:\n{e}"
+
+def open_text_config(filename, default_content):
+    """
+    Ensures a text-based config file exists in the user's config directory,
+    then opens it in the OS default text editor.
+    """
+    file_path = os.path.join(USER_CONFIG_DIR, filename)
+
+    if not os.path.exists(file_path):
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(default_content)
+
+    try:
+        # Windows command
+        os.startfile(file_path)
+    except AttributeError:
+        # Fallback Mac/Linux
+        if sys.platform == "darwin":
+            subprocess.call(['open', file_path])
+        else:
+            subprocess.call(['xdg-open', file_path])
+    finally:
+        print("Configuration opened. Changes will apply to the next parsing session.")

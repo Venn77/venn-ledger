@@ -50,6 +50,11 @@ class SettingsView(ctk.CTkFrame):
                       hover_color="#cc7f08",
                       command=self.ui_cloud_backup).pack(side="left", padx=(10, 0))
 
+        ctk.CTkButton(self.btn_frame, text="Open Config Folder", anchor="center", width=150,
+                      fg_color="#1f538d",
+                      hover_color="#14375e",
+                      command=lambda: os.startfile(USER_CONFIG_DIR)).pack(side="left", padx=(10, 0))
+
         self.tab_accounts = self.settings_tabview.add("Accounts & Payment Methods")
         self.tab_currencies = self.settings_tabview.add("Currencies & FX")
         self.tab_categories = self.settings_tabview.add("Categories & Streams")

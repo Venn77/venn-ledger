@@ -1,58 +1,23 @@
-import re, json, ollama, difflib
+import re, json, ollama, difflib, os
+from config import USER_CONFIG_DIR
 
 
-def chunk_file_by_day(filepath):
-    """
-    Identifies 'DD/MM (description):' or 'DD/MM:' and
-    groups the lines following it until the next date.
-    Skips days that contain no valid transactions after filtering.
-    """
-    with open(filepath, 'r', encoding="utf-8") as f:
-        content = f.read()
+DEFAULT_SKIP_TERMS_TEXT = """->
+TC
+Extracción
+Transfer
+Mp TC
+MP TC
+Withdrawal
+MP:"""
 
-    pattern = r'(\d{2}/\d{2}(?:\s\(.*?\))?:)'
-
-    parts = re.split(pattern, content)
-
-    days = []
-
-    for i in range(1, len(parts), 2):
-        header = parts[i]
-        raw_transactions = parts[i + 1].strip().split('\n')
-        # Only keep lines that don't start with unwanted terms
-        filtered_lines = [
-            line.strip() for line in raw_transactions
-            if line.strip() and not line.strip().startswith(("->",
-                                                             "TC",
-                                                             "Extracción",
-                                                             "Transfer",
-                                                             "Mp TC",
-                                                             "MP TC",
-                                                             "Withdrawal",
-                                                             "MP:")
-                                                            )
-        ]
-        if filtered_lines:
-            transactions = "\n".join(filtered_lines)
-            days.append({
-                "header": header,
-                "data": transactions
-            })
-        else:
-            pass
-
-    return days
-
-def get_row_prompt(default_currency):
-    """Prepares a system prompt for LLM interpretation of expense items."""
-    return f"""
-<role>You are a literal data extraction pipe. ZERO reasoning. ZERO spelling correction.</role>
+DEFAULT_PROMPT_TEMPLATE = """<role>You are a literal data extraction pipe. ZERO reasoning. ZERO spelling correction.</role>
 
 <mapping_table>
 - 'santander' -> 'Santander Debit'
 - 'bizum'     -> 'Santander Bizum'
 - 'mp'        -> 'Mercado Pago'
-- 'cash'      -> 'Cash (EUR)'
+- 'cash'      -> 'Cash ({default_currency})'
 - 'laliga'    -> 'Santander LaLiga'
 - 'lacaixa'   -> 'LaCaixa IKEA'
 - 'wizink'    -> 'Wizink'
@@ -185,10 +150,75 @@ Before finalizing the JSON:
 1. QUANTITY CHECK: Is the 'Amount' actually a price? (e.g., Is it 40.00 or is it part of a vendor name like 'Castellana 200'?) 
 2. CURRENCY VALIDITY: If the Amount is not followed by a currency code (e.g., USD, JPY, ARS) does the currency match {default_currency}?
 3. REMAINDER CHECK: Did the input line have words after the HINT (e.g., '2TB Storage', 'May rent', 'Meeting + Negotiation with DOMO')? If yes, and your 'description' is empty, you have failed. Re-extract and include all words.
-</verification_protocol>
-"""
+</verification_protocol>"""
 
-def get_structured_data(combined_text, default_currency, categories, cancel_event=None, progress_callback=None):
+
+def chunk_file_by_day(filepath, skip_terms):
+    """
+    Identifies 'DD/MM (description):' or 'DD/MM:' and
+    groups the lines following it until the next date.
+    Skips days that contain no valid transactions after filtering.
+    """
+    with open(filepath, 'r', encoding="utf-8") as f:
+        content = f.read()
+
+    pattern = r'(\d{2}/\d{2}(?:\s\(.*?\))?:)'
+
+    parts = re.split(pattern, content)
+
+    days = []
+
+    for i in range(1, len(parts), 2):
+        header = parts[i]
+        raw_transactions = parts[i + 1].strip().split('\n')
+        # Only keep lines that don't start with unwanted terms
+        filtered_lines = [
+            line.strip() for line in raw_transactions
+            if line.strip() and not line.strip().startswith(skip_terms)
+        ]
+        if filtered_lines:
+            transactions = "\n".join(filtered_lines)
+            days.append({
+                "header": header,
+                "data": transactions
+            })
+        else:
+            pass
+
+    return days
+
+def get_row_prompt(default_currency):
+    """
+    Reads the AI prompt template from the user's config folder.
+    If it doesn't exist, it creates it using the default template.
+    """
+    prompt_file_path = os.path.join(USER_CONFIG_DIR, "ai_prompt_template.txt")
+
+    if not os.path.exists(prompt_file_path):
+        with open(prompt_file_path, "w", encoding="utf-8-sig") as f:
+            f.write(DEFAULT_PROMPT_TEMPLATE)
+
+    with open(prompt_file_path, "r", encoding="utf-8-sig") as f:
+        user_template = f.read()
+
+    final_prompt = user_template.replace("{default_currency}", default_currency)
+
+    return final_prompt
+
+def get_skip_terms():
+    """Reads skip terms from the config folder or creates the default file."""
+    skip_file_path = os.path.join(USER_CONFIG_DIR, "ai_skip_terms.txt")
+
+    if not os.path.exists(skip_file_path):
+        with open(skip_file_path, "w", encoding="utf-8-sig") as f:
+            f.write(DEFAULT_SKIP_TERMS_TEXT)
+
+    with open(skip_file_path, "r", encoding="utf-8-sig") as f:
+        terms = [line.strip() for line in f.readlines() if line.strip()]
+
+    return tuple(terms)
+
+def get_structured_data(combined_text, categories, system_prompt, cancel_event=None, progress_callback=None):
     """
     Invokes a local LLM (e.g. Mistral) to convert
     text lines into JSON objects.
@@ -277,8 +307,7 @@ def get_structured_data(combined_text, default_currency, categories, cancel_even
             response = ollama.chat(
                 model='mistral:7b',
                 messages=[
-                    {'role': 'system',
-                     'content': get_row_prompt(default_currency)},
+                    {'role': 'system', 'content': system_prompt},
                     {'role': 'user', 'content': user_content}
                 ],
                 format=json_schema,

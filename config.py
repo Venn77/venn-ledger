@@ -17,13 +17,12 @@ else:
     USER_DATA_DIR = BUNDLE_DIR
 
 ASSETS_DIR = os.path.join(BUNDLE_DIR, "assets")
-BUNDLED_CONFIG_DIR = os.path.join(BUNDLE_DIR, "config")
 
 DB_DIR = os.path.join(USER_DATA_DIR, "database")
 USER_CONFIG_DIR = os.path.join(USER_DATA_DIR, "config")
 LOG_DIR = os.path.join(USER_DATA_DIR, "logs")
 DB_PATH = os.path.join(DB_DIR, "tracker.db")
-CREDENTIALS_PATH = os.path.join(BUNDLED_CONFIG_DIR, "credentials.json")
+CREDENTIALS_PATH = os.path.join(USER_CONFIG_DIR, "credentials.json")
 TOKEN_PATH = os.path.join(USER_CONFIG_DIR, "token.json")
 CONFIG_PATH = os.path.join(USER_CONFIG_DIR, "ui_prefs.json")
 ERROR_LOG_PATH = os.path.join(LOG_DIR, "error.log")

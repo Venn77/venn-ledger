@@ -1,5 +1,5 @@
 import customtkinter as ctk
-from config import CONFIG_DIR, DB_PATH, TOKEN_PATH
+from config import USER_CONFIG_DIR, DB_PATH, TOKEN_PATH
 from database.models import Category, Stream, Vendor, Payer, Project
 from gui.master_data_grids import (
     SimpleMasterDataGrid, CurrencyGrid, ExchangeRateGrid, AccountGrid, PMGrid
@@ -207,7 +207,7 @@ class SettingsView(ctk.CTkFrame):
         self.update()
 
         filename = f"VennExpense_CloudBackup_{datetime.date.today().strftime('%Y%m%d')}.db"
-        temp_filepath = os.path.join(CONFIG_DIR, filename)
+        temp_filepath = os.path.join(USER_CONFIG_DIR, filename)
 
         success, message = backup_sqlite_db(self.app.db_session, DB_PATH, temp_filepath)
 

@@ -1,8 +1,8 @@
 import customtkinter as ctk
 import matplotlib.pyplot as plt
-import json, os
+import json, os, sys, traceback
 from typing import Any
-from config import CONFIG_PATH
+from config import CONFIG_PATH, IS_COMPILED, ERROR_LOG_PATH
 from database.models import Session, Account, Transfer
 from core import manager as finance_manager
 from utils.icon_manager import get_icon
@@ -11,6 +11,17 @@ from gui.transactions_view import TransactionsView
 from gui.settings_view import SettingsView
 from gui.ai_view import AIImportView
 from gui.dashboard_view import DashboardView
+
+
+if IS_COMPILED:
+    def global_exception_handler(exc_type, exc_value, exc_traceback):
+        with open(ERROR_LOG_PATH, "a") as log_file:
+            log_file.write("--- FATAL CRASH ---\n")
+            traceback.print_exception(exc_type, exc_value, exc_traceback, file=log_file)
+            log_file.write("\n")
+
+
+    sys.excepthook = global_exception_handler
 
 
 class FinanceApp(ctk.CTk):

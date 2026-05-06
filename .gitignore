@@ -1,11 +1,13 @@
-# created by virtualenv automatically
 .venv/
 __pycache__/
+*.pyc
 .idea/
 config/
-my_expenses.txt
-my_expenses_2025.txt
-my_expenses_japan_2025.txt
-my_expenses_ARG_2024.txt
-my_expenses_ARG_2025.txt
 *.db
+logs/
+*.log
+build/
+dist/
+*.spec
+.DS_Store
+Thumbs.db

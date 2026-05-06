@@ -303,12 +303,6 @@ def get_structured_data(combined_text, default_currency, categories, cancel_even
         except Exception as e:
             raise ConnectionError(f"Ollama execution failed: {str(e)}")
 
-    # Debug
-    # print(f"--- DEBUG STATS ---")
-    # print(f"Lines sent to AI: {len(lines)}")
-    # print(f"Input lines:\n{lines}\n")
-    # print(f"combined_text: {combined_text}")
-
     return final_results
 
 

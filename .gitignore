@@ -3,7 +3,6 @@
 __pycache__/
 .idea/
 config/
-database/tracker.db
 my_expenses.txt
 my_expenses_2025.txt
 my_expenses_japan_2025.txt

@@ -18,7 +18,7 @@ def validate_and_save_batch(results, default_currency, year, project, categories
 
         # 1. Resolve date
         day_res, month_res = map(int, item['date'].split('/'))
-        dt = datetime.datetime(year, month_res, day_res)
+        dt = datetime.datetime(year, month_res, day_res, 12,0,0,0)
 
         # 2. Test currency and define payment method
         if item['currency'] != default_currency:

@@ -35,6 +35,9 @@ class FinanceApp(ctk.CTk):
         self.db_session = Session()
         self.manager = finance_manager.TransactionManager(self.db_session)
         self.cal_window = None
+        self.active_expense_window = None
+        self.active_gain_window = None
+        self.active_transfer_window = None
         self.reorder_mode = None
         self.selected_account_id = None
         self.filter_account_id = None
@@ -291,6 +294,19 @@ class FinanceApp(ctk.CTk):
             tx_view.load_transactions()
             tx_view.reset_scroll_to_top()
 
+    def _open_or_focus_transaction_window(self, window_type, window_class, transaction_data=None):
+        """Ensures only one instance of a specific transaction window is open at a time."""
+        attr_name = f"active_{window_type}_window"
+        current_window = getattr(self, attr_name, None)
+
+        if isinstance(current_window, ctk.CTkToplevel) and current_window.winfo_exists():
+            current_window.deiconify()
+            current_window.lift()
+            current_window.focus_force()
+        else:
+            new_window = window_class(self, self.manager, transaction_data=transaction_data, db_session=self.db_session)
+            setattr(self, attr_name, new_window)
+
     def _prepare_transaction_data(self, row_data, is_edit=False):
         """Maps a unified SQL row into the dictionary for the forms."""
         data = {
@@ -327,11 +343,11 @@ class FinanceApp(ctk.CTk):
         """Strips the ID and opens the form as a new entry."""
         mapped_data = self._prepare_transaction_data(row_data, is_edit=False)
         if row_data.type == "expense":
-            AddExpenseWindow(self, self.manager, transaction_data=mapped_data, db_session=self.db_session)
+            self._open_or_focus_transaction_window("expense", AddExpenseWindow, mapped_data)
         elif row_data.type == "gain":
-            AddGainWindow(self, self.manager, transaction_data=mapped_data, db_session=self.db_session)
+            self._open_or_focus_transaction_window("gain", AddGainWindow, mapped_data)
         elif "transfer" in row_data.type:
-            AddTransferWindow(self, self.manager, transaction_data=mapped_data, db_session=self.db_session)
+            self._open_or_focus_transaction_window("transfer", AddTransferWindow, mapped_data)
 
     def open_edit_transaction(self, row_data):
         """
@@ -340,14 +356,47 @@ class FinanceApp(ctk.CTk):
         """
         mapped_data = self._prepare_transaction_data(row_data, is_edit=True)
         if row_data.type == "expense":
-            AddExpenseWindow(self, self.manager, transaction_data=mapped_data, db_session=self.db_session)
+            self._open_or_focus_transaction_window("expense", AddExpenseWindow, mapped_data)
         elif row_data.type == "gain":
-            AddGainWindow(self, self.manager, transaction_data=mapped_data, db_session=self.db_session)
+            self._open_or_focus_transaction_window("gain", AddGainWindow, mapped_data)
         elif "transfer" in row_data.type:
-            AddTransferWindow(self, self.manager, transaction_data=mapped_data, db_session=self.db_session)
+            self._open_or_focus_transaction_window("transfer", AddTransferWindow, mapped_data)
 
     def delete_transaction_prompt(self, transaction_id, transaction_type, context_text="", on_cancel=None):
         """Generates a popup to confirm deletion before modifying the DB."""
+        active_window = None
+        if transaction_type == "expense":
+            active_window = getattr(self, "active_expense_window", None)
+        elif transaction_type == "gain":
+            active_window = getattr(self, "active_gain_window", None)
+        elif "transfer" in transaction_type:
+            active_window = getattr(self, "active_transfer_window", None)
+
+        if isinstance(active_window, ctk.CTkToplevel) and active_window.winfo_exists():
+            is_edit = getattr(active_window, "is_edit_mode", False)
+            tx_data = getattr(active_window, "transaction_data", {})
+
+            if is_edit and tx_data and tx_data.get("id") == transaction_id:
+                if on_cancel: on_cancel()
+
+                info_popup = ctk.CTkToplevel(self)
+                info_popup.title("Action Blocked")
+                info_popup.geometry("350x150")
+                info_popup.attributes("-topmost", True)
+                info_popup.grab_set()
+
+                self.update_idletasks()
+                x = self.winfo_x() + (self.winfo_width() // 2) - 175
+                y = self.winfo_y() + (self.winfo_height() // 2) - 75
+                info_popup.geometry(f"+{x}+{y}")
+
+                ctk.CTkLabel(info_popup, text="Cannot delete this transaction.",
+                             font=("JetBrains Mono", 13, "bold")).pack(pady=(25, 5))
+                ctk.CTkLabel(info_popup, text="It is currently open in an Edit window.",
+                             font=("JetBrains Mono", 11)).pack(pady=(0, 20))
+                ctk.CTkButton(info_popup, text="OK", width=80, fg_color="#1f538d", command=info_popup.destroy).pack()
+                return
+
         popup = ctk.CTkToplevel(self)
         popup.title("Confirm Delete")
         popup.geometry("350x170")
@@ -404,13 +453,13 @@ class FinanceApp(ctk.CTk):
             self.destroy()
 
     def open_add_expense(self):
-        AddExpenseWindow(self, self.manager, db_session=self.db_session)
+        self._open_or_focus_transaction_window("expense", AddExpenseWindow)
 
     def open_add_gain(self):
-        AddGainWindow(self, self.manager, db_session=self.db_session)
+        self._open_or_focus_transaction_window("gain", AddGainWindow)
 
     def open_add_transfer(self):
-        AddTransferWindow(self, self.manager, db_session=self.db_session)
+        self._open_or_focus_transaction_window("transfer", AddTransferWindow)
 
 
 if __name__ == "__main__":

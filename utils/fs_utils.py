@@ -109,16 +109,33 @@ def backup_sqlite_db(db_session, source_db_path, dest_filepath):
     except Exception as e:
         return False, f"An error occurred during backup:\n{e}"
 
-def open_text_config(filename, default_content):
+
+def ensure_file_has_content(file_path, default_content, allow_empty=False):
     """
-    Ensures a text-based config file exists in the user's config directory,
-    then opens it in the OS default text editor.
+    Checks if a file is missing.
+    If allow_empty is False, it also checks if it's blank.
+    Overwrites with default content if necessary.
     """
-    file_path = os.path.join(USER_CONFIG_DIR, filename)
+    needs_reset = False
 
     if not os.path.exists(file_path):
-        with open(file_path, "w", encoding="utf-8") as f:
+        needs_reset = True
+    else:
+        if not allow_empty:
+            with open(file_path, "r", encoding="utf-8-sig") as f:
+                content = f.read()
+                if not content.strip():
+                    needs_reset = True
+
+    if needs_reset:
+        with open(file_path, "w", encoding="utf-8-sig") as f:
             f.write(default_content)
+
+def open_text_config(filename, default_content, allow_empty=False):
+    """Ensures a text-based config file is healthy, then opens it in the OS default text editor."""
+    file_path = os.path.join(USER_CONFIG_DIR, filename)
+
+    ensure_file_has_content(file_path, default_content, allow_empty)
 
     try:
         # Windows command
@@ -129,5 +146,3 @@ def open_text_config(filename, default_content):
             subprocess.call(['open', file_path])
         else:
             subprocess.call(['xdg-open', file_path])
-    finally:
-        print("Configuration opened. Changes will apply to the next parsing session.")

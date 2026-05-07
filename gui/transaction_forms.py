@@ -734,6 +734,9 @@ class AddTransferWindow(BaseTransactionWindow):
         self.account_map = {acc.name: acc for acc in active_accounts}
         self.all_acc_names = list(self.account_map.keys())
 
+        if not self.all_acc_names:
+            self.all_acc_names = ["No valid Account found"]
+
         title = "Edit Transfer" if transaction_data and transaction_data.get("id") else "New Transfer"
         super().__init__(parent, manager, title, transaction_data, db_session=db_session)
 
@@ -752,17 +755,20 @@ class AddTransferWindow(BaseTransactionWindow):
         self.swap_btn = ctk.CTkButton(self, text="⇅ Swap", width=50, height=24, fg_color="transparent", text_color="gray60", hover_color="gray25", font=("JetBrains Mono", 12),
                                       command=self.swap_accounts)
 
-        if len(self.all_acc_names) > 1:
+        if len(self.all_acc_names) > 1 and "No valid Account found" not in self.all_acc_names:
             self.origin_menu.set(self.all_acc_names[0])
             self.dest_menu.set(self.all_acc_names[1])
+        else:
+            self.origin_menu.set(self.all_acc_names[0])
+            self.dest_menu.set(self.all_acc_names[0])
 
         self.lbl_dest_amt = ctk.CTkLabel(self, text="Received Amount", font=("JetBrains Mono", 13, "bold"), anchor="w")
         self.dest_amount_entry = ctk.CTkEntry(self)
 
-        if self.mem["orig_acc"] in self.origin_menu.cget("values"):
+        if self.mem.get("orig_acc") in self.origin_menu.cget("values"):
             self.origin_menu.set(self.mem["orig_acc"])
 
-        if self.mem["dest_acc"] in self.dest_menu.cget("values"):
+        if self.mem.get("dest_acc") in self.dest_menu.cget("values"):
             self.dest_menu.set(self.mem["dest_acc"])
 
         self.finalize_initialization()
@@ -801,6 +807,13 @@ class AddTransferWindow(BaseTransactionWindow):
         """Prepares filtered account lists for Origin/Destination menus."""
         origin_name = self.origin_menu.get()
         dest_name = self.dest_menu.get()
+
+        if origin_name == "No valid Account found" or dest_name == "No valid Account found":
+            self.origin_acc = None
+            self.dest_acc = None
+            self.validate_form()
+            return
+
         self.origin_acc = self.account_map.get(origin_name)
         self.dest_acc = self.account_map.get(dest_name)
 
@@ -880,6 +893,9 @@ class AddTransferWindow(BaseTransactionWindow):
         self._sync_account_data()
 
     def validate_specific_fields(self):
+        if self.origin_menu.get() == "No valid Account found" or self.dest_menu.get() == "No valid Account found":
+            return False, "⚠ Please create at least two Accounts first"
+        
         dest_val = self.dest_amount_entry.get()
         dest_ok = dest_val != self.dest_amount_placeholder and dest_val.strip() != "" and self.is_float(dest_val)
 

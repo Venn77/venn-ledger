@@ -1,5 +1,6 @@
 import re, json, ollama, difflib, os
 from config import USER_CONFIG_DIR
+from utils.fs_utils import ensure_file_has_content
 
 
 DEFAULT_SKIP_TERMS_TEXT = """->
@@ -190,13 +191,11 @@ def chunk_file_by_day(filepath, skip_terms):
 def get_row_prompt(default_currency):
     """
     Reads the AI prompt template from the user's config folder.
-    If it doesn't exist, it creates it using the default template.
+    Auto-heals the file if it is empty.
     """
     prompt_file_path = os.path.join(USER_CONFIG_DIR, "ai_prompt_template.txt")
 
-    if not os.path.exists(prompt_file_path):
-        with open(prompt_file_path, "w", encoding="utf-8-sig") as f:
-            f.write(DEFAULT_PROMPT_TEMPLATE)
+    ensure_file_has_content(prompt_file_path, DEFAULT_PROMPT_TEMPLATE, allow_empty=False)
 
     with open(prompt_file_path, "r", encoding="utf-8-sig") as f:
         user_template = f.read()
@@ -209,9 +208,7 @@ def get_skip_terms():
     """Reads skip terms from the config folder or creates the default file."""
     skip_file_path = os.path.join(USER_CONFIG_DIR, "ai_skip_terms.txt")
 
-    if not os.path.exists(skip_file_path):
-        with open(skip_file_path, "w", encoding="utf-8-sig") as f:
-            f.write(DEFAULT_SKIP_TERMS_TEXT)
+    ensure_file_has_content(skip_file_path, DEFAULT_SKIP_TERMS_TEXT, allow_empty=True)
 
     with open(skip_file_path, "r", encoding="utf-8-sig") as f:
         terms = [line.strip() for line in f.readlines() if line.strip()]

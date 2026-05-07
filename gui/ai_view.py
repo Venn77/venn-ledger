@@ -23,11 +23,13 @@ class AIImportView(ctk.CTkFrame):
         self.db_session = db_session
         self.edit_skip_icon = get_icon("block_white.png", size=(14, 14))
         self.edit_rules_icon = get_icon("settings_white.png", size=(14, 14))
+        self.view_grid_icon = get_icon("grid_white.png", size=(15, 15))
+        self.view_file_icon = get_icon("visibility_white.png", size=(15, 15))
 
         header_row = ctk.CTkFrame(self, fg_color="transparent")
         header_row.pack(fill="x", pady=(0, 10))
 
-        self.ai_header = ctk.CTkLabel(header_row, text="AI Transaction Parser",
+        self.ai_header = ctk.CTkLabel(header_row, text="AI Expense Parser",
                                       font=("JetBrains Mono", 22, "bold"))
         self.ai_header.pack(side="left", anchor="w")
 
@@ -40,7 +42,7 @@ class AIImportView(ctk.CTkFrame):
             font=("JetBrains Mono", 11),
             fg_color="gray25",
             hover_color="gray35",
-            command=lambda: open_text_config("ai_skip_terms.txt", DEFAULT_SKIP_TERMS_TEXT)
+            command=lambda: open_text_config("ai_skip_terms.txt", DEFAULT_SKIP_TERMS_TEXT, allow_empty=True)
         )
         self.btn_edit_skip.pack(side="right", padx=(5, 0))
         ToolTip(self.btn_edit_skip, "Edit terms the parser should ignore (e.g. Transfer, Withdrawal)")
@@ -54,7 +56,11 @@ class AIImportView(ctk.CTkFrame):
             font=("JetBrains Mono", 11),
             fg_color="gray25",
             hover_color="gray35",
-            command=lambda: open_text_config("ai_prompt_template.txt", DEFAULT_PROMPT_TEMPLATE)
+            command=lambda: open_text_config(
+                "ai_prompt_template.txt",
+                DEFAULT_PROMPT_TEMPLATE,
+                allow_empty=False
+            )
         )
         self.btn_edit_rules.pack(side="right", padx=5)
         ToolTip(self.btn_edit_rules, "Edit the LLM System Prompt and examples")
@@ -142,11 +148,11 @@ class AIImportView(ctk.CTkFrame):
                                           font=("JetBrains Mono", 14, "bold"))
         self.staging_title.pack(side="left", padx=10)
 
-        self.btn_import_all = ctk.CTkButton(self.staging_header, text="✅ Import All", fg_color="#4CD964",
+        self.btn_import_all = ctk.CTkButton(self.staging_header, text="✅   Import All", fg_color="#4CD964",
                                             text_color="black", hover_color="#3cb051", width=120,
                                             font=("JetBrains Mono", 12, "bold"), state="disabled")
 
-        self.btn_toggle_view = ctk.CTkButton(self.staging_header, text="👁 View File", fg_color="gray30",
+        self.btn_toggle_view = ctk.CTkButton(self.staging_header, text="View File", image=self.view_file_icon, fg_color="gray30",
                                              hover_color="gray40", width=120, font=("JetBrains Mono", 12, "bold"),
                                              command=self._toggle_ai_view)
 
@@ -278,12 +284,12 @@ class AIImportView(ctk.CTkFrame):
         if self.preview_container.winfo_ismapped():
             self.preview_container.pack_forget()
             self.grid_container.pack(fill="both", expand=True)
-            self.btn_toggle_view.configure(text="👁 View File")
+            self.btn_toggle_view.configure(text="View File", image=self.view_file_icon)
             self.staging_title.configure(text="Review & Fix")
         else:
             self.grid_container.pack_forget()
             self.preview_container.pack(fill="both", expand=True)
-            self.btn_toggle_view.configure(text="▦ View Grid")
+            self.btn_toggle_view.configure(text="View Grid", image=self.view_grid_icon)
             self.staging_title.configure(text="File Preview")
 
     def _reset_ai_view(self, success_msg=None, clear_text=True):
@@ -333,7 +339,7 @@ class AIImportView(ctk.CTkFrame):
             widget.destroy()
         self.grid_container.update_idletasks()
 
-        self.btn_import_all.configure(text="✅ Import All", state="disabled", fg_color="#4CD964", text_color="black")
+        self.btn_import_all.configure(text="✅   Import All", state="disabled", fg_color="#4CD964", text_color="black")
 
         self.grid_container.pack_forget()
 
@@ -377,7 +383,7 @@ class AIImportView(ctk.CTkFrame):
         self.staging_title.configure(text="Review & Fix")
         self.btn_import_all.pack(side="right")
         self.btn_toggle_view.pack(side="right", padx=10)
-        self.btn_toggle_view.configure(text="👁 View File")
+        self.btn_toggle_view.configure(text="View File", image=self.view_file_icon)
 
         self.preview_container.pack_forget()
         self.grid_container.pack(fill="both", expand=True)

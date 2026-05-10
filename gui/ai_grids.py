@@ -210,6 +210,8 @@ class AIStagingGrid(ctk.CTkFrame):
         """Commits all rows from master memory to the database."""
         self.import_btn.configure(state="disabled", text="Importing...")
         self.app.update_idletasks()
+        main_app = self.app.app
+        main_app.update_idletasks()
 
         active_items = [res for res in self.parsed_results if not res.get('discarded')]
         success_count = 0
@@ -245,4 +247,4 @@ class AIStagingGrid(ctk.CTkFrame):
             msg_transaction = "transactions"
         # noinspection PyProtectedMember
         self.app._reset_ai_view(success_msg=f"Successfully imported {success_count} {msg_transaction} to database!", clear_text=False)
-        self.app.refresh_accounts()
+        main_app.refresh_accounts()

@@ -465,11 +465,13 @@ class BaseTransactionWindow(ctk.CTkToplevel):
             # noinspection PyTypeChecker
             main_app.after(10, main_app.refresh_accounts)
 
-        if hasattr(main_app, "views") and main_app.views.get("transactions"):
-            tx_view = main_app.views["transactions"]
-            if hasattr(tx_view, "load_transactions"):
-                # noinspection PyTypeChecker
-                main_app.after(50, tx_view.load_transactions)
+        if hasattr(main_app, "views"):
+            for view_name, view_obj in main_app.views.items():
+                if view_obj and view_obj.winfo_ismapped():
+                    if hasattr(view_obj, "refresh_view"):
+                        # noinspection PyTypeChecker
+                        main_app.after(50, view_obj.refresh_view)
+                    break
 
         self.destroy()
 
@@ -740,6 +742,7 @@ class AddTransferWindow(BaseTransactionWindow):
         title = "Edit Transfer" if transaction_data and transaction_data.get("id") else "New Transfer"
         super().__init__(parent, manager, title, transaction_data, db_session=db_session)
 
+        self.currency_var.set("EUR")
         self.origin_acc = None
         self.dest_acc = None
         self.auto_mirror = True

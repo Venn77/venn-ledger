@@ -147,6 +147,9 @@ class FinanceApp(ctk.CTk):
                 self.views[view_name] = SettingsView(self, self.manager, self.db_session)
 
             self.views[view_name].grid(row=0, column=1, padx=20, pady=20, sticky="nsew")
+        else:
+            if hasattr(self.views[view_name], "refresh_view"):
+                self.views[view_name].refresh_view()
 
         self.views[view_name].grid()
 

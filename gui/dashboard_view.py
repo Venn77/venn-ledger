@@ -344,4 +344,12 @@ class DashboardView(ctk.CTkFrame):
         canvas.draw()
         canvas.get_tk_widget().pack(fill="both", expand=True, padx=10, pady=(0, 10))
 
+    def refresh_view(self):
+        """Called automatically when switching back to this tab.
+        Clears out the old charts and redraws them with fresh data."""
+        for widget in self.scroll.winfo_children():
+            widget.destroy()
 
+        plt.close('all')
+
+        self.build_dashboard()

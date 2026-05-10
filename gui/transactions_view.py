@@ -704,3 +704,8 @@ class TransactionsView(ctk.CTkFrame):
         self.current_page = 0
         self.load_transactions()
         self.reset_scroll_to_top()
+
+    def refresh_view(self):
+        """Called automatically when switching back to this tab.
+        Fetches the latest ledger data from the database."""
+        self.load_transactions()

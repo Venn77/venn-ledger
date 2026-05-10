@@ -402,3 +402,19 @@ class AIImportView(ctk.CTkFrame):
         print("--- THREAD COMPLETE. DATA RECEIVED IN GUI ---")
         for res in parsed_results:
             print(res)
+
+    def refresh_view(self):
+        """Called when this tab is brought to the front.
+        Ensures the dropdowns have the latest Master Data."""
+
+        active_currencies = [c.code for c in self.db_session.query(Currency).filter_by(active_bool=True).all()]
+        active_projects = ["None"] + [p.name for p in self.db_session.query(Project).filter_by(active_bool=True).all()]
+
+        self.ai_curr_combo.configure(values=active_currencies)
+        self.ai_proj_combo.configure(values=active_projects)
+
+        if self.ai_curr_combo.get() not in active_currencies and active_currencies:
+            self.ai_curr_combo.set("EUR" if "EUR" in active_currencies else active_currencies[0])
+
+        if self.ai_proj_combo.get() not in active_projects:
+            self.ai_proj_combo.set("None")

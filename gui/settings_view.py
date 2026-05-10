@@ -251,4 +251,18 @@ class SettingsView(ctk.CTkFrame):
         else:
             show_popup(self, "Cloud Error", message, is_error=True)
 
+    def refresh_view(self):
+        """Called automatically when switching back to this tab.
+        Refreshes the database queries for any Master Data grids that have been loaded."""
+        grids = [
+            self.acc_grid, self.pm_grid,
+            self.cat_grid, self.stream_grid,
+            self.vendor_grid, self.payer_grid,
+            self.proj_grid,
+            self.curr_grid, self.fx_grid
+        ]
+
+        for grid in grids:
+            if grid is not None and hasattr(grid, "load_data"):
+                grid.load_data()
 

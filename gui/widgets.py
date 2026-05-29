@@ -375,6 +375,29 @@ class AIStagingRow(ctk.CTkFrame):
         if pm_val not in valid_pms:
             errors.append("Select a matching Payment Method.")
 
+        if not errors:
+            # noinspection PyBroadException
+            try:
+                day_str, month_str = self.data['date'].split('/')
+                db_date_str = f"{self.year}-{int(month_str):02d}-{int(day_str):02d}"
+
+                amt_val = float(raw_amt)
+
+                is_dup = self.app.manager.check_for_duplicate(
+                    amount=amt_val,
+                    entity_name=ven_val,
+                    date_str=db_date_str,
+                    transaction_type="expense"
+                )
+
+                self.data['is_duplicate'] = is_dup
+
+            except Exception:
+                pass
+
+        if self.data.get('is_duplicate'):
+            warnings.append("Potential Duplicate in DB")
+
         raw_line = f"\n\nRaw Line: {self.data.get('line', '')}"
 
         # Apply Colors
@@ -417,7 +440,7 @@ class TransactionRow(ctk.CTkFrame):
 
         # Render Columns
         # Date
-        self._add_lbl(data.ts.strftime("%Y-%m-%d"), width=100)
+        self._add_lbl(data.ts.strftime("%Y-%m-%d"), width=80)
         # Vendor or Stream
         if data.entity and len(data.entity) > ent_char_limit:
             display_ent = data.entity[:ent_char_limit].strip() + "..."
@@ -466,7 +489,7 @@ class TransactionRow(ctk.CTkFrame):
         ToolTip(self.btn_del, "Delete Transaction")
         # Amount
         amt_str = f"{style['prefix']}{data.amount:,.2f} {data.currency}"
-        lbl_amt = self._add_lbl(amt_str, width=120, anchor="e", color=style['text'], bold=True)
+        lbl_amt = self._add_lbl(amt_str, width=140, anchor="e", color=style['text'], bold=True)
         if data.currency != 'EUR': ToolTip(lbl_amt, f"Converted: {style['prefix']}{data.eur_val:,.2f} EUR (Rate: {data.fx_rate})")
 
         # Hover Effect

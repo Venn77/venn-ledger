@@ -29,7 +29,7 @@ class FinanceApp(ctk.CTk):
         super().__init__()
         self.title("Venn Ledger 2026")
         self.geometry("1440x700")
-        self.minsize(1440, 700)
+        self.minsize(1440,700)
         self.maxsize(1440,980)
         ctk.set_appearance_mode("dark")
         self.db_session = Session()
@@ -160,9 +160,10 @@ class FinanceApp(ctk.CTk):
 
         # Net Worth
         net_worth = self.manager.get_net_worth()
+        net_worth_color = "#FF6B6B" if net_worth <= 0 else "#4CD964"
 
         ctk.CTkLabel(self.nw_frame, text="TOTAL NET WORTH", font=("JetBrains Mono", 10, "bold"), text_color="gray").pack(pady=(8, 0))
-        ctk.CTkLabel(self.nw_frame, text=f"€ {net_worth:,.2f}", font=("JetBrains Mono", 18, "bold"), text_color="#4CD964").pack(
+        ctk.CTkLabel(self.nw_frame, text=f"€ {net_worth:,.2f}", font=("JetBrains Mono", 18, "bold"), text_color=net_worth_color).pack(
             pady=(0, 8))
 
         # Account cards

@@ -66,11 +66,13 @@ class AIStagingGrid(ctk.CTkFrame):
 
         for data in self.parsed_results:
             errors, warnings = False, False
+            data['is_duplicate'] = False
 
             try:
-                float(data.get('amount', 0))
+                amt = float(data.get('amount', 0))
             except ValueError:
                 errors = True
+                amt = 0.0
 
             curr = data.get('currency', 'EUR')
             valid_pms = [n for n, c in pm_dict.items() if c == curr]
@@ -90,6 +92,25 @@ class AIStagingGrid(ctk.CTkFrame):
                         if not fx_data: errors = True
                     except Exception:
                         errors = True
+
+            if not errors:
+                # noinspection PyBroadException
+                try:
+                    day_str, month_str = data['date'].split('/')
+                    db_date_str = f"{self.year}-{int(month_str):02d}-{int(day_str):02d}"
+
+                    is_dup = self.app.manager.check_for_duplicate(
+                        amount=amt,
+                        entity_name=data.get('vendor', ''),
+                        date_str=db_date_str,
+                        transaction_type="expense"
+                    )
+
+                    if is_dup:
+                        data['is_duplicate'] = True
+                        warnings = True
+                except Exception:
+                    pass
 
             if errors:
                 data['is_valid'] = False

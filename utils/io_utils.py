@@ -157,4 +157,76 @@ def get_valid_year(prompt):
                         \nEx: 2025
                         \r**********************""")
 
+def validate_parsed_record(data, manager, year, pm_currency_map, cat_names, ven_names):
+    """
+    Checks DB integrity, updates status flags, and returns (errors, warnings).
+    """
+    errors, warnings = [], []
+    data['is_duplicate'] = False
+
+    try:
+        amt = float(data.get('amount', 0))
+    except ValueError:
+        errors.append("Invalid Amount.")
+        amt = 0.0
+
+    curr = data.get('currency', 'EUR')
+    valid_pms = [name for name, c_code in pm_currency_map.items() if c_code == curr]
+    if data.get('payment_method') not in valid_pms:
+        errors.append("Select a matching Payment Method.")
+
+    if curr != "EUR":
+        raw_fx = data.get('fx_rate')
+        if raw_fx is None:
+            if not extract_exchange_rate(data.get('description', '')):
+                # noinspection PyBroadException
+                try:
+                    d, m = data['date'].split('/')
+                    dt = datetime.datetime(int(year), int(m), int(d), 12, 0, 0)
+                    if not manager.get_historical_fx_rate(curr, dt):
+                        errors.append("Missing/Invalid FX Rate.")
+                except Exception:
+                    errors.append("Missing/Invalid FX Rate.")
+        else:
+            try:
+                if float(raw_fx) <= 0: raise ValueError
+            except ValueError:
+                errors.append("Missing/Invalid FX Rate.")
+
+    ven_val = data.get('vendor', '').strip()
+    if not ven_val:
+        warnings.append("Will be imported with no Vendor.")
+    elif ven_val not in ven_names:
+        warnings.append("New Vendor will be created.")
+
+    cat_val = data.get('category', '').strip()
+    if not cat_val:
+        warnings.append("Will be imported with no Category.")
+    elif cat_val not in cat_names:
+        warnings.append("New Category will be created.")
+
+    if not errors:
+        # noinspection PyBroadException
+        try:
+            d, m = data['date'].split('/')
+            db_date = f"{year}-{int(m):02d}-{int(d):02d}"
+            if manager.check_for_duplicate(amt, ven_val, db_date, "expense"):
+                data['is_duplicate'] = True
+                warnings.append("Potential Duplicate in DB")
+        except Exception:
+            pass
+
+    raw_line = f"\n\nRaw Line: {data.get('line', '')}"
+    if errors:
+        data['is_valid'], data['status_type'] = False, "red"
+        data['tooltip'] = " | ".join(errors) + raw_line
+    elif warnings:
+        data['is_valid'], data['status_type'] = True, "yellow"
+        data['tooltip'] = " | ".join(warnings) + raw_line
+    else:
+        data['is_valid'], data['status_type'] = True, "green"
+        data['tooltip'] = "Ready to import." + raw_line
+
+    return errors, warnings
+
 

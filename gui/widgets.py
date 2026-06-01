@@ -1,7 +1,7 @@
 import customtkinter as ctk
 import tkinter as tk
 import datetime
-from utils.io_utils import extract_exchange_rate
+from utils.io_utils import extract_exchange_rate, validate_parsed_record
 
 
 class ToolTip:
@@ -324,101 +324,38 @@ class AIStagingRow(ctk.CTkFrame):
             self.app.after(10, self.grid_ref.update_pagination_state)
 
     def validate(self):
-        """Checks DB integrity and updates the status light, and syncs back to master memory."""
-        warnings = []
-        errors = []
-
+        """Syncs UI to memory, calls validator, and applies visuals."""
         self.data['description'] = self.desc_var.get().strip()
+        self.data['amount'] = self.amt_var.get().strip()
+        self.data['vendor'] = self.ven_var.get().strip()
+        self.data['payment_method'] = self.pm_combo.get()
 
-        # Check Amount
-        raw_amt = self.amt_var.get().strip()
-        self.data['amount'] = raw_amt
-        try:
-            float(raw_amt)
-        except ValueError:
-            errors.append("Invalid Amount.")
-
-        # Check FX
         if self.currency_combo.get() != "EUR":
-            raw_fx = self.fx_var.get().strip()
-            self.data['fx_rate'] = raw_fx
-            try:
-                rate = float(raw_fx)
-                if rate <= 0: raise ValueError
-            except ValueError:
-                errors.append("Missing/Invalid FX Rate.")
+            self.data['fx_rate'] = self.fx_var.get().strip()
 
-        # Check Vendor
-        ven_val = self.ven_var.get().strip()
-        self.data['vendor'] = ven_val
-        if not ven_val:
-            warnings.append("Will be imported with no Vendor.")
-        elif ven_val not in self.ven_names:
-            warnings.append("New Vendor will be created.")
-
-        # Check Category
         cat_val = self.cat_combo.get().strip()
         if hasattr(self.cat_combo, 'placeholder') and cat_val == self.cat_combo.placeholder:
             cat_val = ""
         self.data['category'] = cat_val
 
-        if not cat_val:
-            warnings.append("Will be imported with no Category.")
-        elif cat_val not in self.cat_names:
-            warnings.append("New Category will be created.")
+        errors, warnings = validate_parsed_record(
+            data=self.data,
+            manager=self.app.manager,
+            year=self.year,
+            pm_currency_map=self.pm_dict,
+            cat_names=self.cat_names,
+            ven_names=self.ven_names
+        )
 
-        # Check Payment Method & Currency Link
-        pm_val = self.pm_combo.get()
-        self.data['payment_method'] = pm_val
-        valid_pms = [name for name, c_code in self.pm_dict.items() if c_code == self.currency_combo.get()]
-
-        if pm_val not in valid_pms:
-            errors.append("Select a matching Payment Method.")
-
-        if not errors:
-            # noinspection PyBroadException
-            try:
-                day_str, month_str = self.data['date'].split('/')
-                db_date_str = f"{self.year}-{int(month_str):02d}-{int(day_str):02d}"
-
-                amt_val = float(raw_amt)
-
-                is_dup = self.app.manager.check_for_duplicate(
-                    amount=amt_val,
-                    entity_name=ven_val,
-                    date_str=db_date_str,
-                    transaction_type="expense"
-                )
-
-                self.data['is_duplicate'] = is_dup
-
-            except Exception:
-                pass
-
-        if self.data.get('is_duplicate'):
-            warnings.append("Potential Duplicate in DB")
-
-        raw_line = f"\n\nRaw Line: {self.data.get('line', '')}"
-
-        # Apply Colors
         if errors:
             self.status_lbl.configure(text="🔴", text_color="#FF6B6B")
-            self.is_valid = False
-            self.data['is_valid'] = False
-            self.data['status_type'] = "red"
-            self.status_tooltip.text = " | ".join(errors) + raw_line
         elif warnings:
             self.status_lbl.configure(text="🟡", text_color="#FFD60A")
-            self.is_valid = True
-            self.data['is_valid'] = True
-            self.data['status_type'] = "yellow"
-            self.status_tooltip.text = " | ".join(warnings) + raw_line
         else:
             self.status_lbl.configure(text="🟢", text_color="#4CD964")
-            self.is_valid = True
-            self.data['is_valid'] = True
-            self.data['status_type'] = "green"
-            self.status_tooltip.text = "Ready to import." + raw_line
+
+        self.status_tooltip.text = self.data['tooltip']
+        self.is_valid = self.data['is_valid']
 
         if hasattr(self.grid_ref, 'check_master_validation'):
             self.grid_ref.check_master_validation()

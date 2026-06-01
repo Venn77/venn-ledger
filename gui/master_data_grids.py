@@ -5,7 +5,7 @@ from database.models import (
 )
 from gui.dialogs import (
     SimpleDataDialog, CurrencyDialog, FXDialog,
-    AccountDialog, PMDialog
+    AccountDialog, PMDialog, show_popup
 )
 
 class SimpleMasterDataGrid(ctk.CTkFrame):
@@ -194,12 +194,15 @@ class CurrencyGrid(ctk.CTkFrame):
                 side="left", padx=(10, 5), pady=8)
             ctk.CTkLabel(row, text=item.name, width=150, anchor="w", font=("JetBrains Mono", 11)).pack(side="left",
                                                                                                        padx=5)
+            if item.is_base:
+                ctk.CTkLabel(row, text="[BASE]", text_color="#4CD964", font=("JetBrains Mono", 10, "bold")).pack(
+                    side="left", padx=5)
 
             btn_frame = ctk.CTkFrame(row, fg_color="transparent")
             btn_frame.pack(side="right", padx=10)
 
             toggle_text, toggle_color = ("Deactivate", "#b13e3e") if item.active_bool else ("Activate", "#1f538d")
-            state = "disabled" if item.code == "EUR" else "normal"
+            state = "disabled" if item.is_base == True else "normal"
             ctk.CTkButton(btn_frame, text=toggle_text, width=80, height=24, fg_color=toggle_color, state=state,
                           command=lambda i=item.code: self.toggle(i)).pack(side="right", padx=2)
             ctk.CTkButton(btn_frame, text="Edit", width=60, height=24, fg_color="gray30", hover_color="gray40",
@@ -212,6 +215,9 @@ class CurrencyGrid(ctk.CTkFrame):
 
     def toggle(self, code):
         item = self.db_session.get(Currency, code)
+        if item.is_base:
+            show_popup(self, "Error", "You cannot deactivate the base currency.", is_error=True)
+            return
         item.active_bool = not item.active_bool
         self.db_session.commit()
         self.load_data()
@@ -219,7 +225,7 @@ class CurrencyGrid(ctk.CTkFrame):
     def add_new(self):
         def _save(code, name):
             if self.db_session.get(Currency, code): return False, "Currency Code already exists."
-            self.db_session.add(Currency(code=code, name=name))
+            self.db_session.add(Currency(code=code, name=name, is_base=False))
             self.db_session.commit()
             self.load_data()
             return True, ""
@@ -268,8 +274,14 @@ class ExchangeRateGrid(ctk.CTkFrame):
 
         for widget in self.scroll.winfo_children(): widget.destroy()
 
-        self.current_results = self.db_session.query(ExchangeRate).filter(ExchangeRate.currency_code != "EUR").order_by(
-            ExchangeRate.timestamp.desc()).limit(500).all()
+        self.current_results = (
+                    self.db_session.query(ExchangeRate)
+                    .join(Currency)
+                    .filter(Currency.is_base == False)
+                    .order_by(ExchangeRate.timestamp.desc())
+                    .limit(500)
+                    .all()
+            )
         self.total_items = len(self.current_results)
 
         if self.total_items > 0:
@@ -342,8 +354,8 @@ class ExchangeRateGrid(ctk.CTkFrame):
                       command=_confirm).pack(side="left", padx=5)
 
     def add_new(self):
-        act_currencies = [c.code for c in self.db_session.query(Currency).filter_by(active_bool=True).all() if
-                        c.code != "EUR"]
+        act_currencies = [c.code for c in self.db_session.query(Currency).filter_by(active_bool=True).all()
+                          if not c.is_base]
         if not act_currencies:
             return
 

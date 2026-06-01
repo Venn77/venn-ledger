@@ -163,7 +163,7 @@ class FinanceApp(ctk.CTk):
         net_worth_color = "#FF6B6B" if net_worth <= 0 else "#4CD964"
 
         ctk.CTkLabel(self.nw_frame, text="TOTAL NET WORTH", font=("JetBrains Mono", 10, "bold"), text_color="gray").pack(pady=(8, 0))
-        ctk.CTkLabel(self.nw_frame, text=f"€ {net_worth:,.2f}", font=("JetBrains Mono", 18, "bold"), text_color=net_worth_color).pack(
+        ctk.CTkLabel(self.nw_frame, text=f"{self.manager.base_currency_symbol} {net_worth:,.2f}", font=("JetBrains Mono", 18, "bold"), text_color=net_worth_color).pack(
             pady=(0, 8))
 
         # Account cards

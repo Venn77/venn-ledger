@@ -190,7 +190,7 @@ class AIStagingRow(ctk.CTkFrame):
         # 4. Currency
         self.currency_combo = ctk.CTkComboBox(self, values=self.curr_names, width=70, height=24, state="readonly",
                                           command=self._on_currency_change)
-        self.currency_combo.set(data['currency'] if data['currency'] in self.curr_names else "EUR")
+        self.currency_combo.set(data['currency'] if data['currency'] in self.curr_names else self.app.manager.base_currency)
         self.currency_combo.grid(row=0, column=4, padx=5)
 
         # 4. FX Rate
@@ -264,11 +264,11 @@ class AIStagingRow(ctk.CTkFrame):
         """Determines the FX rate and sets the appropriate Tooltip."""
         self.fx_var.set("")
 
-        if curr_code == "EUR":
+        if curr_code == self.app.manager.base_currency:
             self.fx_entry.configure(state="normal", fg_color="gray15", text_color="gray50", font=("JetBrains Mono", 11))
-            self.fx_var.set("EUR Base")
+            self.fx_var.set(f"{self.app.manager.base_currency} Base")
             self.fx_entry.configure(state="disabled")
-            self._set_fx_tooltip("EUR is the Base Currency")
+            self._set_fx_tooltip(f"{self.app.manager.base_currency} is the Base Currency")
             return
 
         self.fx_entry.configure(state="normal", fg_color=["#F9F9FA", "#343638"], text_color="white", font=("JetBrains Mono", 12))
@@ -330,7 +330,7 @@ class AIStagingRow(ctk.CTkFrame):
         self.data['vendor'] = self.ven_var.get().strip()
         self.data['payment_method'] = self.pm_combo.get()
 
-        if self.currency_combo.get() != "EUR":
+        if self.currency_combo.get() != self.app.manager.base_currency:
             self.data['fx_rate'] = self.fx_var.get().strip()
 
         cat_val = self.cat_combo.get().strip()
@@ -427,7 +427,7 @@ class TransactionRow(ctk.CTkFrame):
         # Amount
         amt_str = f"{style['prefix']}{data.amount:,.2f} {data.currency}"
         lbl_amt = self._add_lbl(amt_str, width=140, anchor="e", color=style['text'], bold=True)
-        if data.currency != 'EUR': ToolTip(lbl_amt, f"Converted: {style['prefix']}{data.eur_val:,.2f} EUR (Rate: {data.fx_rate})")
+        if data.currency != main_app.manager.base_currency: ToolTip(lbl_amt, f"Converted: {style['prefix']}{data.base_val:,.2f} {main_app.manager.base_currency} (Rate: {data.fx_rate})")
 
         # Hover Effect
         self.is_locked = False

@@ -104,7 +104,7 @@ class AIImportView(ctk.CTkFrame):
 
         ctk.CTkLabel(cmd_bar, text="Default Currency:", font=("JetBrains Mono", 11, "bold")).pack(side="left")
         self.ai_curr_combo = ctk.CTkComboBox(cmd_bar, values=active_currencies, state="readonly", width=70)
-        if "EUR" in active_currencies: self.ai_curr_combo.set("EUR")
+        if self.manager.base_currency in active_currencies: self.ai_curr_combo.set(self.manager.base_currency)
         self.ai_curr_combo.pack(side="left", padx=(10, 15))
         ToolTip(self.ai_curr_combo, "Select from dropdown.")
 
@@ -298,7 +298,7 @@ class AIImportView(ctk.CTkFrame):
             self.ai_year_combo.configure(state="normal")
             self.ai_year_combo.set(str(datetime.datetime.now().year))
             self.ai_curr_combo.configure(state="normal")
-            self.ai_curr_combo.set("EUR")
+            self.ai_curr_combo.set(self.manager.base_currency)
             self.ai_proj_combo.configure(state="normal")
             self.ai_proj_combo.set("None")
             self.btn_browse.configure(state="normal")
@@ -414,7 +414,7 @@ class AIImportView(ctk.CTkFrame):
         self.ai_proj_combo.configure(values=active_projects)
 
         if self.ai_curr_combo.get() not in active_currencies and active_currencies:
-            self.ai_curr_combo.set("EUR" if "EUR" in active_currencies else active_currencies[0])
+            self.ai_curr_combo.set(self.manager.base_currency if self.manager.base_currency in active_currencies else active_currencies[0])
 
         if self.ai_proj_combo.get() not in active_projects:
             self.ai_proj_combo.set("None")

@@ -7,7 +7,7 @@ from core import manager as finance_manager
 from pathlib import Path
 
 
-def validate_and_save_batch(results, default_currency, year, project, categories, payment_methods, vendors):
+def validate_and_save_batch(results, default_currency, year, project, categories, payment_methods, vendors, base_currency):
     """
     Validates currency, exchange rate, category, vendor and payment method.
     Saves to db after user confirmation.
@@ -65,7 +65,7 @@ def validate_and_save_batch(results, default_currency, year, project, categories
             print("   ! Skipping item to prevent balance corruption.")
             continue
 
-        if item['currency'] != 'EUR':
+        if item_currency != base_currency:
             # Get exchange rate from description
             rate_source = None
             fx_rate = extract_exchange_rate(item['description'])
@@ -80,14 +80,14 @@ def validate_and_save_batch(results, default_currency, year, project, categories
             if fx_rate and rate_source == 'description':
                 choice = input(f"   ? Use exchange rate '{fx_rate}'? (y/n): ").lower()
                 if choice != 'y':
-                    fx_rate = get_valid_float(f"Enter the exchange rate ('EUR' -> '{item['currency']}'): ")
+                    fx_rate = get_valid_float(f"Enter the exchange rate ('{base_currency}' -> '{item_currency}'): ")
             elif fx_rate and rate_source == 'db':
                 # Auto accept rate if obtained from db
                 fx_rate = fx_rate
             else:
-                print(f"   ! No rate found in description or DB for {item['currency']}.")
+                print(f"   ! No rate found in description or DB for {item_currency}.")
                 # Manual rate input if not found
-                fx_rate = get_valid_float(f"Enter the exchange rate ('EUR' -> '{item['currency']}'): ")
+                fx_rate = get_valid_float(f"Enter the exchange rate ('{base_currency}' -> '{item_currency}'): ")
         else:
             fx_rate = None
 
@@ -233,7 +233,7 @@ if __name__ == "__main__":
                 cat_names = [c.name for c in active_categories]
                 pm_names = [p.name for p in active_payment_methods]
                 ven_names = [v.name for v in active_vendors]
-                validate_and_save_batch(parsed_results, currency_str, year_str, project_str, cat_names, pm_names, ven_names)
+                validate_and_save_batch(parsed_results, currency_str, year_str, project_str, cat_names, pm_names, ven_names, manager.base_currency)
 
             cmd = input("\nPress Enter for next batch, or 'q' to quit: ").lower()
             if cmd == 'q':

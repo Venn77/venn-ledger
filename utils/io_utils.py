@@ -170,12 +170,14 @@ def validate_parsed_record(data, manager, year, pm_currency_map, cat_names, ven_
         errors.append("Invalid Amount.")
         amt = 0.0
 
-    curr = data.get('currency', 'EUR')
+    base_curr = getattr(manager, 'base_currency', 'EUR')
+
+    curr = data.get('currency', base_curr)
     valid_pms = [name for name, c_code in pm_currency_map.items() if c_code == curr]
     if data.get('payment_method') not in valid_pms:
         errors.append("Select a matching Payment Method.")
 
-    if curr != "EUR":
+    if curr != base_curr:
         raw_fx = data.get('fx_rate')
         if raw_fx is None:
             if not extract_exchange_rate(data.get('description', '')):

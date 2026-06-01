@@ -3,12 +3,14 @@ import shutil
 import os, sys, subprocess
 from sqlalchemy import text
 from config import USER_CONFIG_DIR
-from database.models import Expense, Gain, Transfer
+from database.models import Expense, Gain, Transfer, Currency
 
 
 def export_data_to_csv(db_session, filepath):
     """Gathers all transactions, sorts them by latest, and exports to a CSV file."""
     try:
+        base_curr = db_session.query(Currency).filter_by(is_base=True).first()
+        base_code = base_curr.code if base_curr else "Base"
         expenses = db_session.query(Expense).all()
         gains = db_session.query(Gain).all()
         transfers = db_session.query(Transfer).all()
@@ -62,7 +64,7 @@ def export_data_to_csv(db_session, filepath):
         for t in transfers:
             acc_pm = f"{t.origin_account.name} -> {t.destination_account.name}" if (
                         t.origin_account and t.destination_account) else "Unknown Transfer"
-            currency = t.origin_account.currency_code if t.origin_account else "EUR"
+            currency = t.origin_account.currency_code if t.origin_account else base_code
 
             all_transactions.append([
                 "Transfer",
@@ -87,7 +89,7 @@ def export_data_to_csv(db_session, filepath):
             writer.writerow([
                 "Type", "Date", "Entity (Vendor/Payer)", "Category/Stream",
                 "Account/PM", "Project", "Original Amount", "Currency",
-                "FX Rate", "Amount (EUR/Dest)", "Split", "Description"
+                "FX Rate", f"Amount ({base_code}/Dest)", "Split", "Description"
             ])
             writer.writerows(all_transactions)
 

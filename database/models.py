@@ -18,15 +18,13 @@ def set_sqlite_pragma(dbapi_connection, _connection_record):
     cursor.execute("PRAGMA synchronous=NORMAL")
     cursor.close()
 
-def calculate_conversion(item):
-    """Returns converted amount in EUR with two decimals."""
-    if item.currency_code == "EUR":
-        # Convert to decimal, round, prep for DB
+def calculate_conversion(item, is_base_currency=False):
+    """Returns converted amount with two decimals."""
+    if is_base_currency or not getattr(item, 'fx_rate', None):
         val = Decimal(str(item.amount)).quantize(Decimal("0.00"), rounding=ROUND_HALF_UP)
         item.converted_amount = float(val)
         item.fx_rate = None
-    elif item.fx_rate:
-        # Divide as Decimal for precision
+    else:
         raw_val = Decimal(str(item.amount)) / Decimal(str(item.fx_rate))
         val = raw_val.quantize(Decimal("0.00"), rounding=ROUND_HALF_UP)
         item.converted_amount = float(val)
@@ -36,6 +34,8 @@ class Currency(Base):
     __tablename__ = 'currencies'
     code = Column(String(3), primary_key=True, comment="The currency, e.g., EUR")
     name = Column(String(50), nullable=False, comment="e.g., Euro, United States Dollar, etc.")
+    symbol = Column(String(5), default="", comment="e.g., €, $, £")
+    is_base = Column(Boolean, default=False, comment="True if this is the user's primary/home currency")
     active_bool = Column(Boolean, default=True, comment="If the currency is active (so it is selectable in-app)")
     # Relationships
     accounts = relationship("Account", back_populates="currency")
@@ -51,7 +51,7 @@ class ExchangeRate(Base):
     # Foreign Keys
     currency_code = Column(String(3), ForeignKey('currencies.code'), nullable=False)
     id = Column(Integer, primary_key=True)
-    fx_multiplier = Column(Float, default=1.0, comment="Conversion rate if currency is not EUR")
+    fx_multiplier = Column(Float, default=1.0, comment="Conversion rate if currency is not the base currency")
     timestamp = Column(DateTime, nullable=False, server_default=func.now(), comment="UTC timestamp of entry")
     # Relationships
     currencies = relationship("Currency", back_populates="exchange_rate")
@@ -165,8 +165,8 @@ class Expense(Base):
     project_id = Column(Integer, ForeignKey('projects.id'))
     id = Column(Integer, primary_key=True)
     amount = Column(Float, nullable=False, comment="The numerical cost, e.g., 15.50")
-    fx_rate = Column(Float, comment="Conversion rate if currency is not EUR")
-    converted_amount = Column(Float, comment="Converted amount if currency is not EUR")
+    fx_rate = Column(Float, comment="Conversion rate if currency is not the base currency")
+    converted_amount = Column(Float, comment="Converted amount if currency is not base currency")
     split_bool = Column(Boolean, default=False, comment="If the expense item will be paid in instalments")
     split_num_instalments = Column(Integer, comment="The number of instalments paid if split_boolean is True")
     description = Column(String, comment="A brief summary of what was bought")
@@ -180,7 +180,7 @@ class Expense(Base):
 
     def __repr__(self):
         return (f"<Expense(amount={self.amount} {self.currency_code}, "
-                f"EUR={self.converted_amount:.2f}, vendor='{self.vendor_id}', category='{self.category_id}')>")
+                f"BASE={self.converted_amount:.2f}, vendor='{self.vendor_id}', category='{self.category_id}')>")
 
 class Gain(Base):
     __tablename__ = 'gains'
@@ -192,8 +192,8 @@ class Gain(Base):
     project_id = Column(Integer, ForeignKey('projects.id'))
     id = Column(Integer, primary_key=True)
     amount = Column(Float, nullable=False, comment="The numerical value, e.g., 1250.66")
-    fx_rate = Column(Float, comment="Conversion rate if currency is not EUR")
-    converted_amount = Column(Float, comment="Converted amount if currency is not EUR")
+    fx_rate = Column(Float, comment="Conversion rate if currency is not the base currency")
+    converted_amount = Column(Float, comment="Converted amount if currency is not the base currency")
     split_bool = Column(Boolean, default=False, comment="If the gain item will be received in instalments")
     split_num_instalments = Column(Integer, comment="The number of instalments paid if split_boolean is True")
     description = Column(String, comment="A brief summary of what it was about")
@@ -207,7 +207,7 @@ class Gain(Base):
 
     def __repr__(self):
         return (f"<Gain(amount={self.amount} {self.currency_code}, "
-                f"EUR={self.converted_amount:.2f}, payer='{self.payer_id}', stream='{self.stream_id}')>")
+                f"BASE={self.converted_amount:.2f}, payer='{self.payer_id}', stream='{self.stream_id}')>")
 
 class Transfer(Base):
     __tablename__ = 'transfers'
@@ -231,19 +231,19 @@ class Transfer(Base):
 
 Base.metadata.create_all(engine)
 
-def seed_initial_data():
-    """Ensures critical base data exists in a fresh installation."""
-    local_session = Session()
-    try:
-        eur = local_session.query(Currency).filter_by(code="EUR").first()
-        if not eur:
-            local_session.add(Currency(code="EUR", name="Euro", active_bool=True))
-            local_session.commit()
-            print("Database initialized: Seeded base currency (EUR).")
-    except Exception as e:
-        local_session.rollback()
-        print(f"Failed to seed initial data: {e}")
-    finally:
-        local_session.close()
-
-seed_initial_data()
+# def seed_initial_data():
+#     """Ensures critical base data exists in a fresh installation."""
+#     local_session = Session()
+#     try:
+#         eur = local_session.query(Currency).filter_by(code="EUR").first()
+#         if not eur:
+#             local_session.add(Currency(code="EUR", name="Euro", active_bool=True))
+#             local_session.commit()
+#             print("Database initialized: Seeded base currency (EUR).")
+#     except Exception as e:
+#         local_session.rollback()
+#         print(f"Failed to seed initial data: {e}")
+#     finally:
+#         local_session.close()
+#
+# seed_initial_data()

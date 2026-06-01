@@ -2,7 +2,7 @@ from database.models import (
     calculate_conversion,
     Category, Vendor, Account, PaymentMethod,
     Project, Expense, ExchangeRate, Transfer,
-    Stream, Payer, Gain
+    Stream, Payer, Gain, Currency
 )
 from decimal import Decimal
 from sqlalchemy import func
@@ -12,8 +12,17 @@ import datetime
 class TransactionManager:
     def __init__(self, db_session):
         self.db_session = db_session
+
+        base_curr = self.db_session.query(Currency).filter_by(is_base=True).first()
+        if base_curr:
+            self.base_currency = base_curr.code
+            self.base_currency_symbol = base_curr.symbol
+        else:
+            self.base_currency = "EUR"
+            self.base_currency_symbol = "€"
+
         self.last_used = {
-            "currency": "EUR",
+            "currency": self.base_currency,
             "pm": "",
             "acc": "",
             "orig_acc": "",
@@ -36,7 +45,7 @@ class TransactionManager:
         """Resolves the FX rate, fetching the latest historical rate if none is provided."""
         if exchange_rate:
             return exchange_rate
-        if currency_code == "EUR":
+        if currency_code == self.base_currency:
             return None
 
         rate_entry = (self.db_session.query(ExchangeRate)
@@ -108,7 +117,7 @@ class TransactionManager:
         new_expense.description = description
         new_expense.timestamp = timestamp or datetime.datetime.now()
 
-        new_expense = calculate_conversion(new_expense)
+        new_expense = calculate_conversion(new_expense, is_base_currency=(currency_code == self.base_currency))
 
         account.balance = self._safe_sub(account.balance, amount)
 
@@ -168,7 +177,7 @@ class TransactionManager:
         new_gain.description = description
         new_gain.timestamp = timestamp or datetime.datetime.now()
 
-        new_gain = calculate_conversion(new_gain)
+        new_gain = calculate_conversion(new_gain, is_base_currency=(currency_code == self.base_currency))
 
         account.balance = self._safe_add(account.balance, amount)
 
@@ -250,13 +259,13 @@ class TransactionManager:
         return None
 
     def get_net_worth(self):
-        """Calculates total balance of all accounts, converted to EUR."""
+        """Calculates total balance of all accounts, converted to base currency."""
         accounts = self.db_session.query(Account).all()
-        total_eur = 0.0
+        total_base = 0.0
 
         for acc in accounts:
-            if acc.currency_code == "EUR":
-                total_eur = self._safe_add(total_eur, acc.balance)
+            if acc.currency_code == self.base_currency:
+                total_base = self._safe_add(total_base, acc.balance)
             else:
                 # Get the latest rate
                 rate = (self.db_session.query(ExchangeRate)
@@ -266,9 +275,9 @@ class TransactionManager:
 
                 multiplier = rate.fx_multiplier if rate else 1.0
                 converted_balance = float(Decimal(str(acc.balance)) / Decimal(str(multiplier)))
-                total_eur = self._safe_add(total_eur, converted_balance)
+                total_base = self._safe_add(total_base, converted_balance)
 
-        return total_eur
+        return total_base
 
     def transfer_funds(self, origin_id, destination_id, amount_orig, amount_dest, desc, ts=None, transfer_id=None):
         """Transfers funds between two accounts or edits an existing transfer."""

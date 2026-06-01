@@ -267,14 +267,14 @@ class TransactionsView(ctk.CTkFrame):
         """
         sub = base_query.subquery()
 
-        totals_eur = current_session.query(
-            func.sum(case((sub.c.type == 'gain', sub.c.eur_val), else_=0)).label("in_eur"),
-            func.sum(case((sub.c.type == 'expense', sub.c.eur_val), else_=0)).label("out_eur")
+        totals_base = current_session.query(
+            func.sum(case((sub.c.type == 'gain', sub.c.base_val), else_=0)).label("in_base"),
+            func.sum(case((sub.c.type == 'expense', sub.c.base_val), else_=0)).label("out_base")
         ).one()
 
-        in_eur = totals_eur[0] or 0
-        out_eur = totals_eur[1] or 0
-        net_balance = in_eur - out_eur
+        in_base = totals_base[0] or 0
+        out_base = totals_base[1] or 0
+        net_balance = in_base - out_base
 
         raw_breakdown = (current_session.query(
             sub.c.type,
@@ -292,7 +292,7 @@ class TransactionsView(ctk.CTkFrame):
             else:
                 out_dict[curr] = amt
 
-        return (in_eur, in_dict), (out_eur, out_dict), net_balance
+        return (in_base, in_dict), (out_base, out_dict), net_balance
 
     @staticmethod
     def get_unified_transaction_query(current_session):
@@ -302,7 +302,7 @@ class TransactionsView(ctk.CTkFrame):
             Expense.timestamp.label("ts"),
             Expense.amount.label("amount"),
             Expense.currency_code.label("currency"),
-            Expense.converted_amount.label("eur_val"),
+            Expense.converted_amount.label("base_val"),
             Expense.fx_rate.label("fx_rate"),
             Expense.description.label("desc"),
             literal_column("'expense'").label("type"),
@@ -319,7 +319,7 @@ class TransactionsView(ctk.CTkFrame):
             Gain.timestamp.label("ts"),
             Gain.amount.label("amount"),
             Gain.currency_code.label("currency"),
-            Gain.converted_amount.label("eur_val"),
+            Gain.converted_amount.label("base_val"),
             Gain.fx_rate.label("fx_rate"),
             Gain.description.label("desc"),
             literal_column("'gain'").label("type"),
@@ -337,7 +337,7 @@ class TransactionsView(ctk.CTkFrame):
             Transfer.timestamp.label("ts"),
             Transfer.amount_origin.label("amount"),
             origin_account.currency_code.label("currency"),
-            Transfer.amount_destination.label("eur_val"),
+            Transfer.amount_destination.label("base_val"),
             literal_column("NULL").label("fx_rate"),
             Transfer.description.label("desc"),
             literal_column("'transfer_out'").label("type"),
@@ -356,7 +356,7 @@ class TransactionsView(ctk.CTkFrame):
             Transfer.timestamp.label("ts"),
             Transfer.amount_destination.label("amount"),
             dest_account.currency_code.label("currency"),
-            Transfer.amount_origin.label("eur_val"),
+            Transfer.amount_origin.label("base_val"),
             literal_column("NULL").label("fx_rate"),
             Transfer.description.label("desc"),
             literal_column("'transfer_in'").label("type"),
@@ -386,15 +386,15 @@ class TransactionsView(ctk.CTkFrame):
         self.transaction_counter_lbl.configure(text=count_text)
 
         if total_count > 0:
-            (in_eur, in_dict), (out_eur, out_dict), net_bal = self.calculate_totals(current_query, self.db_session)
+            (in_base, in_dict), (out_base, out_dict), net_bal = self.calculate_totals(current_query, self.db_session)
 
-            in_brk = " | ".join([f"{amt:,.2f} {c}" for c, amt in in_dict.items()]) or "0.00 EUR"
-            self.in_lbl.configure(text=f"In: {in_brk}  (Combined: ≈ {in_eur:,.2f} EUR)")
+            in_brk = " | ".join([f"{amt:,.2f} {c}" for c, amt in in_dict.items()]) or f"0.00 {self.manager.base_currency}"
+            self.in_lbl.configure(text=f"In: {in_brk}  (Combined: ≈ {in_base:,.2f} {self.manager.base_currency})")
 
-            out_brk = " | ".join([f"{amt:,.2f} {c}" for c, amt in out_dict.items()]) or "0.00 EUR"
-            self.out_lbl.configure(text=f"Out: {out_brk}  (Combined: ≈ {out_eur:,.2f} EUR)")
+            out_brk = " | ".join([f"{amt:,.2f} {c}" for c, amt in out_dict.items()]) or f"0.00 {self.manager.base_currency}"
+            self.out_lbl.configure(text=f"Out: {out_brk}  (Combined: ≈ {out_base:,.2f} {self.manager.base_currency})")
 
-            self.balance_lbl.configure(text=f"Balance: (≈ {net_bal:,.2f} EUR)")
+            self.balance_lbl.configure(text=f"Balance: (≈ {net_bal:,.2f} {self.manager.base_currency})")
 
             bal_color = "#4CD964" if net_bal >= 0 else "#b13e3e"
             self.balance_lbl.configure(text_color=bal_color)

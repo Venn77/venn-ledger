@@ -45,7 +45,7 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         else:
             initial_date = f"{mem_date} {self.session_time}"
 
-        self.currency_var = ctk.StringVar(value=self.mem.get("currency", "EUR"))
+        self.currency_var = ctk.StringVar(value=self.mem.get("currency", self.manager.base_currency))
         self.date_var = ctk.StringVar(value=initial_date)
         self.project_var = ctk.StringVar(value=self.mem.get("project", ""))
 
@@ -320,7 +320,7 @@ class BaseTransactionWindow(ctk.CTkToplevel):
     def update_fx_list(self):
         """Refreshes FX rate based on currency and date."""
         selected_currency = self.currency_var.get()
-        if selected_currency == "EUR":
+        if selected_currency == self.manager.base_currency:
             self.lbl_fx.grid_forget()
             self.fx_entry.grid_forget()
             return
@@ -378,7 +378,7 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         self._apply_placeholder(self.amount_entry, self.amount_placeholder)
         self._apply_placeholder(self.desc_entry, self.desc_placeholder)
 
-        self.currency_var.set("EUR")
+        self.currency_var.set(self.manager.base_currency)
         self.project_var.set("")
         self.date_var.set(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
@@ -403,7 +403,7 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         date_ok = self.is_valid_date(self.date_var.get())
         cur_ok = self.currency_var.get() != ""
         fx_val = self.fx_entry.get()
-        fx_ok = self.currency_var.get() == "EUR" or (
+        fx_ok = self.currency_var.get() == self.manager.base_currency or (
                     fx_val != self.fx_placeholder and fx_val.strip() != "" and self.is_float(fx_val))
 
         if not (amt_ok and date_ok and cur_ok and fx_ok):
@@ -437,7 +437,7 @@ class BaseTransactionWindow(ctk.CTkToplevel):
             amt = float(self.amount_entry.get().replace(",", "."))
             cur = self.currency_var.get()
             ts = datetime.datetime.strptime(self.date_var.get(), "%Y-%m-%d %H:%M:%S")
-            fx_rate = None if cur == "EUR" else float(self.fx_entry.get().replace(",", "."))
+            fx_rate = None if cur == self.manager.base_currency else float(self.fx_entry.get().replace(",", "."))
             descr = "" if self.desc_entry.get() == self.desc_placeholder else self.desc_entry.get()
             proj = self.project_var.get()
 
@@ -572,7 +572,7 @@ class AddExpenseWindow(BaseTransactionWindow):
     def clear_specific_fields(self):
         self.category_combo.reset()
         self.vendor_combo.reset()
-        self.on_currency_change("EUR")
+        self.on_currency_change(self.manager.base_currency)
 
     def validate_specific_fields(self):
         if self.pm_menu.get() in ["", "No valid PM found"]:
@@ -688,7 +688,7 @@ class AddGainWindow(BaseTransactionWindow):
     def clear_specific_fields(self):
         self.stream_combo.reset()
         self.payer_combo.reset()
-        self.on_currency_change("EUR")
+        self.on_currency_change(self.manager.base_currency)
 
     def validate_specific_fields(self):
         if self.acc_menu.get() in ["", "No valid Account found"]:
@@ -742,7 +742,7 @@ class AddTransferWindow(BaseTransactionWindow):
         title = "Edit Transfer" if transaction_data and transaction_data.get("id") else "New Transfer"
         super().__init__(parent, manager, title, transaction_data, db_session=db_session)
 
-        self.currency_var.set("EUR")
+        self.currency_var.set(self.manager.base_currency)
         self.origin_acc = None
         self.dest_acc = None
         self.auto_mirror = True

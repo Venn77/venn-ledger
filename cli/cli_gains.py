@@ -51,7 +51,7 @@ def run_gain_ui():
 
     # 7. FX Logic
     fx_rate = None
-    if account.currency_code != "EUR":
+    if account.currency_code != manager.base_currency:
         # Get exchange rate from description
         rate_source = None
         fx_rate = extract_exchange_rate(descr)
@@ -68,7 +68,7 @@ def run_gain_ui():
         if fx_rate and rate_source == 'description':
             choice = input(f"   ? Use exchange rate '{fx_rate}'? (y/n): ").lower()
             if choice != 'y':
-                fx_rate = get_valid_float(f"Enter the exchange rate ('EUR' -> '{account.currency_code}'): ")
+                fx_rate = get_valid_float(f"Enter the exchange rate ('{manager.base_currency}' -> '{account.currency_code}'): ")
         elif fx_rate and rate_source == 'db':
             # Auto accept rate if obtained from db
             fx_rate = fx_rate
@@ -76,7 +76,7 @@ def run_gain_ui():
         else:
             print(f"   ! No rate found in description or DB for {account.currency_code}.")
             # Manual rate input if not found
-            fx_rate = get_valid_float(f"Enter the exchange rate ('EUR' -> '{account.currency_code}'): ")
+            fx_rate = get_valid_float(f"Enter the exchange rate ('{manager.base_currency}' -> '{account.currency_code}'): ")
 
     # 8. Resolve project
     project_str = get_active_project("\nChoose Project to use (or 's' for None): ", db_session)

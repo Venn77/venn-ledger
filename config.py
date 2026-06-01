@@ -31,4 +31,17 @@ os.makedirs(DB_DIR, exist_ok=True)
 os.makedirs(USER_CONFIG_DIR, exist_ok=True)
 os.makedirs(LOG_DIR, exist_ok=True)
 
+CURRENCY_SYMBOLS = {
+    "EUR": "€", "USD": "$", "GBP": "£", "JPY": "¥", "CNY": "¥",
+    "INR": "₹", "KRW": "₩", "RUB": "₽", "ILS": "₪", "THB": "฿",
+    "VND": "₫", "PHP": "₱", "NGN": "₦", "ZAR": "R",
+
+    "CAD": "$", "AUD": "$", "NZD": "$", "MXN": "$", "ARS": "$",
+    "CLP": "$", "COP": "$", "SGD": "$", "HKD": "$",
+
+    "CHF": "CHF", "SEK": "kr", "NOK": "kr", "DKK": "kr", "ISK": "kr",
+    "BRL": "R$", "PLN": "zł", "CZK": "Kč", "HUF": "Ft", "RON": "lei",
+    "IDR": "Rp", "MYR": "RM", "AED": "د.إ", "SAR": "﷼"
+}
+
 

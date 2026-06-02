@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import json, os, sys, traceback
 from typing import Any
 from config import CONFIG_PATH, IS_COMPILED, ERROR_LOG_PATH
-from database.models import Session, Account, Transfer
+from database.models import Session, Account, Transfer, Currency
 from core import manager as finance_manager
 from utils.icon_manager import get_icon
 from gui.transaction_forms import AddExpenseWindow, AddGainWindow, AddTransferWindow
@@ -11,6 +11,7 @@ from gui.transactions_view import TransactionsView
 from gui.settings_view import SettingsView
 from gui.ai_view import AIImportView
 from gui.dashboard_view import DashboardView
+from gui.wizard import FirstRunWizard
 
 
 if IS_COMPILED:
@@ -20,20 +21,21 @@ if IS_COMPILED:
             traceback.print_exception(exc_type, exc_value, exc_traceback, file=log_file)
             log_file.write("\n")
 
-
     sys.excepthook = global_exception_handler
 
 
 class FinanceApp(ctk.CTk):
     def __init__(self):
         super().__init__()
+        if IS_COMPILED:
+            self.report_callback_exception = global_exception_handler
         self.title("Venn Ledger 2026")
         self.geometry("1440x700")
         self.minsize(1440,700)
         self.maxsize(1440,980)
         ctk.set_appearance_mode("dark")
         self.db_session = Session()
-        self.manager = finance_manager.TransactionManager(self.db_session)
+        base_exists = self.db_session.query(Currency).filter_by(is_base=True).first()
         self.cal_window = None
         self.active_expense_window = None
         self.active_gain_window = None
@@ -41,6 +43,16 @@ class FinanceApp(ctk.CTk):
         self.reorder_mode = None
         self.selected_account_id = None
         self.filter_account_id = None
+
+        if not base_exists:
+            self.withdraw()
+            FirstRunWizard(self, self.db_session, self._finish_init)
+        else:
+            self._finish_init()
+
+    def _finish_init(self):
+        """Called either immediately (if DB exists) or after the Wizard finishes."""
+        self.manager = finance_manager.TransactionManager(self.db_session)
         self.bar_chart_icon = get_icon("bar_chart.png", size=(18, 18), light_filename="bar_chart_lm.png")
         self.bolt_icon = get_icon("bolt.png", size=(18, 18), light_filename="bolt_lm.png")
         self.trending_up_icon = get_icon("trending_up.png", size=(18, 18), light_filename="trending_up_lm.png")
@@ -59,10 +71,12 @@ class FinanceApp(ctk.CTk):
         }
 
         self._build_sidebar()
-
         self.switch_view("transactions")
-
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+        self.deiconify()
+        # noinspection PyTypeChecker
+        self.after(0, lambda: self.state('zoomed'))
 
     def _build_sidebar(self):
         """Builds the permanent sidebar and navigation buttons."""
@@ -468,8 +482,6 @@ class FinanceApp(ctk.CTk):
 
 if __name__ == "__main__":
     app = FinanceApp()
-    # noinspection PyTypeChecker
-    app.after(0, lambda: app.state('zoomed'))
     app.mainloop()
 
 

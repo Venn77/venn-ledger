@@ -360,3 +360,49 @@ class TransactionManager:
             self.db_session.rollback()
             raise e
 
+def seed_fresh_database(db_session, base_code, base_name, base_symbol, checking_bal=0.0, cash_bal=0.0):
+    """
+    Called during the First-Run Wizard.
+    Populates a fresh database with essential starter data.
+    """
+    try:
+        base_curr = Currency(code=base_code, name=base_name, symbol=base_symbol, active_bool=True, is_base=True)
+        db_session.add(base_curr)
+        db_session.flush()
+
+        cash_acc = Account(
+            name=f"Cash ({base_code})",
+            description="Physical cash on hand",
+            currency_code=base_code,
+            balance=cash_bal,
+            initial_balance=cash_bal
+        )
+
+        checking_acc = Account(
+            name=f"Bank Account ({base_code})",
+            description="Daily spending account",
+            currency_code=base_code,
+            balance=checking_bal,
+            initial_balance=checking_bal
+        )
+
+        db_session.add_all([cash_acc, checking_acc])
+        db_session.flush()
+
+        db_session.add_all([
+            PaymentMethod(name=f"Cash ({base_code})", account_id=cash_acc.id),
+            PaymentMethod(name=f"Debit Card ({base_code})", account_id=checking_acc.id)
+        ])
+
+        for cat in ["Groceries", "Housing", "Transport", "Utilities", "Dining Out", "Entertainment", "Health", "Shopping"]:
+            db_session.add(Category(name=cat))
+
+        for stream in ["Salary", "Freelance", "Refunds", "Gifts", "Interest"]:
+            db_session.add(Stream(name=stream))
+
+        db_session.commit()
+    except Exception as e:
+        db_session.rollback()
+        raise RuntimeError(f"Failed to seed initial data: {e}")
+
+

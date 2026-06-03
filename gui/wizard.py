@@ -19,8 +19,10 @@ class FirstRunWizard(ctk.CTkToplevel):
         self.grab_set()
 
         self.update_idletasks()
-        x = self.winfo_x() + (self.winfo_width() // 2) - (450 // 2)
-        y = self.winfo_y() + (self.winfo_height() // 2) - (300 // 2)
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        x = int((screen_width / 2) - (450 / 2))
+        y = int((screen_height / 2) - (480 / 2))
         self.geometry(f"+{x}+{y}")
 
         self._build_ui()
@@ -37,18 +39,22 @@ class FirstRunWizard(ctk.CTkToplevel):
         ctk.CTkLabel(form_frame, text="Base Currency:", font=("JetBrains Mono", 12, "bold")).grid(row=0, column=0,
                                                                                                   sticky="e", padx=15,
                                                                                                   pady=10)
-        codes = sorted(list(CURRENCY_SYMBOLS.keys()))
+        codes = sorted(list(CURRENCY_SYMBOLS.keys())) + ["Custom..."]
         self.code_var = ctk.StringVar(value="EUR")
         self.code_dropdown = ctk.CTkOptionMenu(form_frame, values=codes, variable=self.code_var,
                                                command=self._on_code_change)
         self.code_dropdown.grid(row=0, column=1, sticky="w", padx=10, pady=10)
 
-        ctk.CTkLabel(form_frame, text="Symbol:", font=("JetBrains Mono", 12, "bold")).grid(row=1, column=0, sticky="e",
+        self.custom_code_var = ctk.StringVar(value="")
+        self.custom_code_entry = ctk.CTkEntry(form_frame, textvariable=self.custom_code_var, width=80,
+                                              placeholder_text="e.g. BTC")
+
+        ctk.CTkLabel(form_frame, text="Symbol:", font=("JetBrains Mono", 12, "bold")).grid(row=2, column=0, sticky="e",
                                                                                            padx=15, pady=10)
         self.symbol_var = ctk.StringVar(value="€")
         self.symbol_entry = ctk.CTkEntry(form_frame, textvariable=self.symbol_var, width=60, state="disabled",
                                          text_color="#5AC8FA", font=("JetBrains Mono", 14, "bold"))
-        self.symbol_entry.grid(row=1, column=1, sticky="w", padx=10, pady=10)
+        self.symbol_entry.grid(row=2, column=1, sticky="w", padx=10, pady=10)
 
         bal_frame = ctk.CTkFrame(self, fg_color="gray15", corner_radius=8)
         bal_frame.pack(pady=10, padx=20, fill="x")
@@ -76,16 +82,19 @@ class FirstRunWizard(ctk.CTkToplevel):
         self.btn_start.pack(pady=(5, 20))
 
     def _on_code_change(self, new_code):
-        symbol = CURRENCY_SYMBOLS.get(new_code, new_code)
-        self.symbol_var.set(symbol)
+        if new_code == "Custom...":
+            self.custom_code_entry.grid(row=1, column=1, sticky="w", padx=10, pady=(0, 10))
+            self.symbol_entry.configure(state="normal")
+            self.symbol_var.set("")
+        else:
+            self.custom_code_entry.grid_forget()
+            self.symbol_entry.configure(state="disabled")
+            self.symbol_var.set(CURRENCY_SYMBOLS.get(new_code, new_code))
 
     def _on_close_attempt(self):
         self.parent_app.on_closing()
 
     def _submit(self):
-        code = self.code_var.get()
-        symbol = self.symbol_var.get()
-
         raw_check = self.check_var.get().strip().replace(",", ".")
         raw_cash = self.cash_var.get().strip().replace(",", ".")
 
@@ -94,6 +103,14 @@ class FirstRunWizard(ctk.CTkToplevel):
             cash_bal = float(raw_cash) if raw_cash else 0.0
         except ValueError:
             self.lbl_error.configure(text="⚠ Balances must be valid numbers (e.g. 1500.50)")
+            return
+
+        raw_code = self.code_var.get()
+        code = self.custom_code_var.get().strip().upper() if raw_code == "Custom..." else raw_code
+        symbol = self.symbol_var.get().strip()
+
+        if raw_code == "Custom..." and (not code or not symbol):
+            self.lbl_error.configure(text="⚠ Please provide both a Code and a Symbol.")
             return
 
         seed_fresh_database(self.db_session, code, f"{code} Currency", symbol, check_bal, cash_bal)

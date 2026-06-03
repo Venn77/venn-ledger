@@ -71,6 +71,7 @@ class FinanceApp(ctk.CTk):
         }
 
         self._build_sidebar()
+        self.bind("<<DataChanged>>", lambda e: self.refresh_accounts())
         self.switch_view("transactions")
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 

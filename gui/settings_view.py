@@ -75,6 +75,7 @@ class SettingsView(ctk.CTkFrame):
         = self.proj_grid = self.curr_grid\
         = self.fx_grid = self.loading_popup\
         = self._backup_cancelled = None
+        self.app.bind("<<DataChanged>>", lambda e: self.refresh_view(), add="+")
         # noinspection PyTypeChecker
         self.after(50, self.on_tab_change)
 
@@ -99,8 +100,6 @@ class SettingsView(ctk.CTkFrame):
 
             self.pm_grid = PMGrid(self.tab_accounts, self.db_session)
             self.pm_grid.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
-
-            self.acc_grid.bind("<<DataChanged>>", self.pm_grid.load_data)
 
         elif tab_name == "Categories & Streams":
 

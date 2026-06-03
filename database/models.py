@@ -231,19 +231,4 @@ class Transfer(Base):
 
 Base.metadata.create_all(engine)
 
-# def seed_initial_data():
-#     """Ensures critical base data exists in a fresh installation."""
-#     local_session = Session()
-#     try:
-#         eur = local_session.query(Currency).filter_by(code="EUR").first()
-#         if not eur:
-#             local_session.add(Currency(code="EUR", name="Euro", active_bool=True))
-#             local_session.commit()
-#             print("Database initialized: Seeded base currency (EUR).")
-#     except Exception as e:
-#         local_session.rollback()
-#         print(f"Failed to seed initial data: {e}")
-#     finally:
-#         local_session.close()
-#
-# seed_initial_data()
+

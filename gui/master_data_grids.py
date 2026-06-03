@@ -221,6 +221,7 @@ class CurrencyGrid(ctk.CTkFrame):
         item.active_bool = not item.active_bool
         self.db_session.commit()
         self.load_data()
+        self.winfo_toplevel().event_generate("<<DataChanged>>")
 
     def add_new(self):
         def _save(code, name):
@@ -228,6 +229,7 @@ class CurrencyGrid(ctk.CTkFrame):
             self.db_session.add(Currency(code=code, name=name, is_base=False))
             self.db_session.commit()
             self.load_data()
+            self.winfo_toplevel().event_generate("<<DataChanged>>")
             return True, ""
 
         CurrencyDialog(self, "Add Currency", on_submit=_save)
@@ -253,7 +255,11 @@ class ExchangeRateGrid(ctk.CTkFrame):
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", pady=(0, 10))
         ctk.CTkLabel(header, text="Exchange Rates", font=("JetBrains Mono", 16, "bold")).pack(side="left")
-        ctk.CTkButton(header, text="+ Log New Rate", width=130, command=self.add_new).pack(side="right")
+        self.btn_add = ctk.CTkButton(header, text="+ Log New Rate", width=130, command=self.add_new)
+        self.btn_add.pack(side="right")
+
+        self.lbl_warning = ctk.CTkLabel(self, text="⚠ Add a foreign currency in 'Currencies' to log rates.",
+                                        text_color="orange", font=("JetBrains Mono", 11))
 
         self.loading_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.loading_lbl = ctk.CTkLabel(self.loading_frame, text="Loading...", font=("JetBrains Mono", 16, "bold"),
@@ -317,7 +323,15 @@ class ExchangeRateGrid(ctk.CTkFrame):
 
     def _finish_loading(self):
         self.loading_frame.pack_forget()
-        self.scroll.pack(fill="both", expand=True)
+        act_currencies = [c for c in self.db_session.query(Currency).filter_by(active_bool=True).all() if not c.is_base]
+        if not act_currencies:
+            self.btn_add.configure(state="disabled")
+            self.scroll.pack_forget()
+            self.lbl_warning.pack(pady=5)
+        else:
+            self.btn_add.configure(state="normal")
+            self.lbl_warning.pack_forget()
+            self.scroll.pack(fill="both", expand=True)
 
     def delete(self, rate_id):
         rate = self.db_session.get(ExchangeRate, rate_id)
@@ -343,9 +357,19 @@ class ExchangeRateGrid(ctk.CTkFrame):
 
         def _confirm():
             if rate:
+                rate_count = self.db_session.query(ExchangeRate).filter_by(currency_code=rate.currency_code).count()
+                acc_count = self.db_session.query(Account).filter_by(currency_code=rate.currency_code).count()
+
+                if rate_count <= 1 and acc_count > 0:
+                    show_popup(self, "Action Blocked",
+                               f"Cannot delete the last {rate.currency_code} rate.\nYou have accounts depending on it.",
+                               is_error=True)
+                    popup.destroy()
+                    return
                 self.db_session.delete(rate)
                 self.db_session.commit()
                 self.load_data()
+                self.winfo_toplevel().event_generate("<<DataChanged>>")
             popup.destroy()
 
         ctk.CTkButton(btn_frame, text="Cancel", width=70, fg_color="gray40", command=popup.destroy).pack(side="left",
@@ -363,6 +387,7 @@ class ExchangeRateGrid(ctk.CTkFrame):
             self.db_session.add(ExchangeRate(currency_code=code, fx_multiplier=rate, timestamp=timestamp))
             self.db_session.commit()
             self.load_data()
+            self.winfo_toplevel().event_generate("<<DataChanged>>")
             return True, ""
 
         FXDialog(self, active_currencies=act_currencies, on_submit=_save)
@@ -438,17 +463,23 @@ class AccountGrid(ctk.CTkFrame):
         self.db_session.commit()
         self.load_data()
 
-        self.event_generate("<<DataChanged>>")
+        self.winfo_toplevel().event_generate("<<DataChanged>>")
 
     def add_new(self):
         currencies = [c.code for c in self.db_session.query(Currency).filter_by(active_bool=True).all()]
         if not currencies: return
 
-        def _save(name, descr, curr, bal):
+        def _save(name, descr, curr_code, bal):
+            curr_obj = self.db_session.query(Currency).filter_by(code=curr_code).first()
+            if not curr_obj.is_base:
+                has_rate = self.db_session.query(ExchangeRate).filter_by(currency_code=curr_code).first()
+                if not has_rate:
+                    return False, f"You must log an Exchange Rate for {curr_code} first."
             if self.db_session.query(Account).filter_by(name=name).first(): return False, "Name already exists."
-            self.db_session.add(Account(name=name, description=descr, currency_code=curr, balance=bal, initial_balance=bal))
+            self.db_session.add(Account(name=name, description=descr, currency_code=curr_code, balance=bal, initial_balance=bal))
             self.db_session.commit()
             self.load_data()
+            self.winfo_toplevel().event_generate("<<DataChanged>>")
             return True, ""
 
         AccountDialog(self, currencies, on_submit=_save)
@@ -461,6 +492,7 @@ class AccountGrid(ctk.CTkFrame):
             acc.description = descr
             self.db_session.commit()
             self.load_data()
+            self.winfo_toplevel().event_generate("<<DataChanged>>")
             return True, ""
 
         AccountDialog(self, [], initial_name=acc.name, initial_desc=acc.description, initial_curr=acc.currency_code,

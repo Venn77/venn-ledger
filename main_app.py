@@ -71,7 +71,7 @@ class FinanceApp(ctk.CTk):
         }
 
         self._build_sidebar()
-        self.bind("<<DataChanged>>", lambda e: self.refresh_accounts())
+        self.bind("<<SidebarUpdate>>", lambda e: self.refresh_accounts())
         self.switch_view("transactions")
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
@@ -218,6 +218,16 @@ class FinanceApp(ctk.CTk):
             # Hover colors
             hover_bg = "#2c5d8f" if is_filtered else "gray30"
 
+            # Account colors
+            is_active = acc.active_bool
+            name_text = acc.name.upper() if is_active else f"{acc.name.upper()} (INACTIVE)"
+            name_color = "white" if is_active else "gray50"
+
+            if not is_active:
+                bal_color = "gray50"
+            else:
+                bal_color = "#FF6B6B" if acc.balance < 0 else "white"
+
             # Compact Card
             acc_card = ctk.CTkFrame(self.acc_scroll, fg_color=base_bg, border_color=border_col, border_width=border_w, corner_radius=4)
             acc_card.pack(pady=2, padx=5, fill="x")
@@ -235,12 +245,11 @@ class FinanceApp(ctk.CTk):
             acc_card.bind("<Button-1>", lambda e, aid=acc.id: self.handle_account_click(aid))
 
             # Row 1: Name
-            ctk.CTkLabel(acc_card, text=acc.name.upper(),
+            ctk.CTkLabel(acc_card, text=name_text, text_color=name_color,
                          font=("JetBrains Mono", 10),
                          anchor="w", height=15).pack(fill="x", padx=10, pady=(5, 0))
 
             # Row 2: Balance
-            bal_color = "#FF6B6B" if acc.balance < 0 else "white"
             ctk.CTkLabel(acc_card, text=f"{acc.balance:,.2f} {acc.currency_code}",
                          font=("JetBrains Mono", 12, "bold"), text_color=bal_color,
                          anchor="w", height=20).pack(fill="x", padx=10, pady=(0, 5))

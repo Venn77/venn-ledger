@@ -221,7 +221,7 @@ class CurrencyGrid(ctk.CTkFrame):
         item.active_bool = not item.active_bool
         self.db_session.commit()
         self.load_data()
-        self.winfo_toplevel().event_generate("<<DataChanged>>")
+        self.winfo_toplevel().event_generate("<<SettingsUpdate>>")
 
     def add_new(self):
         def _save(code, name):
@@ -229,7 +229,7 @@ class CurrencyGrid(ctk.CTkFrame):
             self.db_session.add(Currency(code=code, name=name, is_base=False))
             self.db_session.commit()
             self.load_data()
-            self.winfo_toplevel().event_generate("<<DataChanged>>")
+            self.winfo_toplevel().event_generate("<<SettingsUpdate>>")
             return True, ""
 
         CurrencyDialog(self, "Add Currency", on_submit=_save)
@@ -369,7 +369,7 @@ class ExchangeRateGrid(ctk.CTkFrame):
                 self.db_session.delete(rate)
                 self.db_session.commit()
                 self.load_data()
-                self.winfo_toplevel().event_generate("<<DataChanged>>")
+                self.winfo_toplevel().event_generate("<<SidebarUpdate>>")
             popup.destroy()
 
         ctk.CTkButton(btn_frame, text="Cancel", width=70, fg_color="gray40", command=popup.destroy).pack(side="left",
@@ -387,7 +387,7 @@ class ExchangeRateGrid(ctk.CTkFrame):
             self.db_session.add(ExchangeRate(currency_code=code, fx_multiplier=rate, timestamp=timestamp))
             self.db_session.commit()
             self.load_data()
-            self.winfo_toplevel().event_generate("<<DataChanged>>")
+            self.winfo_toplevel().event_generate("<<SidebarUpdate>>")
             return True, ""
 
         FXDialog(self, active_currencies=act_currencies, on_submit=_save)
@@ -463,7 +463,8 @@ class AccountGrid(ctk.CTkFrame):
         self.db_session.commit()
         self.load_data()
 
-        self.winfo_toplevel().event_generate("<<DataChanged>>")
+        self.winfo_toplevel().event_generate("<<SidebarUpdate>>")
+        self.winfo_toplevel().event_generate("<<SettingsUpdate>>")
 
     def add_new(self):
         currencies = [c.code for c in self.db_session.query(Currency).filter_by(active_bool=True).all()]
@@ -479,7 +480,7 @@ class AccountGrid(ctk.CTkFrame):
             self.db_session.add(Account(name=name, description=descr, currency_code=curr_code, balance=bal, initial_balance=bal))
             self.db_session.commit()
             self.load_data()
-            self.winfo_toplevel().event_generate("<<DataChanged>>")
+            self.winfo_toplevel().event_generate("<<SidebarUpdate>>")
             return True, ""
 
         AccountDialog(self, currencies, on_submit=_save)
@@ -492,7 +493,8 @@ class AccountGrid(ctk.CTkFrame):
             acc.description = descr
             self.db_session.commit()
             self.load_data()
-            self.winfo_toplevel().event_generate("<<DataChanged>>")
+            self.winfo_toplevel().event_generate("<<SidebarUpdate>>")
+            self.winfo_toplevel().event_generate("<<SettingsUpdate>>")
             return True, ""
 
         AccountDialog(self, [], initial_name=acc.name, initial_desc=acc.description, initial_curr=acc.currency_code,
@@ -522,7 +524,7 @@ class PMGrid(ctk.CTkFrame):
                 side="left", padx=10, pady=8)
 
             acc_color = "gray60" if not item.account.active_bool else "#5AC8FA"
-            acc_text = f"→ {item.account.name}" + (" (Inactive)" if not item.account.active_bool else "")
+            acc_text = f"→ {item.account.name}"
             ctk.CTkLabel(row, text=acc_text, width=150, anchor="w", text_color=acc_color,
                          font=("JetBrains Mono", 11)).pack(side="left", padx=5)
 

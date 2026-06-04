@@ -75,7 +75,7 @@ class SettingsView(ctk.CTkFrame):
         = self.proj_grid = self.curr_grid\
         = self.fx_grid = self.loading_popup\
         = self._backup_cancelled = None
-        self.app.bind("<<DataChanged>>", lambda e: self.refresh_view(), add="+")
+        self.app.bind("<<SettingsUpdate>>", lambda e: self.refresh_view(), add="+")
         # noinspection PyTypeChecker
         self.after(50, self.on_tab_change)
 

@@ -43,6 +43,7 @@ class FinanceApp(ctk.CTk):
         self.reorder_mode = None
         self.selected_account_id = None
         self.filter_account_id = None
+        self.current_net_worth = 0.0
 
         if not base_exists:
             self.withdraw()
@@ -102,6 +103,13 @@ class FinanceApp(ctk.CTk):
 
         self.nw_frame = ctk.CTkFrame(self.sidebar, fg_color="gray15", corner_radius=8)
         self.nw_frame.pack(fill="x", pady=(0, 15), padx=15)
+
+        self.lbl_nw_title = ctk.CTkLabel(self.nw_frame, text="TOTAL NET WORTH", font=("JetBrains Mono", 10, "bold"),
+                                         text_color="gray")
+        self.lbl_nw_title.pack(pady=(8, 0))
+
+        self.lbl_nw_val = ctk.CTkLabel(self.nw_frame, text="...", font=("JetBrains Mono", 18, "bold"))
+        self.lbl_nw_val.pack(pady=(0, 8))
 
         self.reorder_btn = ctk.CTkButton(self.sidebar, text="Reorder Accounts", image=self.reorder_icon, compound="left", fg_color="transparent",
                                          border_width=1, command=self.toggle_reorder_mode)
@@ -170,16 +178,7 @@ class FinanceApp(ctk.CTk):
 
     def refresh_accounts(self):
         """Builds the account buttons and the Net Worth summary."""
-        for widget in self.nw_frame.winfo_children():
-            widget.destroy()
-
-        # Net Worth
-        net_worth = self.manager.get_net_worth()
-        net_worth_color = "#FF6B6B" if net_worth <= 0 else "#4CD964"
-
-        ctk.CTkLabel(self.nw_frame, text="TOTAL NET WORTH", font=("JetBrains Mono", 10, "bold"), text_color="gray").pack(pady=(8, 0))
-        ctk.CTkLabel(self.nw_frame, text=f"{self.manager.base_currency_symbol} {net_worth:,.2f}", font=("JetBrains Mono", 18, "bold"), text_color=net_worth_color).pack(
-            pady=(0, 8))
+        self.update_net_worth()
 
         # Account cards
         for widget in self.acc_scroll.winfo_children():
@@ -258,6 +257,42 @@ class FinanceApp(ctk.CTk):
                 child.bind("<Button-1>", lambda e, aid=acc.id: self.handle_account_click(aid))
                 child.bind("<Enter>", on_enter)
                 child.bind("<Leave>", on_leave)
+
+    def update_net_worth(self):
+        """Calculates Net Worth and triggers the rolling number animation."""
+        new_nw = self.manager.get_net_worth()
+
+        if abs(new_nw - self.current_net_worth) < 0.01:
+            settle_color = "#FF6B6B" if new_nw <= 0 else "white"
+            self.lbl_nw_val.configure(text=f"{self.manager.base_currency_symbol} {new_nw:,.2f}",
+                                      text_color=settle_color)
+            return
+
+        difference = new_nw - self.current_net_worth
+        flash_color = "#4CD964" if difference > 0 else "#FF6B6B"
+        settle_color = "#FF6B6B" if new_nw <= 0 else "white"
+
+        self._animate_odometer(self.current_net_worth, new_nw, flash_color, settle_color, steps=20, current_step=0)
+
+        self.current_net_worth = new_nw
+
+    def _animate_odometer(self, start_val, end_val, flash_color, settle_color, steps, current_step):
+        """Recursive Tkinter loop that physically rolls the numbers."""
+        if current_step <= steps:
+            progress = current_step / steps
+            current_val = start_val + ((end_val - start_val) * progress)
+
+            self.lbl_nw_val.configure(
+                text=f"{self.manager.base_currency_symbol} {current_val:,.2f}",
+                text_color=flash_color
+            )
+            self.after(15, self._animate_odometer, start_val, end_val, flash_color, settle_color, steps,
+                       current_step + 1)
+        else:
+            self.lbl_nw_val.configure(
+                text=f"{self.manager.base_currency_symbol} {end_val:,.2f}",
+                text_color=settle_color
+            )
 
     def toggle_reorder_mode(self):
         self.reorder_mode = not self.reorder_mode

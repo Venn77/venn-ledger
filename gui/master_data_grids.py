@@ -197,6 +197,10 @@ class CurrencyGrid(ctk.CTkFrame):
             if item.is_base:
                 ctk.CTkLabel(row, text="[BASE]", text_color="#4CD964", font=("JetBrains Mono", 10, "bold")).pack(
                     side="left", padx=5)
+            else:
+                math_symbol = "[ × ]" if item.quotation_method == "multiply" else "[ ÷ ]"
+                ctk.CTkLabel(row, text=math_symbol, text_color="gray50", font=("JetBrains Mono", 10, "bold")).pack(
+                    side="left", padx=5)
 
             btn_frame = ctk.CTkFrame(row, fg_color="transparent")
             btn_frame.pack(side="right", padx=10)

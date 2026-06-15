@@ -17,9 +17,11 @@ class TransactionManager:
         if base_curr:
             self.base_currency = base_curr.code
             self.base_currency_symbol = base_curr.symbol
+            self.base_currency_decimals = base_curr.decimals
         else:
             self.base_currency = "EUR"
             self.base_currency_symbol = "€"
+            self.base_currency_decimals = 2
 
         self.last_used = {
             "currency": self.base_currency,
@@ -117,7 +119,12 @@ class TransactionManager:
         new_expense.description = description
         new_expense.timestamp = timestamp or datetime.datetime.now()
 
-        new_expense = calculate_conversion(new_expense, is_base_currency=(currency_code == self.base_currency))
+        curr_obj = self.db_session.get(Currency, currency_code)
+        q_method = curr_obj.quotation_method if curr_obj else "divide"
+        c_decimals = curr_obj.decimals if curr_obj else 2
+
+        new_expense = calculate_conversion(new_expense, is_base_currency=(currency_code == self.base_currency),
+                                           quotation_method=q_method, decimals=c_decimals)
 
         account.balance = self._safe_sub(account.balance, amount)
 
@@ -177,7 +184,12 @@ class TransactionManager:
         new_gain.description = description
         new_gain.timestamp = timestamp or datetime.datetime.now()
 
-        new_gain = calculate_conversion(new_gain, is_base_currency=(currency_code == self.base_currency))
+        curr_obj = self.db_session.get(Currency, currency_code)
+        q_method = curr_obj.quotation_method if curr_obj else "divide"
+        c_decimals = curr_obj.decimals if curr_obj else 2
+
+        new_gain = calculate_conversion(new_gain, is_base_currency=(currency_code == self.base_currency),
+                                        quotation_method=q_method, decimals=c_decimals)
 
         account.balance = self._safe_add(account.balance, amount)
 
@@ -274,7 +286,10 @@ class TransactionManager:
                         .first())
 
                 multiplier = rate.fx_multiplier if rate else 1.0
-                converted_balance = float(Decimal(str(acc.balance)) / Decimal(str(multiplier)))
+                if acc.currency.quotation_method == "multiply":
+                    converted_balance = float(Decimal(str(acc.balance)) * Decimal(str(multiplier)))
+                else:
+                    converted_balance = float(Decimal(str(acc.balance)) / Decimal(str(multiplier)))
                 total_base = self._safe_add(total_base, converted_balance)
 
         return total_base
@@ -360,13 +375,14 @@ class TransactionManager:
             self.db_session.rollback()
             raise e
 
-def seed_fresh_database(db_session, base_code, base_name, base_symbol, checking_bal=0.0, cash_bal=0.0):
+def seed_fresh_database(db_session, base_code, base_name, base_symbol, checking_bal=0.0, cash_bal=0.0, base_decimals=2):
     """
     Called during the First-Run Wizard.
     Populates a fresh database with essential starter data.
     """
     try:
-        base_curr = Currency(code=base_code, name=base_name, symbol=base_symbol, active_bool=True, is_base=True)
+        base_curr = Currency(code=base_code, name=base_name, symbol=base_symbol, active_bool=True, is_base=True,
+                             decimals=base_decimals)
         db_session.add(base_curr)
         db_session.flush()
 

@@ -86,10 +86,13 @@ class FirstRunWizard(ctk.CTkToplevel):
             self.custom_code_entry.grid(row=1, column=1, sticky="w", padx=10, pady=(0, 10))
             self.symbol_entry.configure(state="normal")
             self.symbol_var.set("")
+            self.decimals = 2
         else:
             self.custom_code_entry.grid_forget()
             self.symbol_entry.configure(state="disabled")
-            self.symbol_var.set(CURRENCY_SYMBOLS.get(new_code, new_code))
+            currency_data = CURRENCY_SYMBOLS.get(new_code, {"symbol": new_code, "decimals": 2})
+            self.symbol_var.set(currency_data["symbol"])
+            self.decimals = currency_data["decimals"]
 
     def _on_close_attempt(self):
         self.parent_app.on_closing()
@@ -113,7 +116,7 @@ class FirstRunWizard(ctk.CTkToplevel):
             self.lbl_error.configure(text="⚠ Please provide both a Code and a Symbol.")
             return
 
-        seed_fresh_database(self.db_session, code, f"{code} Currency", symbol, check_bal, cash_bal)
+        seed_fresh_database(self.db_session, code, f"{code} Currency", symbol, check_bal, cash_bal, self.decimals)
 
         self.grab_release()
         self.destroy()

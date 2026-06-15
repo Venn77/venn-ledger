@@ -18,24 +18,30 @@ def set_sqlite_pragma(dbapi_connection, _connection_record):
     cursor.execute("PRAGMA synchronous=NORMAL")
     cursor.close()
 
-def calculate_conversion(item, is_base_currency=False):
+def calculate_conversion(item, is_base_currency=False, quotation_method="divide", decimals=2):
     """Returns converted amount with two decimals."""
+    precision_string = "0." + ("0" * decimals) if decimals > 0 else "0"
     if is_base_currency or not getattr(item, 'fx_rate', None):
-        val = Decimal(str(item.amount)).quantize(Decimal("0.00"), rounding=ROUND_HALF_UP)
+        val = Decimal(str(item.amount)).quantize(Decimal(precision_string), rounding=ROUND_HALF_UP)
         item.converted_amount = float(val)
         item.fx_rate = None
     else:
-        raw_val = Decimal(str(item.amount)) / Decimal(str(item.fx_rate))
-        val = raw_val.quantize(Decimal("0.00"), rounding=ROUND_HALF_UP)
+        if quotation_method == "multiply":
+            raw_val = Decimal(str(item.amount)) * Decimal(str(item.fx_rate))
+        else:
+            raw_val = Decimal(str(item.amount)) / Decimal(str(item.fx_rate))
+        val = raw_val.quantize(Decimal(precision_string), rounding=ROUND_HALF_UP)
         item.converted_amount = float(val)
     return item
 
 class Currency(Base):
     __tablename__ = 'currencies'
-    code = Column(String(3), primary_key=True, comment="The currency, e.g., EUR")
+    code = Column(String(10), primary_key=True, comment="The currency, e.g., EUR")
     name = Column(String(50), nullable=False, comment="e.g., Euro, United States Dollar, etc.")
     symbol = Column(String(5), default="", comment="e.g., €, $, £")
     is_base = Column(Boolean, default=False, comment="True if this is the user's primary/home currency")
+    quotation_method = Column(String(10), default="divide", comment="For conversion purposes - 'multiply' or 'divide'")
+    decimals = Column(Integer, default=2, comment="Number of decimals: 0 for JPY, 2 for USD, etc.")
     active_bool = Column(Boolean, default=True, comment="If the currency is active (so it is selectable in-app)")
     # Relationships
     accounts = relationship("Account", back_populates="currency")

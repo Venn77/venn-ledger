@@ -213,7 +213,7 @@ class DashboardView(ctk.CTkFrame):
             else:
                 real_val = expenses[idx]
 
-            sel.annotation.set_text(f"{self.manager.base_currency_symbol} {real_val:,.2f}")
+            sel.annotation.set_text(f"{self.manager.base_currency_symbol} {real_val:,.{self.manager.base_currency_decimals}f}")
             sel.annotation.get_bbox_patch().set(fc="#1f1f1f", ec="white", alpha=0.9, boxstyle="round,pad=0.3")
             sel.annotation.arrow_patch.set(color="white")
 
@@ -283,7 +283,7 @@ class DashboardView(ctk.CTkFrame):
                         total = sum(values)
                         pct = (values[i] / total) * 100 if total > 0 else 0
 
-                        text = f"{labels[i]}\n{self.manager.base_currency_symbol} {values[i]:,.2f} ({pct:.1f}%)"
+                        text = f"{labels[i]}\n{self.manager.base_currency_symbol} {values[i]:,.{self.manager.base_currency_decimals}f} ({pct:.1f}%)"
 
                         if labels[i] == "Other" and other_breakdown:
                             breakdown_str = "\n".join([f"• {k}: {self.manager.base_currency_symbol}{v:,.0f}" for k, v in other_breakdown])
@@ -336,7 +336,7 @@ class DashboardView(ctk.CTkFrame):
             month_label = labels[idx]
             val = net_worths[idx]
 
-            sel.annotation.set_text(f"{month_label}\n{self.manager.base_currency_symbol} {val:,.2f}")
+            sel.annotation.set_text(f"{month_label}\n{self.manager.base_currency_symbol} {val:,.{self.manager.base_currency_decimals}f}")
             sel.annotation.xy = (idx, val)
             sel.annotation.get_bbox_patch().set(fc="#1f1f1f", ec="#5AC8FA", alpha=0.9, boxstyle="round,pad=0.3")
 

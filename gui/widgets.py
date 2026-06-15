@@ -361,10 +361,11 @@ class AIStagingRow(ctk.CTkFrame):
             self.grid_ref.check_master_validation()
 
 class TransactionRow(ctk.CTkFrame):
-    def __init__(self, master, main_app, data, char_limit, ent_char_limit):
+    def __init__(self, master, main_app, data, char_limit, ent_char_limit, dec_map):
         super().__init__(master, fg_color="gray15")
         self.main_app = main_app
         self.data = data
+        self.dec_map = dec_map
         self.pack(fill="x", pady=2, padx=5)
 
         colors = {
@@ -425,9 +426,10 @@ class TransactionRow(ctk.CTkFrame):
         self.btn_del = ctk.CTkButton(self.actions_frame, text="X", command=self._trigger_delete, **del_kwargs)
         ToolTip(self.btn_del, "Delete Transaction")
         # Amount
-        amt_str = f"{style['prefix']}{data.amount:,.2f} {data.currency}"
+        amt_str = f"{style['prefix']}{data.amount:,.{dec_map.get(data.currency, 2)}f} {data.currency}"
         lbl_amt = self._add_lbl(amt_str, width=140, anchor="e", color=style['text'], bold=True)
-        if data.currency != main_app.manager.base_currency: ToolTip(lbl_amt, f"Converted: {style['prefix']}{data.base_val:,.2f} {main_app.manager.base_currency} (Rate: {data.fx_rate})")
+        if data.currency != main_app.manager.base_currency:
+            ToolTip(lbl_amt, f"Converted: {style['prefix']}{data.base_val:,.{main_app.manager.base_currency_decimals}f} {main_app.manager.base_currency} (Rate: {data.fx_rate})")
 
         # Hover Effect
         self.is_locked = False
@@ -538,7 +540,7 @@ class TransactionRow(ctk.CTkFrame):
     def _trigger_delete(self):
         self.is_locked = True
 
-        amt_str = f"{self.data.amount:,.2f} {self.data.currency}"
+        amt_str = f"{self.data.amount:,.{self.dec_map.get(self.data.currency, 2)}f} {self.data.currency}"
         ent_str = self.data.entity or self.data.proj_name or "Unknown"
         context_str = f"[{self.data.ts.strftime('%Y-%m-%d')}] {ent_str} | {amt_str}"
 

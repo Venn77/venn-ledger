@@ -13,7 +13,7 @@ def get_account_choice(prompt, accounts):
     for idx, acc in enumerate(accounts):
         bal = Decimal(str(acc.balance)).quantize(Decimal("0.00"), rounding=ROUND_HALF_UP)
         bal = float(bal)
-        print(f" [{idx}] {acc.name:<{20 if len(str(idx)) == 1 else 19}} | {acc.currency_code:>12} | {bal:>12.2f}")
+        print(f" [{idx}] {acc.name:<{20 if len(str(idx)) == 1 else 19}} | {acc.currency_code:>12} | {bal:>12.{acc.currency.decimals}f}")
     while True:
         choice = input(prompt).strip().lower()
         if choice.isdigit() and int(choice) < len(accounts):
@@ -42,7 +42,7 @@ def run_transfer_ui():
 
     if origin.currency_code == destination.currency_code:
         amount_destination = amount_origin
-        print(f"   ! Same currency detected. Destination amount set to {amount_destination:.2f}.")
+        print(f"   ! Same currency detected. Destination amount set to {amount_destination:.{destination.currency.decimals}f}.")
     else:
         amount_destination = get_valid_float(f"\nEnter amount to transfer into '{destination.name}' ({destination.currency_code}): ")
     # 3. Metadata

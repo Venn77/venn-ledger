@@ -186,7 +186,7 @@ class Expense(Base):
 
     def __repr__(self):
         return (f"<Expense(amount={self.amount} {self.currency_code}, "
-                f"BASE={self.converted_amount:.2f}, vendor='{self.vendor_id}', category='{self.category_id}')>")
+                f"BASE={self.converted_amount:.{self.currency.decimals}f}, vendor='{self.vendor_id}', category='{self.category_id}')>")
 
 class Gain(Base):
     __tablename__ = 'gains'
@@ -213,7 +213,7 @@ class Gain(Base):
 
     def __repr__(self):
         return (f"<Gain(amount={self.amount} {self.currency_code}, "
-                f"BASE={self.converted_amount:.2f}, payer='{self.payer_id}', stream='{self.stream_id}')>")
+                f"BASE={self.converted_amount:.{self.currency.decimals}f}, payer='{self.payer_id}', stream='{self.stream_id}')>")
 
 class Transfer(Base):
     __tablename__ = 'transfers'

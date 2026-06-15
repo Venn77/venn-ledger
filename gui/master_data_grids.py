@@ -199,7 +199,7 @@ class CurrencyGrid(ctk.CTkFrame):
                     side="left", padx=5)
             else:
                 math_symbol = "[ × ]" if item.quotation_method == "multiply" else "[ ÷ ]"
-                ctk.CTkLabel(row, text=math_symbol, text_color="gray50", font=("JetBrains Mono", 10, "bold")).pack(
+                ctk.CTkLabel(row, text=math_symbol, text_color="gray50", font=("JetBrains Mono", 12, "bold")).pack(
                     side="left", padx=5)
 
             btn_frame = ctk.CTkFrame(row, fg_color="transparent")
@@ -418,7 +418,7 @@ class AccountGrid(ctk.CTkFrame):
 
             ctk.CTkLabel(row, text=item.name, width=150, anchor="w", font=("JetBrains Mono", 12, "bold")).pack(
                 side="left", padx=10, pady=8)
-            ctk.CTkLabel(row, text=f"{item.balance:,.2f} {item.currency_code}", width=100, anchor="w",
+            ctk.CTkLabel(row, text=f"{item.balance:,.{item.currency.decimals}f} {item.currency_code}", width=100, anchor="w",
                          text_color="#5AC8FA", font=("JetBrains Mono", 11, "bold")).pack(side="left", padx=5)
 
             btn_frame = ctk.CTkFrame(row, fg_color="transparent")
@@ -444,7 +444,7 @@ class AccountGrid(ctk.CTkFrame):
             self.update_idletasks()
             popup.geometry(f"+{self.winfo_x() + 100}+{self.winfo_y() + 100}")
 
-            msg = f"Account '{acc.name}' has a balance of {acc.balance:,.2f}.\n\nDeactivating it hides it from menus and\ndeactivates its Payment Methods, but the\nbalance will STILL count toward Net Worth.\n\nProceed?"
+            msg = f"Account '{acc.name}' has a balance of {acc.balance:,.{acc.currency.decimals}f}.\n\nDeactivating it hides it from menus and\ndeactivates its Payment Methods, but the\nbalance will STILL count toward Net Worth.\n\nProceed?"
             ctk.CTkLabel(popup, text=msg, font=("JetBrains Mono", 11)).pack(pady=15)
 
             def _confirm():

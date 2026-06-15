@@ -3,7 +3,7 @@ import datetime
 from database.models import (
     Account, Expense, Gain, Category,
     PaymentMethod, Vendor, Project,
-    Transfer, Payer, Stream
+    Transfer, Payer, Stream, Currency
 )
 from sqlalchemy import (
     desc, or_, func, column, literal_column,
@@ -181,6 +181,8 @@ class TransactionsView(ctk.CTkFrame):
         self.nav_timer = None
         self.type_timer = None
         self.page_timer = None
+        self.curr_data = self.db_session.query(Currency.code, Currency.decimals).all()
+        self.dec_map = {code: decimals for code, decimals in self.curr_data}
 
         self.on_date_filter_change("This Month")
 
@@ -255,7 +257,7 @@ class TransactionsView(ctk.CTkFrame):
 
         ent_char_limit = char_limit - 7
 
-        self.grid_component.render_rows(results, char_limit, ent_char_limit)
+        self.grid_component.render_rows(results, char_limit, ent_char_limit, self.dec_map)
 
         self.update_pagination_ui(total_count, query)
 
@@ -388,13 +390,13 @@ class TransactionsView(ctk.CTkFrame):
         if total_count > 0:
             (in_base, in_dict), (out_base, out_dict), net_bal = self.calculate_totals(current_query, self.db_session)
 
-            in_brk = " | ".join([f"{amt:,.2f} {c}" for c, amt in in_dict.items()]) or f"0.00 {self.manager.base_currency}"
-            self.in_lbl.configure(text=f"In: {in_brk}  (Combined: ≈ {in_base:,.2f} {self.manager.base_currency})")
+            in_brk = " | ".join([f"{amt:,.{self.dec_map.get(c, 2)}f} {c}" for c, amt in in_dict.items()]) or f"{0:,.{self.manager.base_currency_decimals}f} {self.manager.base_currency}"
+            self.in_lbl.configure(text=f"In: {in_brk}  (Combined: ≈ {in_base:,.{self.manager.base_currency_decimals}f} {self.manager.base_currency})")
 
-            out_brk = " | ".join([f"{amt:,.2f} {c}" for c, amt in out_dict.items()]) or f"0.00 {self.manager.base_currency}"
-            self.out_lbl.configure(text=f"Out: {out_brk}  (Combined: ≈ {out_base:,.2f} {self.manager.base_currency})")
+            out_brk = " | ".join([f"{amt:,.{self.dec_map.get(c, 2)}f} {c}" for c, amt in out_dict.items()]) or f"{0:,.{self.manager.base_currency_decimals}f} {self.manager.base_currency}"
+            self.out_lbl.configure(text=f"Out: {out_brk}  (Combined: ≈ {out_base:,.{self.manager.base_currency_decimals}f} {self.manager.base_currency})")
 
-            self.balance_lbl.configure(text=f"Balance: (≈ {net_bal:,.2f} {self.manager.base_currency})")
+            self.balance_lbl.configure(text=f"Balance: (≈ {net_bal:,.{self.manager.base_currency_decimals}f} {self.manager.base_currency})")
 
             bal_color = "#4CD964" if net_bal >= 0 else "#b13e3e"
             self.balance_lbl.configure(text_color=bal_color)

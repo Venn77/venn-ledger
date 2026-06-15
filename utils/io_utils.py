@@ -44,7 +44,7 @@ def get_active_account(prompt, db_session):
     for idx, acc in enumerate(active_accounts):
         bal = Decimal(str(acc.balance)).quantize(Decimal("0.00"), rounding=ROUND_HALF_UP)
         bal = float(bal)
-        print(f" [{idx}] {acc.name:<{20 if len(str(idx)) == 1 else 19}} | {acc.currency_code:>12} | {bal:>12.2f}")
+        print(f" [{idx}] {acc.name:<{20 if len(str(idx)) == 1 else 19}} | {acc.currency_code:>12} | {bal:>12.{acc.currency.decimals}f}")
     while True:
         choice = input(prompt).strip().lower()
         if choice.isdigit() and int(choice) < len(active_accounts):

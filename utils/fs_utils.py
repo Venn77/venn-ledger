@@ -31,10 +31,10 @@ def export_data_to_csv(db_session, filepath):
                 cat_stream,
                 acc_pm,
                 project,
-                f"-{e.amount:.2f}",
+                f"-{e.amount:.{e.currency.decimals}f}",
                 e.currency_code,
                 e.fx_rate if e.fx_rate else 1.0,
-                f"-{e.converted_amount:.2f}",
+                f"-{e.converted_amount:.{base_curr.decimals}f}",
                 split,
                 e.description or ""
             ])
@@ -53,10 +53,10 @@ def export_data_to_csv(db_session, filepath):
                 cat_stream,
                 acc_pm,
                 project,
-                f"+{g.amount:.2f}",
+                f"+{g.amount:.{g.currency.decimals}f}",
                 g.currency_code,
                 g.fx_rate if g.fx_rate else 1.0,
-                f"+{g.converted_amount:.2f}",
+                f"+{g.converted_amount:.{base_curr.decimals}f}",
                 split,
                 g.description or ""
             ])
@@ -73,10 +73,10 @@ def export_data_to_csv(db_session, filepath):
                 "Transfer",
                 acc_pm,
                 "",
-                f"{t.amount_origin:.2f}",
+                f"{t.amount_origin:.{t.origin_account.currency.decimals}f}",
                 currency,
                 "",
-                f"{t.amount_destination:.2f}",
+                f"{t.amount_destination:.{t.destination_account.currency.decimals}f}",
                 "No",
                 t.description or ""
             ])

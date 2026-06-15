@@ -249,7 +249,7 @@ class FinanceApp(ctk.CTk):
                          anchor="w", height=15).pack(fill="x", padx=10, pady=(5, 0))
 
             # Row 2: Balance
-            ctk.CTkLabel(acc_card, text=f"{acc.balance:,.2f} {acc.currency_code}",
+            ctk.CTkLabel(acc_card, text=f"{acc.balance:,.{acc.currency.decimals}f} {acc.currency_code}",
                          font=("JetBrains Mono", 12, "bold"), text_color=bal_color,
                          anchor="w", height=20).pack(fill="x", padx=10, pady=(0, 5))
 
@@ -264,7 +264,7 @@ class FinanceApp(ctk.CTk):
 
         if abs(new_nw - self.current_net_worth) < 0.01:
             settle_color = "#FF6B6B" if new_nw <= 0 else "white"
-            self.lbl_nw_val.configure(text=f"{self.manager.base_currency_symbol} {new_nw:,.2f}",
+            self.lbl_nw_val.configure(text=f"{self.manager.base_currency_symbol} {new_nw:,.{self.manager.base_currency_decimals}f}",
                                       text_color=settle_color)
             return
 
@@ -283,14 +283,14 @@ class FinanceApp(ctk.CTk):
             current_val = start_val + ((end_val - start_val) * progress)
 
             self.lbl_nw_val.configure(
-                text=f"{self.manager.base_currency_symbol} {current_val:,.2f}",
+                text=f"{self.manager.base_currency_symbol} {current_val:,.{self.manager.base_currency_decimals}f}",
                 text_color=flash_color
             )
             self.after(15, self._animate_odometer, start_val, end_val, flash_color, settle_color, steps,
                        current_step + 1)
         else:
             self.lbl_nw_val.configure(
-                text=f"{self.manager.base_currency_symbol} {end_val:,.2f}",
+                text=f"{self.manager.base_currency_symbol} {end_val:,.{self.manager.base_currency_decimals}f}",
                 text_color=settle_color
             )
 

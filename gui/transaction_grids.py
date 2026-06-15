@@ -7,7 +7,7 @@ class TransactionGrid(ctk.CTkScrollableFrame):
         super().__init__(parent, label_text="History")
         self.app = app_ref
 
-    def render_rows(self, results, char_limit, ent_char_limit):
+    def render_rows(self, results, char_limit, ent_char_limit, dec_map):
         """Wipes the current grid and draws the new page of transactions."""
         for widget in self.winfo_children():
             widget.destroy()
@@ -15,6 +15,6 @@ class TransactionGrid(ctk.CTkScrollableFrame):
         self.update_idletasks()
 
         for row_data in results:
-            TransactionRow(self, self.app, row_data, char_limit, ent_char_limit)
+            TransactionRow(self, self.app, row_data, char_limit, ent_char_limit, dec_map)
 
 

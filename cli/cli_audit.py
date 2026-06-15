@@ -39,9 +39,9 @@ def run_global_audit():
         stored_bal = Decimal(str(acc.balance)).quantize(Decimal("0.00"), rounding=ROUND_HALF_UP)
 
         diff = stored_bal - calc_bal
-        status = "✅ OK" if diff == 0 else f"❌ ERR ({diff})"
+        status = "✅ OK" if diff == 0 else f"❌ ERR ({diff:,.{acc.currency.decimals}f})"
 
-        print(f"{acc.name:<20} | {float(stored_bal):>12.2f} | {float(calc_bal):>12.2f} | {status}")
+        print(f"{acc.name:<20} | {float(stored_bal):>12.{acc.currency.decimals}f} | {float(calc_bal):>12.{acc.currency.decimals}f} | {status}")
 
 
 if __name__ == "__main__":

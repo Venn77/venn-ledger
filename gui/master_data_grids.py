@@ -228,9 +228,9 @@ class CurrencyGrid(ctk.CTkFrame):
         self.winfo_toplevel().event_generate("<<SettingsUpdate>>")
 
     def add_new(self):
-        def _save(code, name):
+        def _save(code, name, q_method, decimals):
             if self.db_session.get(Currency, code): return False, "Currency Code already exists."
-            self.db_session.add(Currency(code=code, name=name, is_base=False))
+            self.db_session.add(Currency(code=code[:10], name=name, is_base=False, quotation_method=q_method, decimals=decimals))
             self.db_session.commit()
             self.load_data()
             self.winfo_toplevel().event_generate("<<SettingsUpdate>>")
@@ -382,10 +382,20 @@ class ExchangeRateGrid(ctk.CTkFrame):
                       command=_confirm).pack(side="left", padx=5)
 
     def add_new(self):
-        act_currencies = [c.code for c in self.db_session.query(Currency).filter_by(active_bool=True).all()
-                          if not c.is_base]
-        if not act_currencies:
+        base_curr = self.db_session.query(Currency).filter_by(is_base=True).first()
+        if not base_curr:
             return
+
+        foreign_currs = self.db_session.query(Currency).filter_by(active_bool=True, is_base=False).all()
+        if not foreign_currs:
+            return
+
+        curr_dict = {
+            c.code: {
+                "method": c.quotation_method,
+                "decimals": c.decimals
+            } for c in foreign_currs
+        }
 
         def _save(code, rate, timestamp):
             self.db_session.add(ExchangeRate(currency_code=code, fx_multiplier=rate, timestamp=timestamp))
@@ -394,7 +404,13 @@ class ExchangeRateGrid(ctk.CTkFrame):
             self.winfo_toplevel().event_generate("<<SidebarUpdate>>")
             return True, ""
 
-        FXDialog(self, active_currencies=act_currencies, on_submit=_save)
+        FXDialog(
+            self,
+            currency_data=curr_dict,
+            base_code=base_curr.code,
+            base_decimals=base_curr.decimals,
+            on_submit=_save
+        )
 
 class AccountGrid(ctk.CTkFrame):
     def __init__(self, parent, db_session):

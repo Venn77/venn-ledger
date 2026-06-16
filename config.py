@@ -70,7 +70,18 @@ CURRENCY_SYMBOLS = {
     "IDR": {"symbol": "Rp", "decimals": 0, "name": "Indonesian Rupiah"},
     "MYR": {"symbol": "RM", "decimals": 2, "name": "Malaysian Ringgit"},
     "AED": {"symbol": "د.إ", "decimals": 2, "name": "UAE Dirham"},
-    "SAR": {"symbol": "﷼", "decimals": 2, "name": "Saudi Riyal"}
+    "SAR": {"symbol": "﷼", "decimals": 2, "name": "Saudi Riyal"},
+
+    "BTC": {"symbol": "₿", "decimals": 8, "name": "Bitcoin"},
+    "ETH": {"symbol": "Ξ", "decimals": 8, "name": "Ethereum"},
+    "USDT": {"symbol": "₮", "decimals": 4, "name": "Tether USD"},
+    "USDC": {"symbol": "USDC", "decimals": 4, "name": "USD Coin"},
+    "BNB": {"symbol": "BNB", "decimals": 8, "name": "Binance Coin"},
+    "SOL": {"symbol": "SOL", "decimals": 8, "name": "Solana"},
+    "ADA": {"symbol": "₳", "decimals": 6, "name": "Cardano"},
+    "XRP": {"symbol": "✕", "decimals": 6, "name": "Ripple"},
+    "DOGE": {"symbol": "Ð", "decimals": 8, "name": "Dogecoin"},
+    "DOT": {"symbol": "●", "decimals": 8, "name": "Polkadot"}
 }
 
 

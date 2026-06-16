@@ -119,8 +119,12 @@ class SimpleDataDialog(ctk.CTkToplevel):
         self.has_desc = has_desc
 
         self.update_idletasks()
-        x = parent.winfo_x() + (parent.winfo_width() // 2) - (width // 2)
-        y = parent.winfo_y() + (parent.winfo_height() // 2) - (height // 2)
+        ref_frame = parent
+        while ref_frame.master and ref_frame.master != parent.winfo_toplevel():
+            ref_frame = ref_frame.master
+
+        x = ref_frame.winfo_rootx() + (ref_frame.winfo_width() // 2) - (width // 2)
+        y = ref_frame.winfo_rooty() + (ref_frame.winfo_height() // 2) - (height // 2)
         self.geometry(f"+{x}+{y}")
 
         ctk.CTkLabel(self, text="Name:", font=("JetBrains Mono", 12, "bold")).pack(pady=(15, 0))
@@ -167,20 +171,25 @@ class CurrencyDialog(ctk.CTkToplevel):
     def __init__(self, parent, title, initial_code="", initial_name="", is_edit=False, on_submit=None):
         super().__init__(parent)
         self.title(title)
-        height = 220
+        self.is_edit = is_edit
+        self.on_submit = on_submit
+
+        height = 220 if is_edit else 410
         width = 300
         self.geometry(f"{width}x{height}")
         self.attributes("-topmost", True)
         self.grab_set()
 
-        self.on_submit = on_submit
-
         self.update_idletasks()
-        x = parent.winfo_x() + (parent.winfo_width() // 2) - (width // 2)
-        y = parent.winfo_y() + (parent.winfo_height() // 2) - (height // 2)
+        ref_frame = parent
+        while ref_frame.master and ref_frame.master != parent.winfo_toplevel():
+            ref_frame = ref_frame.master
+
+        x = ref_frame.winfo_rootx() + (ref_frame.winfo_width() // 2) - (width // 2)
+        y = ref_frame.winfo_rooty() + (ref_frame.winfo_height() // 2) - (height // 2)
         self.geometry(f"+{x}+{y}")
 
-        ctk.CTkLabel(self, text="Currency Code (3 Letters):", font=("JetBrains Mono", 11, "bold")).pack(pady=(15, 0))
+        ctk.CTkLabel(self, text="Currency Code (Max 10 chars):", font=("JetBrains Mono", 11, "bold")).pack(pady=(15, 0))
         self.code_entry = ctk.CTkEntry(self, width=240)
         self.code_entry.insert(0, initial_code)
         if is_edit:
@@ -192,6 +201,36 @@ class CurrencyDialog(ctk.CTkToplevel):
         self.name_entry.insert(0, initial_name)
         self.name_entry.pack(pady=(2, 10))
 
+        if not is_edit:
+            ctk.CTkLabel(self, text="# of Decimals:", font=("JetBrains Mono", 11, "bold")).pack()
+            self.precision_var = ctk.StringVar(value="2 (Standard Fiat)")
+            self.precision_dropdown = ctk.CTkOptionMenu(
+                self,
+                values=["0 (Whole Numbers)", "2 (Standard Fiat)", "8 (Crypto/Tokens)"],
+                variable=self.precision_var,
+                width=240
+            )
+            self.precision_dropdown.pack(pady=(2, 10))
+
+            ctk.CTkLabel(self, text="Conversion Math:", font=("JetBrains Mono", 11, "bold")).pack()
+            self.quote_var = ctk.StringVar(value="Divide (Foreign ÷ Rate = Base)")
+            self.quote_dropdown = ctk.CTkOptionMenu(
+                self,
+                values=["Divide (Foreign ÷ Rate = Base)", "Multiply (Foreign × Rate = Base)"],
+                variable=self.quote_var,
+                width=240,
+                command=self._update_example
+            )
+            self.quote_dropdown.pack(pady=(2, 0))
+
+            self.example_lbl = ctk.CTkLabel(
+                self,
+                text="e.g., 100 USD ÷ 1.20 Rate = 83.33 EUR",
+                text_color="#5AC8FA",
+                font=("JetBrains Mono", 10)
+            )
+            self.example_lbl.pack(pady=(0, 10))
+
         self.err_lbl = ctk.CTkLabel(self, text="", text_color="#FF6B6B", font=("JetBrains Mono", 10), height=15)
         self.err_lbl.pack()
 
@@ -202,19 +241,40 @@ class CurrencyDialog(ctk.CTkToplevel):
                                                                                                         padx=10)
         ctk.CTkButton(btn_frame, text="Save", width=80, command=self.submit).pack(side="left", padx=10)
 
+    def _update_example(self, selection):
+        """Swaps the example text based on the math method chosen."""
+        if "Multiply" in selection:
+            self.example_lbl.configure(text="e.g., 100 USD × 150 Rate = 15,000 JPY")
+        else:
+            self.example_lbl.configure(text="e.g., 100 USD ÷ 1.20 Rate = 83.33 EUR")
+
     def submit(self):
         code_val = self.code_entry.get().strip().upper()
         name_val = self.name_entry.get().strip()
 
-        if len(code_val) != 3:
-            self.err_lbl.configure(text="Code must be exactly 3 letters.")
+        if not code_val or len(code_val) > 10:
+            self.err_lbl.configure(text="Code must be 1-10 characters.")
             return
         if not name_val:
             self.err_lbl.configure(text="Name cannot be empty.")
             return
 
         if self.on_submit:
-            success, msg = self.on_submit(code_val, name_val)
+            if self.is_edit:
+                success, msg = self.on_submit(code_val, name_val)
+            else:
+                q_method = "multiply" if "Multiply" in self.quote_var.get() else "divide"
+
+                p_str = self.precision_var.get()
+                if p_str.startswith("0"):
+                    decimals = 0
+                elif p_str.startswith("8"):
+                    decimals = 8
+                else:
+                    decimals = 2
+
+                success, msg = self.on_submit(code_val, name_val, q_method, decimals)
+
             if success:
                 self.destroy()
             else:
@@ -222,29 +282,49 @@ class CurrencyDialog(ctk.CTkToplevel):
 
 class FXDialog(ctk.CTkToplevel):
     """Custom popup for adding a new Exchange Rate."""
-    def __init__(self, parent, active_currencies, on_submit=None):
+    def __init__(self, parent, currency_data, base_code, base_decimals, on_submit=None):
         super().__init__(parent)
         self.title("New Exchange Rate")
-        height = 340
+        height = 380
         width = 300
         self.geometry(f"{width}x{height}")
         self.attributes("-topmost", True)
         self.grab_set()
 
+        self.currency_data = currency_data
+        self.base_code = base_code
+        self.base_decimals = base_decimals
         self.on_submit = on_submit
 
         self.update_idletasks()
-        x = parent.winfo_x() + (parent.winfo_width() // 2) - (width // 2)
-        y = parent.winfo_y() + (parent.winfo_height() // 2) - (height // 2)
+        ref_frame = parent
+        while ref_frame.master and ref_frame.master != parent.winfo_toplevel():
+            ref_frame = ref_frame.master
+
+        x = ref_frame.winfo_rootx() + (ref_frame.winfo_width() // 2) - (width // 2)
+        y = ref_frame.winfo_rooty() + (ref_frame.winfo_height() // 2) - (height // 2)
         self.geometry(f"+{x}+{y}")
 
-        ctk.CTkLabel(self, text="Select Currency:", font=("JetBrains Mono", 11, "bold")).pack(pady=(15, 0))
-        self.curr_combo = ctk.CTkComboBox(self, values=active_currencies, width=240)
-        self.curr_combo.pack(pady=(2, 5))
+        ctk.CTkLabel(self, text="Foreign Currency:", font=("JetBrains Mono", 11, "bold")).pack(pady=(15, 0))
+        self.code_var = ctk.StringVar(value=list(currency_data.keys())[0])
+        self.code_dropdown = ctk.CTkOptionMenu(
+            self,
+            values=list(currency_data.keys()),
+            variable=self.code_var,
+            width=240,
+            command=self._update_preview
+        )
+        self.code_dropdown.pack(pady=(2, 10))
 
-        ctk.CTkLabel(self, text="FX Multiplier (e.g. 1850.0):", font=("JetBrains Mono", 11, "bold")).pack()
-        self.rate_entry = ctk.CTkEntry(self, width=240)
-        self.rate_entry.pack(pady=(2, 5))
+        ctk.CTkLabel(self, text="Exchange Rate:", font=("JetBrains Mono", 11, "bold")).pack()
+        self.rate_entry = ctk.CTkEntry(self, width=240, placeholder_text="e.g. 1.2500")
+        self.rate_entry.pack(pady=(2, 0))
+
+        self.preview_lbl = ctk.CTkLabel(self, text="Enter a rate to see preview...", text_color="gray50",
+                                        font=("JetBrains Mono", 10))
+        self.preview_lbl.pack(pady=(0, 10))
+
+        self.rate_entry.bind("<KeyRelease>", self._update_preview)
 
         ctk.CTkLabel(self, text="Date (YYYY-MM-DD):", font=("JetBrains Mono", 11, "bold")).pack()
         self.date_entry = ctk.CTkEntry(self, width=240)
@@ -266,27 +346,58 @@ class FXDialog(ctk.CTkToplevel):
                                                                                                         padx=10)
         ctk.CTkButton(btn_frame, text="Save", width=80, command=self.submit).pack(side="left", padx=10)
 
-    def submit(self):
-        curr_val = self.curr_combo.get()
+        self._update_preview()
+
+    def _update_preview(self, _event=None):
+        code = self.code_var.get()
+        raw_rate = self.rate_entry.get().strip().replace(",", ".")
+
         try:
-            rate_val = float(self.rate_entry.get().replace(",", "."))
-            if rate_val <= 0: raise ValueError
+            rate = float(raw_rate)
+            if rate <= 0: raise ValueError
         except ValueError:
-            self.err_lbl.configure(text="Rate must be a positive number.")
+            self.preview_lbl.configure(text="Enter a valid rate to see preview...", text_color="gray50")
             return
 
+        method = self.currency_data[code]["method"]
+
+        if method == "multiply":
+            result = 100.0 * rate
+            math_sym = "×"
+        else:
+            result = 100.0 / rate
+            math_sym = "÷"
+
+        self.preview_lbl.configure(
+            text=f"e.g., 100 {code} {math_sym} {rate} = {result:,.{self.base_decimals}f} {self.base_code}",
+            text_color="#5AC8FA"
+        )
+
+    def submit(self):
+        code = self.code_var.get()
+        raw_rate = self.rate_entry.get().strip().replace(",", ".")
         date_val = self.date_entry.get().strip()
         time_val = self.time_entry.get().strip()
 
         try:
+            rate = float(raw_rate)
+            if rate <= 0: raise ValueError
+        except ValueError:
+            self.err_lbl.configure(text="Rate must be a positive number.")
+            return
+
+        try:
             dt_str = f"{date_val} {time_val}"
-            timestamp_val = datetime.datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
+            try:
+                timestamp = datetime.datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                timestamp = datetime.datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
         except ValueError:
             self.err_lbl.configure(text="Invalid date/time format.")
             return
 
         if self.on_submit:
-            success, msg = self.on_submit(curr_val, rate_val, timestamp_val)
+            success, msg = self.on_submit(code, rate, timestamp)
             if success:
                 self.destroy()
             else:
@@ -305,8 +416,12 @@ class AccountDialog(ctk.CTkToplevel):
         self.on_submit = on_submit
 
         self.update_idletasks()
-        x = parent.winfo_x() + (parent.winfo_width() // 2) - (width // 2)
-        y = parent.winfo_y() + (parent.winfo_height() // 2) - (height // 2)
+        ref_frame = parent
+        while ref_frame.master and ref_frame.master != parent.winfo_toplevel():
+            ref_frame = ref_frame.master
+
+        x = ref_frame.winfo_rootx() + (ref_frame.winfo_width() // 2) - (width // 2)
+        y = ref_frame.winfo_rooty() + (ref_frame.winfo_height() // 2) - (height // 2)
         self.geometry(f"+{x}+{y}")
 
         ctk.CTkLabel(self, text="Account Name:", font=("JetBrains Mono", 11, "bold")).pack(pady=(15, 0))
@@ -371,8 +486,12 @@ class PMDialog(ctk.CTkToplevel):
         self.on_submit = on_submit
 
         self.update_idletasks()
-        x = parent.winfo_x() + (parent.winfo_width() // 2) - (width // 2)
-        y = parent.winfo_y() + (parent.winfo_height() // 2) - (height // 2)
+        ref_frame = parent
+        while ref_frame.master and ref_frame.master != parent.winfo_toplevel():
+            ref_frame = ref_frame.master
+
+        x = ref_frame.winfo_rootx() + (ref_frame.winfo_width() // 2) - (width // 2)
+        y = ref_frame.winfo_rooty() + (ref_frame.winfo_height() // 2) - (height // 2)
         self.geometry(f"+{x}+{y}")
 
         ctk.CTkLabel(self, text="Method Name (e.g. Santander Debit):", font=("JetBrains Mono", 11, "bold")).pack(

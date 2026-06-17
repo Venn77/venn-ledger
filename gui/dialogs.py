@@ -404,7 +404,7 @@ class FXDialog(ctk.CTkToplevel):
                 self.err_lbl.configure(text=msg)
 
 class AccountDialog(ctk.CTkToplevel):
-    def __init__(self, parent, active_currencies, initial_name="", initial_desc="", initial_curr="", initial_bal="0.00",
+    def __init__(self, parent, currency_data, initial_name="", initial_desc="", initial_curr="", initial_bal="0.00",
                  is_edit=False, on_submit=None):
         super().__init__(parent)
         self.title("Edit Account" if is_edit else "New Account")
@@ -414,6 +414,8 @@ class AccountDialog(ctk.CTkToplevel):
         self.attributes("-topmost", True)
         self.grab_set()
         self.on_submit = on_submit
+
+        self.currency_data = currency_data
 
         self.update_idletasks()
         ref_frame = parent
@@ -435,14 +437,17 @@ class AccountDialog(ctk.CTkToplevel):
         self.desc_entry.pack(pady=(2, 10))
 
         ctk.CTkLabel(self, text="Currency:", font=("JetBrains Mono", 11, "bold")).pack()
-        self.curr_combo = ctk.CTkComboBox(self, values=active_currencies, width=260)
+        codes = list(self.currency_data.keys())
+        self.curr_combo = ctk.CTkComboBox(self, values=codes, width=260, command=self._reformat_balance)
         if initial_curr: self.curr_combo.set(initial_curr)
+        elif codes: self.curr_combo.set(codes[0])
         if is_edit: self.curr_combo.configure(state="disabled")
         self.curr_combo.pack(pady=(2, 10))
 
         ctk.CTkLabel(self, text="Initial Balance:", font=("JetBrains Mono", 11, "bold")).pack()
         self.bal_entry = ctk.CTkEntry(self, width=260)
         self.bal_entry.insert(0, initial_bal)
+        self._reformat_balance(self.curr_combo.get())
         if is_edit: self.bal_entry.configure(state="disabled")
         self.bal_entry.pack(pady=(2, 10))
 
@@ -454,6 +459,26 @@ class AccountDialog(ctk.CTkToplevel):
         ctk.CTkButton(btn_frame, text="Cancel", width=80, fg_color="gray40", command=self.destroy).pack(side="left",
                                                                                                         padx=10)
         ctk.CTkButton(btn_frame, text="Save", width=80, command=self.submit).pack(side="left", padx=10)
+
+    def _reformat_balance(self, selection):
+        """Reapplies the correct decimal formatting when the currency dropdown changes."""
+        decimals = self.currency_data.get(selection, 2)
+
+        raw = self.bal_entry.get().strip().replace(",", ".")
+        try:
+            val = float(raw) if raw else 0.0
+        except ValueError:
+            val = 0.0
+
+        state = self.bal_entry.cget("state")
+        if state == "disabled":
+            self.bal_entry.configure(state="normal")
+
+        self.bal_entry.delete(0, "end")
+        self.bal_entry.insert(0, f"{val:.{decimals}f}")
+
+        if state == "disabled":
+            self.bal_entry.configure(state="disabled")
 
     def submit(self):
         name = self.name_entry.get().strip()

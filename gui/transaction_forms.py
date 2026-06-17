@@ -6,6 +6,7 @@ from database.models import (
 )
 from gui.widgets import SearchableComboBox, ToolTip
 from gui.dialogs import open_calendar
+from utils.io_utils import format_input_float
 
 
 class BaseTransactionWindow(ctk.CTkToplevel):
@@ -34,9 +35,9 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         self.grid_columnconfigure(1, weight=1)
 
         # 1. Variables & Placeholders
-        self.amount_placeholder = "Amount (e.g. 15.50)"
+        self.currency_map = {c.code: c.decimals for c in self.db_session.query(Currency).all()}
         self.desc_placeholder = "Description (Optional)"
-        self.fx_placeholder = "Rate (e.g. 1.15)"
+        self.fx_placeholder = "Rate (e.g. 1.1500)"
         self.session_time = datetime.datetime.now().strftime("%H:%M:%S")
 
         mem_date = self.mem.get("date", "")
@@ -48,6 +49,9 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         self.currency_var = ctk.StringVar(value=self.mem.get("currency", self.manager.base_currency))
         self.date_var = ctk.StringVar(value=initial_date)
         self.project_var = ctk.StringVar(value=self.mem.get("project", ""))
+
+        init_dec = self.currency_map.get(self.currency_var.get(), 2)
+        self.amount_placeholder = self.get_dynamic_placeholder("Amount", init_dec)
 
         self.cal_window = None
         self.fx_tooltip = None
@@ -123,6 +127,9 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         self.lbl_amount.grid(row=1, column=0, padx=(20, 10), pady=8, sticky="w")
         self.amount_entry.grid(row=1, column=1, padx=(0, 20), pady=8, sticky="ew")
         self._apply_entry_state(self.amount_entry, self.mem.get("amount"), self.amount_placeholder)
+
+        self._reformat_input(self.amount_entry, self.currency_map.get(self.currency_var.get(), 2),
+                             self.amount_placeholder)
 
         # Currency (Row 2)
         self.lbl_currency.grid(row=2, column=0, padx=(20, 10), pady=8, sticky="w")
@@ -246,6 +253,26 @@ class BaseTransactionWindow(ctk.CTkToplevel):
 
     # Shared Methods
     @staticmethod
+    def get_dynamic_placeholder(prefix, decimals):
+        """Creates adaptive context clues based on the target currency format."""
+        if decimals == 0:
+            return f"{prefix} (e.g. 1500)"
+        elif decimals == 8:
+            return f"{prefix} (e.g. 0.05000000)"
+        return f"{prefix} (e.g. 15.50)"
+
+    @staticmethod
+    def _reformat_input(widget, decimals, placeholder):
+        current_text = widget.get().strip()
+        if current_text == placeholder or current_text == "":
+            return
+
+        formatted_val = format_input_float(current_text, decimals)
+        if formatted_val is not None:
+            widget.delete(0, "end")
+            widget.insert(0, formatted_val)
+
+    @staticmethod
     def _apply_placeholder(widget, placeholder):
         """Clears an entry, applies a placeholder, and styles it gray."""
         widget.delete(0, 'end')
@@ -289,9 +316,20 @@ class BaseTransactionWindow(ctk.CTkToplevel):
             self.validate_form()
 
     def _handle_currency_change(self, _var_name, _index, _mode):
-        """Ensures correct execution sequence when the user changes the Currency."""
+        """Re-runs validation, pulls FX updates, and rescales entry placeholders."""
+        cur = self.currency_var.get()
+        dec = self.currency_map.get(cur, 2)
+
+        new_pl = self.get_dynamic_placeholder("Amount", dec)
+        if self.amount_entry.get() == self.amount_placeholder:
+            self.amount_entry.delete(0, 'end')
+            self.amount_entry.insert(0, new_pl)
+
+        self.amount_placeholder = new_pl
+        self._reformat_input(self.amount_entry, dec, self.amount_placeholder)
+
         self.update_fx_list()
-        self.on_currency_change(self.currency_var.get())
+        self.on_currency_change(cur)
         if hasattr(self, 'error_label'):
             self.validate_form()
 
@@ -768,6 +806,8 @@ class AddTransferWindow(BaseTransactionWindow):
         self.lbl_dest_amt = ctk.CTkLabel(self, text="Received Amount", font=("JetBrains Mono", 13, "bold"), anchor="w")
         self.dest_amount_entry = ctk.CTkEntry(self)
 
+        self.dest_amount_placeholder = self.get_dynamic_placeholder("Received Amount", 2)
+
         if self.mem.get("orig_acc") in self.origin_menu.cget("values"):
             self.origin_menu.set(self.mem["orig_acc"])
 
@@ -819,6 +859,23 @@ class AddTransferWindow(BaseTransactionWindow):
 
         self.origin_acc = self.account_map.get(origin_name)
         self.dest_acc = self.account_map.get(dest_name)
+
+        orig_dec = self.currency_map.get(self.origin_acc.currency_code, 2) if self.origin_acc else 2
+        dest_dec = self.currency_map.get(self.dest_acc.currency_code, 2) if self.dest_acc else 2
+
+        new_orig_pl = self.get_dynamic_placeholder("Sent Amount", orig_dec)
+        if self.amount_entry.get() == getattr(self, 'amount_placeholder', ''):
+            self.amount_entry.delete(0, 'end')
+            self.amount_entry.insert(0, new_orig_pl)
+        self.amount_placeholder = new_orig_pl
+        self._reformat_input(self.amount_entry, orig_dec, self.amount_placeholder)
+
+        new_dest_pl = self.get_dynamic_placeholder("Received Amount", dest_dec)
+        if self.dest_amount_entry.get() == getattr(self, 'dest_amount_placeholder', ''):
+            self.dest_amount_entry.delete(0, 'end')
+            self.dest_amount_entry.insert(0, new_dest_pl)
+        self.dest_amount_placeholder = new_dest_pl
+        self._reformat_input(self.dest_amount_entry, dest_dec, self.dest_amount_placeholder)
 
         to_options = [n for n in self.all_acc_names if n != origin_name]
         self.dest_menu.configure(values=to_options)

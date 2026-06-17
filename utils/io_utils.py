@@ -35,6 +35,21 @@ def extract_exchange_rate(description):
             return None
     return None
 
+def format_input_float(raw_val, decimals=2):
+    """Formats a raw value into a string with exact decimal precision WITHOUT commas."""
+    if raw_val is None or str(raw_val).strip() == "":
+        return None
+
+    try:
+        if isinstance(raw_val, str):
+            val = float(raw_val.replace(",", "."))
+        else:
+            val = float(raw_val)
+
+        return f"{val:.{decimals}f}"
+    except ValueError:
+        return None
+
 def get_active_account(prompt, db_session):
     """Returns a selected active account."""
     active_accounts = db_session.query(Account).filter_by(active_bool=True).order_by(Account.name.asc()).all()

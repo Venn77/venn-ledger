@@ -487,8 +487,10 @@ class AccountGrid(ctk.CTkFrame):
         self.winfo_toplevel().event_generate("<<SettingsUpdate>>")
 
     def add_new(self):
-        currencies = [c.code for c in self.db_session.query(Currency).filter_by(active_bool=True).all()]
+        currencies = self.db_session.query(Currency).filter_by(active_bool=True).all()
         if not currencies: return
+
+        curr_data = {c.code: c.decimals for c in currencies}
 
         def _save(name, descr, curr_code, bal):
             curr_obj = self.db_session.query(Currency).filter_by(code=curr_code).first()
@@ -503,7 +505,7 @@ class AccountGrid(ctk.CTkFrame):
             self.winfo_toplevel().event_generate("<<SidebarUpdate>>")
             return True, ""
 
-        AccountDialog(self, currencies, on_submit=_save)
+        AccountDialog(self, currency_data=curr_data, on_submit=_save)
 
     def edit(self, acc):
         def _update(name, descr, _curr, _bal):
@@ -517,7 +519,9 @@ class AccountGrid(ctk.CTkFrame):
             self.winfo_toplevel().event_generate("<<SettingsUpdate>>")
             return True, ""
 
-        AccountDialog(self, [], initial_name=acc.name, initial_desc=acc.description, initial_curr=acc.currency_code,
+        curr_data = {acc.currency_code: acc.currency.decimals}
+
+        AccountDialog(self, currency_data=curr_data, initial_name=acc.name, initial_desc=acc.description, initial_curr=acc.currency_code,
                       initial_bal=str(acc.initial_balance), is_edit=True, on_submit=_update)
 
 class PMGrid(ctk.CTkFrame):

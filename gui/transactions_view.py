@@ -137,6 +137,25 @@ class TransactionsView(ctk.CTkFrame):
         ctk.CTkLabel(self.type_filter_frame, text="Type:", font=("JetBrains Mono", 12, "bold")).pack(side="left",
                                                                                                      padx=(0, 10))
 
+        self.project_filter_frame = ctk.CTkFrame(self.filter_bar, fg_color="transparent")
+        self.project_filter_frame.pack(side="right", padx=(20, 0))
+
+        ctk.CTkLabel(self.project_filter_frame, text="Project:", font=("JetBrains Mono", 12, "bold")).pack(side="left",
+                                                                                                           padx=(0, 10))
+
+        self.project_filter_var = ctk.StringVar(value="All Projects")
+        projects = ["All Projects"] + [p.name for p in
+                                       self.db_session.query(Project).order_by(
+                                           Project.name.asc()).all()]
+        self.project_menu = ctk.CTkOptionMenu(
+            self.project_filter_frame,
+            values=projects,
+            variable=self.project_filter_var,
+            command=self._on_project_filter_change,
+            width=140
+        )
+        self.project_menu.pack(side="left")
+
         self.search_entry.bind("<FocusIn>", lambda e: self._search_focus_in())
         self.search_entry.bind("<FocusOut>", lambda e: self._search_focus_out())
         self.search_entry.bind("<KeyRelease>", self.on_search_key_release)
@@ -223,6 +242,10 @@ class TransactionsView(ctk.CTkFrame):
 
         if self.app.filter_account_id:
             query = query.filter(column("acc_id") == self.app.filter_account_id)
+
+        selected_proj = self.project_filter_var.get()
+        if selected_proj != "All Projects":
+            query = query.filter(column("proj_name") == selected_proj)
 
         allowed_types = []
         if self.show_expenses_var.get():
@@ -707,7 +730,22 @@ class TransactionsView(ctk.CTkFrame):
         self.load_transactions()
         self.reset_scroll_to_top()
 
+    def _on_project_filter_change(self, _selection):
+        """Resets view and reloads when a new project is selected."""
+        self.current_page = 0
+        self.load_transactions()
+        self.reset_scroll_to_top()
+
     def refresh_view(self):
         """Called automatically when switching back to this tab.
         Fetches the latest ledger data from the database."""
+        curr_val = self.project_filter_var.get()
+        projects = ["All Projects"] + [p.name for p in
+                                       self.db_session.query(Project).order_by(
+                                           Project.name.asc()).all()]
+        self.project_menu.configure(values=projects)
+
+        if curr_val not in projects:
+            self.project_filter_var.set("All Projects")
+
         self.load_transactions()

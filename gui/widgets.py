@@ -378,7 +378,7 @@ class TransactionRow(ctk.CTkFrame):
 
         # Render Columns
         # Date
-        self._add_lbl(data.ts.strftime("%Y-%m-%d"), width=80)
+        self._add_lbl(data.ts.strftime("%Y-%m-%d"), width=75)
         # Vendor or Stream
         if data.entity and len(data.entity) > ent_char_limit:
             display_ent = data.entity[:ent_char_limit].strip() + "..."
@@ -393,7 +393,7 @@ class TransactionRow(ctk.CTkFrame):
         # Project
         self._add_lbl(data.proj_name or "", width=100, anchor="w", color="#5AC8FA")
         # Description
-        desc_px_width = char_limit * 7
+        desc_px_width = char_limit * 7 - 25
         display_desc = (data.desc[:char_limit] + "...") if data.desc and len(data.desc) > char_limit else data.desc
         lbl_desc = self._add_lbl(display_desc or "", width=desc_px_width, anchor="w", color="gray50")
         if data.desc: ToolTip(lbl_desc, data.desc)
@@ -427,7 +427,7 @@ class TransactionRow(ctk.CTkFrame):
         ToolTip(self.btn_del, "Delete Transaction")
         # Amount
         amt_str = f"{style['prefix']}{data.amount:,.{dec_map.get(data.currency, 2)}f} {data.currency}"
-        lbl_amt = self._add_lbl(amt_str, width=140, anchor="e", color=style['text'], bold=True)
+        lbl_amt = self._add_lbl(amt_str, width=170, anchor="e", color=style['text'], bold=True)
         if data.currency != main_app.manager.base_currency:
             ToolTip(lbl_amt, f"Converted: {style['prefix']}{data.base_val:,.{main_app.manager.base_currency_decimals}f} {main_app.manager.base_currency} (Rate: {data.fx_rate})")
 

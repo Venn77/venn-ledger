@@ -2,6 +2,7 @@ import customtkinter as ctk
 from typing import Literal, Any
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import matplotlib.ticker as ticker
 import datetime
 import mplcursors
 from database.models import Expense, Gain
@@ -35,6 +36,10 @@ class DashboardView(ctk.CTkFrame):
         self.scroll.pack(fill="both", expand=True)
 
         plt.style.use('dark_background')
+
+        plt.rcParams['font.family'] = 'sans-serif'
+        plt.rcParams['font.sans-serif'] = ['JetBrains Mono', 'Segoe UI']
+
         self.bg_color = '#2b2b2b'
         # noinspection PyTypeChecker
         self.after(50, self.build_dashboard)
@@ -200,6 +205,8 @@ class DashboardView(ctk.CTkFrame):
         ax.spines['right'].set_visible(False)
         ax.grid(axis='y', alpha=0.2)
 
+        ax.yaxis.set_major_formatter(ticker.StrMethodFormatter('{x:,.0f}'))
+
         fig.tight_layout()
 
         cursor = mplcursors.cursor([bars_in, bars_out], hover=True)
@@ -319,6 +326,8 @@ class DashboardView(ctk.CTkFrame):
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
         ax.grid(axis='y', alpha=0.2)
+
+        ax.yaxis.set_major_formatter(ticker.StrMethodFormatter('{x:,.0f}'))
 
         min_nw = float(min(net_worths))
         if min_nw > 0:

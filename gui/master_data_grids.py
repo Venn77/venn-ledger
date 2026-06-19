@@ -432,7 +432,7 @@ class AccountGrid(ctk.CTkFrame):
             row = ctk.CTkFrame(self.scroll, fg_color="gray20", corner_radius=6)
             row.pack(fill="x", pady=2, padx=2)
 
-            ctk.CTkLabel(row, text=item.name, width=150, anchor="w", font=("JetBrains Mono", 12, "bold")).pack(
+            ctk.CTkLabel(row, text=item.name, width=120, anchor="w", font=("JetBrains Mono", 12, "bold")).pack(
                 side="left", padx=10, pady=8)
             ctk.CTkLabel(row, text=f"{item.balance:,.{item.currency.decimals}f} {item.currency_code}", width=100, anchor="w",
                          text_color="#5AC8FA", font=("JetBrains Mono", 11, "bold")).pack(side="left", padx=5)
@@ -549,7 +549,7 @@ class PMGrid(ctk.CTkFrame):
 
             acc_color = "gray60" if not item.account.active_bool else "#5AC8FA"
             acc_text = f"→ {item.account.name}"
-            ctk.CTkLabel(row, text=acc_text, width=150, anchor="w", text_color=acc_color,
+            ctk.CTkLabel(row, text=acc_text, width=140, anchor="w", text_color=acc_color,
                          font=("JetBrains Mono", 11)).pack(side="left", padx=5)
 
             btn_frame = ctk.CTkFrame(row, fg_color="transparent")

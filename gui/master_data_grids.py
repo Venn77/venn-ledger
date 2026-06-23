@@ -101,11 +101,15 @@ class SimpleMasterDataGrid(ctk.CTkFrame):
         self.scroll.pack(fill="both", expand=True)
 
     def toggle_status(self, item_id):
-        item = self.db_session.get(self.model, item_id)
-        if item:
-            item.active_bool = not item.active_bool
-            self.db_session.commit()
-            self.load_data()
+        try:
+            item = self.db_session.get(self.model, item_id)
+            if item:
+                item.active_bool = not item.active_bool
+                self.db_session.commit()
+                self.load_data()
+        except Exception as e:
+            self.db_session.rollback()
+            show_popup(self, "Database Error", f"Failed to toggle status:\n{e}", is_error=True)
 
     def add_new(self):
         def _save(new_name, new_desc):
@@ -134,7 +138,7 @@ class SimpleMasterDataGrid(ctk.CTkFrame):
                 return True, ""
             except IntegrityError:
                 self.db_session.rollback()
-                return False, "Database error."
+                return False, "Database Integrity Error."
             except Exception as e:
                 self.db_session.rollback()
                 return False, str(e)
@@ -160,7 +164,7 @@ class SimpleMasterDataGrid(ctk.CTkFrame):
                 return True, ""
             except IntegrityError:
                 self.db_session.rollback()
-                return False, "Database error."
+                return False, "Database Integrity Error."
             except Exception as e:
                 self.db_session.rollback()
                 return False, str(e)
@@ -218,32 +222,47 @@ class CurrencyGrid(ctk.CTkFrame):
                                                                                                          padx=10)
 
     def toggle(self, code):
-        item = self.db_session.get(Currency, code)
-        if item.is_base:
-            show_popup(self, "Error", "You cannot deactivate the base currency.", is_error=True)
-            return
-        item.active_bool = not item.active_bool
-        self.db_session.commit()
-        self.load_data()
-        self.winfo_toplevel().event_generate("<<SettingsUpdate>>")
-
-    def add_new(self):
-        def _save(code, name, q_method, decimals):
-            if self.db_session.get(Currency, code): return False, "Currency Code already exists."
-            self.db_session.add(Currency(code=code[:10], name=name, is_base=False, quotation_method=q_method, decimals=decimals))
+        try:
+            item = self.db_session.get(Currency, code)
+            if item.is_base:
+                show_popup(self, "Error", "You cannot deactivate the base currency.", is_error=True)
+                return
+            item.active_bool = not item.active_bool
             self.db_session.commit()
             self.load_data()
             self.winfo_toplevel().event_generate("<<SettingsUpdate>>")
-            return True, ""
+        except Exception as e:
+            self.db_session.rollback()
+            show_popup(self, "Database Error", f"Failed to toggle currency:\n{e}", is_error=True)
+
+    def add_new(self):
+        def _save(code, name, q_method, decimals):
+            try:
+                if self.db_session.get(Currency, code): return False, "Currency Code already exists."
+                self.db_session.add(Currency(code=code[:10], name=name, is_base=False, quotation_method=q_method, decimals=decimals))
+                self.db_session.commit()
+                self.load_data()
+                self.winfo_toplevel().event_generate("<<SettingsUpdate>>")
+                return True, ""
+            except IntegrityError:
+                self.db_session.rollback()
+                return False, "Database Integrity Error."
+            except Exception as e:
+                self.db_session.rollback()
+                return False, f"Database error: {str(e)}"
 
         CurrencyDialog(self, "Add Currency", on_submit=_save)
 
     def edit(self, item):
         def _update(_code, name):
-            item.name = name
-            self.db_session.commit()
-            self.load_data()
-            return True, ""
+            try:
+                item.name = name
+                self.db_session.commit()
+                self.load_data()
+                return True, ""
+            except Exception as e:
+                self.db_session.rollback()
+                return False, f"Database error: {str(e)}"
 
         CurrencyDialog(self, "Edit Currency Name", initial_code=item.code, initial_name=item.name, is_edit=True,
                        on_submit=_update)
@@ -361,19 +380,23 @@ class ExchangeRateGrid(ctk.CTkFrame):
 
         def _confirm():
             if rate:
-                rate_count = self.db_session.query(ExchangeRate).filter_by(currency_code=rate.currency_code).count()
-                acc_count = self.db_session.query(Account).filter_by(currency_code=rate.currency_code).count()
+                try:
+                    rate_count = self.db_session.query(ExchangeRate).filter_by(currency_code=rate.currency_code).count()
+                    acc_count = self.db_session.query(Account).filter_by(currency_code=rate.currency_code).count()
 
-                if rate_count <= 1 and acc_count > 0:
-                    show_popup(self, "Action Blocked",
-                               f"Cannot delete the last {rate.currency_code} rate.\nYou have accounts depending on it.",
-                               is_error=True)
-                    popup.destroy()
-                    return
-                self.db_session.delete(rate)
-                self.db_session.commit()
-                self.load_data()
-                self.winfo_toplevel().event_generate("<<SidebarUpdate>>")
+                    if rate_count <= 1 and acc_count > 0:
+                        show_popup(self, "Action Blocked",
+                                   f"Cannot delete the last {rate.currency_code} rate.\nYou have accounts depending on it.",
+                                   is_error=True)
+                        popup.destroy()
+                        return
+                    self.db_session.delete(rate)
+                    self.db_session.commit()
+                    self.load_data()
+                    self.winfo_toplevel().event_generate("<<SidebarUpdate>>")
+                except Exception as e:
+                    self.db_session.rollback()
+                    show_popup(self, "Database Error", f"Failed to delete rate:\n{e}", is_error=True)
             popup.destroy()
 
         ctk.CTkButton(btn_frame, text="Cancel", width=70, fg_color="gray40", command=popup.destroy).pack(side="left",
@@ -398,11 +421,18 @@ class ExchangeRateGrid(ctk.CTkFrame):
         }
 
         def _save(code, rate, timestamp):
-            self.db_session.add(ExchangeRate(currency_code=code, fx_multiplier=rate, timestamp=timestamp))
-            self.db_session.commit()
-            self.load_data()
-            self.winfo_toplevel().event_generate("<<SidebarUpdate>>")
-            return True, ""
+            try:
+                self.db_session.add(ExchangeRate(currency_code=code, fx_multiplier=rate, timestamp=timestamp))
+                self.db_session.commit()
+                self.load_data()
+                self.winfo_toplevel().event_generate("<<SidebarUpdate>>")
+                return True, ""
+            except IntegrityError:
+                self.db_session.rollback()
+                return False, f"A rate for {code} exactly at this time already exists."
+            except Exception as e:
+                self.db_session.rollback()
+                return False, f"Database error: {str(e)}"
 
         FXDialog(
             self,
@@ -477,14 +507,18 @@ class AccountGrid(ctk.CTkFrame):
             self._execute_toggle(acc)
 
     def _execute_toggle(self, acc):
-        acc.active_bool = not acc.active_bool
-        if not acc.active_bool:
-            for pm in acc.payment_methods: pm.active_bool = False
-        self.db_session.commit()
-        self.load_data()
+        try:
+            acc.active_bool = not acc.active_bool
+            if not acc.active_bool:
+                for pm in acc.payment_methods: pm.active_bool = False
+            self.db_session.commit()
+            self.load_data()
 
-        self.winfo_toplevel().event_generate("<<SidebarUpdate>>")
-        self.winfo_toplevel().event_generate("<<SettingsUpdate>>")
+            self.winfo_toplevel().event_generate("<<SidebarUpdate>>")
+            self.winfo_toplevel().event_generate("<<SettingsUpdate>>")
+        except Exception as e:
+            self.db_session.rollback()
+            show_popup(self, "Database Error", f"Failed to toggle account:\n{e}", is_error=True)
 
     def add_new(self):
         currencies = self.db_session.query(Currency).filter_by(active_bool=True).all()
@@ -493,31 +527,45 @@ class AccountGrid(ctk.CTkFrame):
         curr_data = {c.code: c.decimals for c in currencies}
 
         def _save(name, descr, curr_code, bal):
-            curr_obj = self.db_session.query(Currency).filter_by(code=curr_code).first()
-            if not curr_obj.is_base:
-                has_rate = self.db_session.query(ExchangeRate).filter_by(currency_code=curr_code).first()
-                if not has_rate:
-                    return False, f"You must log an Exchange Rate for {curr_code} first."
-            if self.db_session.query(Account).filter_by(name=name).first(): return False, "Name already exists."
-            self.db_session.add(Account(name=name, description=descr, currency_code=curr_code, balance=bal, initial_balance=bal))
-            self.db_session.commit()
-            self.load_data()
-            self.winfo_toplevel().event_generate("<<SidebarUpdate>>")
-            return True, ""
+            try:
+                curr_obj = self.db_session.query(Currency).filter_by(code=curr_code).first()
+                if not curr_obj.is_base:
+                    has_rate = self.db_session.query(ExchangeRate).filter_by(currency_code=curr_code).first()
+                    if not has_rate:
+                        return False, f"You must log an Exchange Rate for {curr_code} first."
+                if self.db_session.query(Account).filter_by(name=name).first(): return False, "Name already exists."
+                self.db_session.add(Account(name=name, description=descr, currency_code=curr_code, balance=bal, initial_balance=bal))
+                self.db_session.commit()
+                self.load_data()
+                self.winfo_toplevel().event_generate("<<SidebarUpdate>>")
+                return True, ""
+            except IntegrityError:
+                self.db_session.rollback()
+                return False, "Database Integrity Error."
+            except Exception as e:
+                self.db_session.rollback()
+                return False, f"Database error: {str(e)}"
 
         AccountDialog(self, currency_data=curr_data, on_submit=_save)
 
     def edit(self, acc):
         def _update(name, descr, _curr, _bal):
-            existing = self.db_session.query(Account).filter_by(name=name).first()
-            if existing and existing.id != acc.id: return False, "Name in use."
-            acc.name = name
-            acc.description = descr
-            self.db_session.commit()
-            self.load_data()
-            self.winfo_toplevel().event_generate("<<SidebarUpdate>>")
-            self.winfo_toplevel().event_generate("<<SettingsUpdate>>")
-            return True, ""
+            try:
+                existing = self.db_session.query(Account).filter_by(name=name).first()
+                if existing and existing.id != acc.id: return False, "Name in use."
+                acc.name = name
+                acc.description = descr
+                self.db_session.commit()
+                self.load_data()
+                self.winfo_toplevel().event_generate("<<SidebarUpdate>>")
+                self.winfo_toplevel().event_generate("<<SettingsUpdate>>")
+                return True, ""
+            except IntegrityError:
+                self.db_session.rollback()
+                return False, "Database Integrity Error."
+            except Exception as e:
+                self.db_session.rollback()
+                return False, f"Database error: {str(e)}"
 
         curr_data = {acc.currency_code: acc.currency.decimals}
 
@@ -568,22 +616,33 @@ class PMGrid(ctk.CTkFrame):
                                                                                                          padx=10)
 
     def toggle(self, item_id):
-        item = self.db_session.get(PaymentMethod, item_id)
-        item.active_bool = not item.active_bool
-        self.db_session.commit()
-        self.load_data()
+        try:
+            item = self.db_session.get(PaymentMethod, item_id)
+            item.active_bool = not item.active_bool
+            self.db_session.commit()
+            self.load_data()
+        except Exception as e:
+            self.db_session.rollback()
+            show_popup(self, "Database Error", f"Failed to toggle Payment Method:\n{e}", is_error=True)
 
     def add_new(self):
         act_accounts = [a.name for a in self.db_session.query(Account).filter_by(active_bool=True).all()]
         if not act_accounts: return
 
         def _save(name, acc_name):
-            if self.db_session.query(PaymentMethod).filter_by(name=name).first(): return False, "Name in use."
-            acc = self.db_session.query(Account).filter_by(name=acc_name).first()
-            self.db_session.add(PaymentMethod(name=name, account_id=acc.id))
-            self.db_session.commit()
-            self.load_data()
-            return True, ""
+            try:
+                if self.db_session.query(PaymentMethod).filter_by(name=name).first(): return False, "Name in use."
+                acc = self.db_session.query(Account).filter_by(name=acc_name).first()
+                self.db_session.add(PaymentMethod(name=name, account_id=acc.id))
+                self.db_session.commit()
+                self.load_data()
+                return True, ""
+            except IntegrityError:
+                self.db_session.rollback()
+                return False, "Database Integrity Error."
+            except Exception as e:
+                self.db_session.rollback()
+                return False, f"Database error: {str(e)}"
 
         PMDialog(self, act_accounts, on_submit=_save)
 
@@ -592,13 +651,20 @@ class PMGrid(ctk.CTkFrame):
         if item.account.name not in act_accounts: act_accounts.append(item.account.name)
 
         def _update(name, acc_name):
-            existing = self.db_session.query(PaymentMethod).filter_by(name=name).first()
-            if existing and existing.id != item.id: return False, "Name in use."
-            acc = self.db_session.query(Account).filter_by(name=acc_name).first()
-            item.name = name
-            item.account_id = acc.id
-            self.db_session.commit()
-            self.load_data()
-            return True, ""
+            try:
+                existing = self.db_session.query(PaymentMethod).filter_by(name=name).first()
+                if existing and existing.id != item.id: return False, "Name in use."
+                acc = self.db_session.query(Account).filter_by(name=acc_name).first()
+                item.name = name
+                item.account_id = acc.id
+                self.db_session.commit()
+                self.load_data()
+                return True, ""
+            except IntegrityError:
+                self.db_session.rollback()
+                return False, "Database Integrity Error."
+            except Exception as e:
+                self.db_session.rollback()
+                return False, f"Database error: {str(e)}"
 
         PMDialog(self, act_accounts, initial_name=item.name, initial_acc=item.account.name, on_submit=_update)

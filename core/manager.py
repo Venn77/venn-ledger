@@ -121,10 +121,9 @@ class TransactionManager:
 
         curr_obj = self.db_session.get(Currency, currency_code)
         q_method = curr_obj.quotation_method if curr_obj else "divide"
-        c_decimals = curr_obj.decimals if curr_obj else 2
 
         new_expense = calculate_conversion(new_expense, is_base_currency=(currency_code == self.base_currency),
-                                           quotation_method=q_method, decimals=c_decimals)
+                                           quotation_method=q_method, decimals=self.base_currency_decimals)
 
         account.balance = self._safe_sub(account.balance, amount)
 
@@ -186,10 +185,9 @@ class TransactionManager:
 
         curr_obj = self.db_session.get(Currency, currency_code)
         q_method = curr_obj.quotation_method if curr_obj else "divide"
-        c_decimals = curr_obj.decimals if curr_obj else 2
 
         new_gain = calculate_conversion(new_gain, is_base_currency=(currency_code == self.base_currency),
-                                        quotation_method=q_method, decimals=c_decimals)
+                                        quotation_method=q_method, decimals=self.base_currency_decimals)
 
         account.balance = self._safe_add(account.balance, amount)
 

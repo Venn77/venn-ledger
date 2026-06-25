@@ -1,5 +1,5 @@
 import customtkinter as ctk
-import datetime
+import datetime, re
 from database.models import (
     Currency, Project, Category, Vendor,
     PaymentMethod, Account, Stream, Payer
@@ -769,6 +769,9 @@ class AddGainWindow(BaseTransactionWindow):
 
 class AddTransferWindow(BaseTransactionWindow):
     def __init__(self, parent, manager, transaction_data=None, db_session=None):
+        if transaction_data and "desc" in transaction_data and transaction_data["desc"]:
+            clean_desc = re.sub(r'^\S{1,10} -> \S{1,10}( \| )?', '', transaction_data["desc"])
+            transaction_data["desc"] = clean_desc
         self.db_session = db_session
         active_accounts = self.db_session.query(Account).filter_by(active_bool=True).order_by(Account.name.asc()).all()
         self.account_map = {acc.name: acc for acc in active_accounts}

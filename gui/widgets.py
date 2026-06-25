@@ -428,7 +428,7 @@ class TransactionRow(ctk.CTkFrame):
         # Amount
         amt_str = f"{style['prefix']}{data.amount:,.{dec_map.get(data.currency, 2)}f} {data.currency}"
         lbl_amt = self._add_lbl(amt_str, width=170, anchor="e", color=style['text'], bold=True)
-        if data.currency != main_app.manager.base_currency:
+        if data.currency != main_app.manager.base_currency and "transfer" not in data.type:
             ToolTip(lbl_amt, f"Converted: {style['prefix']}{data.base_val:,.{main_app.manager.base_currency_decimals}f} {main_app.manager.base_currency} (Rate: {data.fx_rate})")
 
         # Hover Effect

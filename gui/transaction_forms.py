@@ -39,6 +39,7 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         self.currency_map = {c.code: c.decimals for c in self.db_session.query(Currency).all()}
         self.desc_placeholder = "Description (Optional)"
         self.fx_placeholder = "Rate (e.g. 1.1500)"
+        self.proj_placeholder = "Search or type Project..."
         self.session_time = datetime.datetime.now().strftime("%H:%M:%S")
 
         mem_date = self.mem.get("date", "")
@@ -49,7 +50,6 @@ class BaseTransactionWindow(ctk.CTkToplevel):
 
         self.currency_var = ctk.StringVar(value=self.mem.get("currency", self.manager.base_currency))
         self.date_var = ctk.StringVar(value=initial_date)
-        self.project_var = ctk.StringVar(value=self.mem.get("project", ""))
 
         init_dec = self.currency_map.get(self.currency_var.get(), 2)
         self.amount_placeholder = self.get_dynamic_placeholder("Amount", init_dec)
@@ -84,9 +84,15 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         self.lbl_desc = ctk.CTkLabel(self, text="Description", font=("JetBrains Mono", 13, "bold"), anchor="w")
         self.desc_entry = ctk.CTkEntry(self)
 
-        projects = [p.name for p in self.db_session.query(Project).filter_by(active_bool=True).order_by(collate(Project.name, 'NOCASE')).all()]
         self.lbl_project = ctk.CTkLabel(self, text="Project", font=("JetBrains Mono", 13, "bold"), anchor="w")
-        self.project_menu = ctk.CTkOptionMenu(self, values=projects, variable=self.project_var)
+
+        self.all_projects = [p.name for p in self.db_session.query(Project).filter_by(active_bool=True).order_by(
+            collate(Project.name, 'NOCASE')).all()]
+        self.project_combo = SearchableComboBox(self, placeholder=self.proj_placeholder, values=self.all_projects,
+                                                command=lambda _: self.validate_form())
+        self.project_combo.inject_value(self.mem.get("project"))
+        # noinspection PyProtectedMember
+        self.project_combo._entry.bind("<KeyRelease>", self.schedule_validation, add="+")
 
         self.error_label = ctk.CTkLabel(self, text="", text_color="orange", font=("JetBrains Mono", 12))
         self.btn_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -161,7 +167,7 @@ class BaseTransactionWindow(ctk.CTkToplevel):
 
         # Project (Row 9)
         self.lbl_project.grid(row=9, column=0, padx=(20, 10), pady=8, sticky="w")
-        self.project_menu.grid(row=9, column=1, padx=(0, 20), pady=8, sticky="ew")
+        self.project_combo.grid(row=9, column=1, padx=(0, 20), pady=8, sticky="ew")
 
         # Footer (Row 10 & 11)
         self.error_label.grid(row=10, column=0, columnspan=2, pady=(10, 5))
@@ -418,7 +424,7 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         self._apply_placeholder(self.desc_entry, self.desc_placeholder)
 
         self.currency_var.set(self.manager.base_currency)
-        self.project_var.set("")
+        self.project_combo.reset()
         self.date_var.set(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
         self.clear_specific_fields()
@@ -478,7 +484,8 @@ class BaseTransactionWindow(ctk.CTkToplevel):
             ts = datetime.datetime.strptime(self.date_var.get(), "%Y-%m-%d %H:%M:%S")
             fx_rate = None if cur == self.manager.base_currency else float(self.fx_entry.get().replace(",", "."))
             descr = "" if self.desc_entry.get() == self.desc_placeholder else self.desc_entry.get()
-            proj = self.project_var.get()
+            raw_proj = self.project_combo.get().strip()
+            proj = "" if raw_proj == self.proj_placeholder else raw_proj
 
             base_data = {
                 "amount": amt, "currency_code": cur, "timestamp": ts,
@@ -589,7 +596,7 @@ class AddExpenseWindow(BaseTransactionWindow):
         return [
             self.amount_entry, self.currency_menu, self.fx_entry,
             self.category_combo, self.vendor_combo, self.pm_menu,
-            self.date_entry, self.desc_entry, self.project_menu, self.save_btn
+            self.date_entry, self.desc_entry, self.project_combo, self.save_btn
         ]
 
     def on_currency_change(self, selected_currency):
@@ -622,6 +629,7 @@ class AddExpenseWindow(BaseTransactionWindow):
         current_amt = float(self.amount_entry.get().replace(",", "."))
         current_category = self.category_combo.get().strip()
         current_vendor = self.vendor_combo.get().strip()
+        current_project = self.project_combo.get().strip()
 
         exclude_id = self.transaction_data.get("id") if self.is_edit_mode and self.transaction_data else None
 
@@ -629,12 +637,19 @@ class AddExpenseWindow(BaseTransactionWindow):
         if is_duplicate:
             return "⚠ Potential duplicate detected!", True
 
-        is_new_vendor = current_vendor not in self.all_vendors and current_vendor not in [self.ven_placeholder, ""]
-        is_new_category = current_category not in self.all_categories and current_category not in [self.cat_placeholder, ""]
+        news = []
+        if current_category not in self.all_categories and current_category not in [self.cat_placeholder, ""]:
+            news.append(("Category", current_category))
+        if current_vendor not in self.all_vendors and current_vendor not in [self.ven_placeholder, ""]:
+            news.append(("Vendor", current_vendor))
+        if current_project not in self.all_projects and current_project not in [self.proj_placeholder, ""]:
+            news.append(("Project", current_project))
 
-        if is_new_vendor and is_new_category: return "Notice: New Vendor & Category will be created.", False
-        if is_new_vendor: return f"Notice: New Vendor '{current_vendor}' will be created.", False
-        if is_new_category: return f"Notice: New Category '{current_category}' will be created.", False
+        if len(news) == 1:
+            return f"Notice: New {news[0][0]} '{news[0][1]}' will be created.", False
+        elif len(news) > 1:
+            types = [n[0] for n in news]
+            return f"Notice: New {', '.join(types)} will be created.", False
 
         return "", False
 
@@ -705,7 +720,7 @@ class AddGainWindow(BaseTransactionWindow):
         return [
             self.amount_entry, self.currency_menu, self.fx_entry,
             self.stream_combo, self.payer_combo, self.acc_menu,
-            self.date_entry, self.desc_entry, self.project_menu, self.save_btn
+            self.date_entry, self.desc_entry, self.project_combo, self.save_btn
         ]
 
     def on_currency_change(self, selected_currency):
@@ -738,6 +753,7 @@ class AddGainWindow(BaseTransactionWindow):
         current_amt = float(self.amount_entry.get().replace(",", "."))
         current_stream = self.stream_combo.get().strip()
         current_payer = self.payer_combo.get().strip()
+        current_project = self.project_combo.get().strip()
 
         exclude_id = self.transaction_data.get("id") if self.is_edit_mode and self.transaction_data else None
 
@@ -745,12 +761,19 @@ class AddGainWindow(BaseTransactionWindow):
         if is_duplicate:
             return "⚠ Potential duplicate detected!", True
 
-        is_new_payer = current_payer not in self.all_payers and current_payer not in [self.payer_placeholder, ""]
-        is_new_stream = current_stream not in self.all_streams and current_stream not in [self.stream_placeholder, ""]
+        news = []
+        if current_stream not in self.all_streams and current_stream not in [self.stream_placeholder, ""]:
+            news.append(("Stream", current_stream))
+        if current_payer not in self.all_payers and current_payer not in [self.payer_placeholder, ""]:
+            news.append(("Payer", current_payer))
+        if current_project not in self.all_projects and current_project not in [self.proj_placeholder, ""]:
+            news.append(("Project", current_project))
 
-        if is_new_payer and is_new_stream: return "Notice: New Payer & Stream will be created.", False
-        if is_new_payer: return f"Notice: New Payer '{current_payer}' will be created.", False
-        if is_new_stream: return f"Notice: New Stream '{current_stream}' will be created.", False
+        if len(news) == 1:
+            return f"Notice: New {news[0][0]} '{news[0][1]}' will be created.", False
+        elif len(news) > 1:
+            types = [n[0] for n in news]
+            return f"Notice: New {', '.join(types)} will be created.", False
 
         return "", False
 
@@ -841,7 +864,7 @@ class AddTransferWindow(BaseTransactionWindow):
         self._apply_entry_state(self.dest_amount_entry, self.mem.get("dest_amount"), self.dest_amount_placeholder)
 
         self.lbl_project.grid_forget()
-        self.project_menu.grid_forget()
+        self.project_combo.grid_forget()
 
     def get_tab_order(self):
         return [

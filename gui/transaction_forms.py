@@ -1,5 +1,6 @@
 import customtkinter as ctk
 import datetime, re
+from sqlalchemy import collate
 from database.models import (
     Currency, Project, Category, Vendor,
     PaymentMethod, Account, Stream, Payer
@@ -65,7 +66,7 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         self.amount_entry = ctk.CTkEntry(self)
 
         currencies = [c.code for c in
-                      self.db_session.query(Currency).filter_by(active_bool=True).order_by(Currency.code.asc()).all()]
+                      self.db_session.query(Currency).filter_by(active_bool=True).order_by(collate(Currency.code, 'NOCASE')).all()]
         self.lbl_currency = ctk.CTkLabel(self, text="Currency", font=("JetBrains Mono", 13, "bold"), anchor="w")
         self.currency_menu = ctk.CTkOptionMenu(self, values=currencies, variable=self.currency_var,
                                                command=self.on_currency_change)
@@ -83,7 +84,7 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         self.lbl_desc = ctk.CTkLabel(self, text="Description", font=("JetBrains Mono", 13, "bold"), anchor="w")
         self.desc_entry = ctk.CTkEntry(self)
 
-        projects = [p.name for p in self.db_session.query(Project).filter_by(active_bool=True).order_by(Project.name.asc()).all()]
+        projects = [p.name for p in self.db_session.query(Project).filter_by(active_bool=True).order_by(collate(Project.name, 'NOCASE')).all()]
         self.lbl_project = ctk.CTkLabel(self, text="Project", font=("JetBrains Mono", 13, "bold"), anchor="w")
         self.project_menu = ctk.CTkOptionMenu(self, values=projects, variable=self.project_var)
 
@@ -546,7 +547,7 @@ class AddExpenseWindow(BaseTransactionWindow):
         # Category
         self.lbl_category = ctk.CTkLabel(self, text="Category", font=("JetBrains Mono", 13, "bold"), anchor="w")
         self.all_categories = [c.name for c in
-                               self.db_session.query(Category).filter_by(active_bool=True).order_by(Category.name.asc()).all()]
+                               self.db_session.query(Category).filter_by(active_bool=True).order_by(collate(Category.name, 'NOCASE')).all()]
         self.category_combo = SearchableComboBox(self, placeholder=self.cat_placeholder, values=self.all_categories,
                                                  command=lambda _: self.validate_form())
         self.category_combo.inject_value(self.mem.get("category"))
@@ -556,7 +557,7 @@ class AddExpenseWindow(BaseTransactionWindow):
         # Vendor
         self.lbl_vendor = ctk.CTkLabel(self, text="Vendor", font=("JetBrains Mono", 13, "bold"), anchor="w")
         self.all_vendors = [v.name for v in
-                            self.db_session.query(Vendor).filter_by(active_bool=True).order_by(Vendor.name.asc()).all()]
+                            self.db_session.query(Vendor).filter_by(active_bool=True).order_by(collate(Vendor.name, 'NOCASE')).all()]
         self.vendor_combo = SearchableComboBox(self, placeholder=self.ven_placeholder, values=self.all_vendors,
                                                command=lambda _: self.validate_form())
         self.vendor_combo.inject_value(self.mem.get("entity"))
@@ -596,7 +597,7 @@ class AddExpenseWindow(BaseTransactionWindow):
         valid_pms = (
             self.db_session.query(PaymentMethod)
             .join(Account).filter(Account.currency_code == selected_currency, PaymentMethod.active_bool == True)
-            .order_by(PaymentMethod.name.asc())
+            .order_by(collate(PaymentMethod.name, 'NOCASE'))
             .all()
         )
         pm_names = [p.name for p in valid_pms]
@@ -662,7 +663,7 @@ class AddGainWindow(BaseTransactionWindow):
         # Stream
         self.lbl_stream = ctk.CTkLabel(self, text="Stream", font=("JetBrains Mono", 13, "bold"), anchor="w")
         self.all_streams = [s.name for s in
-                               self.db_session.query(Stream).filter_by(active_bool=True).order_by(Stream.name.asc()).all()]
+                               self.db_session.query(Stream).filter_by(active_bool=True).order_by(collate(Stream.name, 'NOCASE')).all()]
         self.stream_combo = SearchableComboBox(self, placeholder=self.stream_placeholder, values=self.all_streams,
                                                  command=lambda _: self.validate_form())
         self.stream_combo.inject_value(self.mem.get("stream"))
@@ -672,7 +673,7 @@ class AddGainWindow(BaseTransactionWindow):
         # Payer
         self.lbl_payer = ctk.CTkLabel(self, text="Payer", font=("JetBrains Mono", 13, "bold"), anchor="w")
         self.all_payers = [p.name for p in
-                            self.db_session.query(Payer).filter_by(active_bool=True).order_by(Payer.name.asc()).all()]
+                            self.db_session.query(Payer).filter_by(active_bool=True).order_by(collate(Payer.name, 'NOCASE')).all()]
         self.payer_combo = SearchableComboBox(self, placeholder=self.payer_placeholder, values=self.all_payers,
                                                command=lambda _: self.validate_form())
         self.payer_combo.inject_value(self.mem.get("entity"))
@@ -712,7 +713,7 @@ class AddGainWindow(BaseTransactionWindow):
         valid_accounts = (
             self.db_session.query(Account)
             .filter(Account.currency_code == selected_currency, Account.active_bool == True)
-            .order_by(Account.name.asc())
+            .order_by(collate(Account.name, 'NOCASE'))
             .all()
         )
         acc_names = [a.name for a in valid_accounts]
@@ -773,7 +774,7 @@ class AddTransferWindow(BaseTransactionWindow):
             clean_desc = re.sub(r'^\S{1,10} -> \S{1,10}( \| )?', '', transaction_data["desc"])
             transaction_data["desc"] = clean_desc
         self.db_session = db_session
-        active_accounts = self.db_session.query(Account).filter_by(active_bool=True).order_by(Account.name.asc()).all()
+        active_accounts = self.db_session.query(Account).filter_by(active_bool=True).order_by(collate(Account.name, 'NOCASE')).all()
         self.account_map = {acc.name: acc for acc in active_accounts}
         self.all_acc_names = list(self.account_map.keys())
 

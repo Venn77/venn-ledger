@@ -1,5 +1,6 @@
 import customtkinter as ctk
 import datetime, gc
+from sqlalchemy import collate
 from database.models import (
     Category, Vendor, Currency, PaymentMethod
 )
@@ -23,10 +24,10 @@ class AIStagingGrid(ctk.CTkFrame):
         self.page_size = 25
         self.rows = []
 
-        self.active_cats = self.db_session.query(Category).filter_by(active_bool=True).order_by(Category.name.asc()).all()
-        self.active_pms = self.db_session.query(PaymentMethod).filter_by(active_bool=True).order_by(PaymentMethod.name.asc()).all()
-        self.active_vendors = self.db_session.query(Vendor).filter_by(active_bool=True).order_by(Vendor.name.asc()).all()
-        self.active_currencies = self.db_session.query(Currency).filter_by(active_bool=True).order_by(Currency.name.asc()).all()
+        self.active_cats = self.db_session.query(Category).filter_by(active_bool=True).order_by(collate(Category.name, 'NOCASE')).all()
+        self.active_pms = self.db_session.query(PaymentMethod).filter_by(active_bool=True).order_by(collate(PaymentMethod.name, 'NOCASE')).all()
+        self.active_vendors = self.db_session.query(Vendor).filter_by(active_bool=True).order_by(collate(Vendor.name, 'NOCASE')).all()
+        self.active_currencies = self.db_session.query(Currency).filter_by(active_bool=True).order_by(collate(Currency.name, 'NOCASE')).all()
 
         self._pre_validate_all()
 

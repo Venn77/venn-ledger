@@ -1,4 +1,5 @@
 import customtkinter as ctk
+from sqlalchemy import collate
 from sqlalchemy.exc import IntegrityError
 from database.models import (
     Currency, ExchangeRate, Account, PaymentMethod
@@ -45,7 +46,7 @@ class SimpleMasterDataGrid(ctk.CTkFrame):
         for widget in self.scroll.winfo_children():
             widget.destroy()
 
-        self.current_results = self.db_session.query(self.model).order_by(self.model.name).all()
+        self.current_results = self.db_session.query(self.model).order_by(collate(self.model.name, 'NOCASE')).all()
         self.total_items = len(self.current_results)
 
         if self.total_items > 0:
@@ -189,7 +190,7 @@ class CurrencyGrid(ctk.CTkFrame):
 
     def load_data(self):
         for widget in self.scroll.winfo_children(): widget.destroy()
-        items = self.db_session.query(Currency).order_by(Currency.code).all()
+        items = self.db_session.query(Currency).order_by(collate(Currency.code, 'NOCASE')).all()
         for item in items:
             row = ctk.CTkFrame(self.scroll, fg_color="gray20", corner_radius=6)
             row.pack(fill="x", pady=2, padx=2)
@@ -409,7 +410,7 @@ class ExchangeRateGrid(ctk.CTkFrame):
         if not base_curr:
             return
 
-        foreign_currs = self.db_session.query(Currency).filter_by(active_bool=True, is_base=False).all()
+        foreign_currs = self.db_session.query(Currency).filter_by(active_bool=True, is_base=False).order_by(collate(Currency.code, 'NOCASE')).all()
         if not foreign_currs:
             return
 
@@ -457,7 +458,7 @@ class AccountGrid(ctk.CTkFrame):
 
     def load_data(self):
         for widget in self.scroll.winfo_children(): widget.destroy()
-        items = self.db_session.query(Account).order_by(Account.name).all()
+        items = self.db_session.query(Account).order_by(collate(Account.name, 'NOCASE')).all()
         for item in items:
             row = ctk.CTkFrame(self.scroll, fg_color="gray20", corner_radius=6)
             row.pack(fill="x", pady=2, padx=2)
@@ -521,7 +522,7 @@ class AccountGrid(ctk.CTkFrame):
             show_popup(self, "Database Error", f"Failed to toggle account:\n{e}", is_error=True)
 
     def add_new(self):
-        currencies = self.db_session.query(Currency).filter_by(active_bool=True).all()
+        currencies = self.db_session.query(Currency).filter_by(active_bool=True).order_by(collate(Currency.code, 'NOCASE')).all()
         if not currencies: return
 
         curr_data = {c.code: c.decimals for c in currencies}
@@ -587,7 +588,7 @@ class PMGrid(ctk.CTkFrame):
 
     def load_data(self, _event=None):
         for widget in self.scroll.winfo_children(): widget.destroy()
-        items = self.db_session.query(PaymentMethod).join(Account).order_by(Account.name, PaymentMethod.name).all()
+        items = self.db_session.query(PaymentMethod).join(Account).order_by(collate(Account.name, 'NOCASE'), collate(PaymentMethod.name, 'NOCASE')).all()
         for item in items:
             row = ctk.CTkFrame(self.scroll, fg_color="gray20", corner_radius=6)
             row.pack(fill="x", pady=2, padx=2)
@@ -626,7 +627,7 @@ class PMGrid(ctk.CTkFrame):
             show_popup(self, "Database Error", f"Failed to toggle Payment Method:\n{e}", is_error=True)
 
     def add_new(self):
-        act_accounts = [a.name for a in self.db_session.query(Account).filter_by(active_bool=True).all()]
+        act_accounts = [a.name for a in self.db_session.query(Account).filter_by(active_bool=True).order_by(collate(Account.name, 'NOCASE')).all()]
         if not act_accounts: return
 
         def _save(name, acc_name):
@@ -647,7 +648,7 @@ class PMGrid(ctk.CTkFrame):
         PMDialog(self, act_accounts, on_submit=_save)
 
     def edit(self, item):
-        act_accounts = [a.name for a in self.db_session.query(Account).filter_by(active_bool=True).all()]
+        act_accounts = [a.name for a in self.db_session.query(Account).filter_by(active_bool=True).order_by(collate(Account.name, 'NOCASE')).all()]
         if item.account.name not in act_accounts: act_accounts.append(item.account.name)
 
         def _update(name, acc_name):

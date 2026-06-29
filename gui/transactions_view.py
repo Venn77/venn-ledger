@@ -7,7 +7,7 @@ from database.models import (
 )
 from sqlalchemy import (
     desc, or_, func, column, literal_column,
-    union_all, asc, case
+    union_all, asc, case, collate
 )
 from sqlalchemy.orm import aliased
 from gui.widgets import ToolTip
@@ -742,7 +742,7 @@ class TransactionsView(ctk.CTkFrame):
         curr_val = self.project_filter_var.get()
         projects = ["All Projects"] + [p.name for p in
                                        self.db_session.query(Project).order_by(
-                                           Project.name.asc()).all()]
+                                           collate(Project.name, 'NOCASE')).all()]
         self.project_menu.configure(values=projects)
 
         if curr_val not in projects:

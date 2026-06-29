@@ -3,6 +3,7 @@ import threading, datetime
 from database.models import (
     Category, Currency, Project
 )
+from sqlalchemy import collate
 from core.ai_parser import (
     DEFAULT_PROMPT_TEMPLATE, DEFAULT_SKIP_TERMS_TEXT,
     chunk_file_by_day, get_structured_data,
@@ -90,9 +91,9 @@ class AIImportView(ctk.CTkFrame):
         self.btn_browse.pack(side="left", padx=(5, 15))
 
         # Dropdowns
-        active_currencies = [c.code for c in self.db_session.query(Currency).filter_by(active_bool=True).all()]
+        active_currencies = [c.code for c in self.db_session.query(Currency).filter_by(active_bool=True).order_by(collate(Currency.name, 'NOCASE')).all()]
         active_projects = ["None"] + [p.name for p in
-                                      self.db_session.query(Project).filter_by(active_bool=True).all()]
+                                      self.db_session.query(Project).filter_by(active_bool=True).order_by(collate(Project.name, 'NOCASE')).all()]
         current_year = str(datetime.datetime.now().year)
         years = [str(y) for y in range(int(current_year) - 2, int(current_year) + 3)]
 
@@ -407,8 +408,8 @@ class AIImportView(ctk.CTkFrame):
         """Called when this tab is brought to the front.
         Ensures the dropdowns have the latest Master Data."""
 
-        active_currencies = [c.code for c in self.db_session.query(Currency).filter_by(active_bool=True).all()]
-        active_projects = ["None"] + [p.name for p in self.db_session.query(Project).filter_by(active_bool=True).all()]
+        active_currencies = [c.code for c in self.db_session.query(Currency).filter_by(active_bool=True).order_by(collate(Currency.name, 'NOCASE')).all()]
+        active_projects = ["None"] + [p.name for p in self.db_session.query(Project).filter_by(active_bool=True).order_by(collate(Project.name, 'NOCASE')).all()]
 
         self.ai_curr_combo.configure(values=active_currencies)
         self.ai_proj_combo.configure(values=active_projects)

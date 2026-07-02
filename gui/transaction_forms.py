@@ -6,7 +6,7 @@ from database.models import (
     PaymentMethod, Account, Stream, Payer
 )
 from gui.widgets import SearchableComboBox, ToolTip
-from gui.dialogs import open_calendar
+from gui.dialogs import open_calendar, show_popup
 from utils.io_utils import format_input_float
 
 
@@ -57,6 +57,7 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         self.cal_window = None
         self.fx_tooltip = None
         self._val_timer = None
+        self._fx_timer = None
         self.tab_widgets = None
 
         # 2. Create Shared Widgets (Top & Bottom)
@@ -318,7 +319,7 @@ class BaseTransactionWindow(ctk.CTkToplevel):
 
     def _handle_date_change(self, _var_name, _index, _mode):
         """Ensures correct execution sequence when the user changes the Date."""
-        self.update_fx_list()
+        self.schedule_fx_update()
         if hasattr(self, 'error_label'):
             self.validate_form()
 
@@ -335,7 +336,7 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         self.amount_placeholder = new_pl
         self._reformat_input(self.amount_entry, dec, self.amount_placeholder)
 
-        self.update_fx_list()
+        self.schedule_fx_update()
         self.on_currency_change(cur)
         if hasattr(self, 'error_label'):
             self.validate_form()
@@ -362,8 +363,14 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         target_date = datetime.datetime.now() - datetime.timedelta(days=days_ago)
         self.date_var.set(f"{target_date.strftime('%Y-%m-%d')} {active_time}")
 
+    def schedule_fx_update(self):
+        """Debounces the FX lookup."""
+        if hasattr(self, '_fx_timer') and self._fx_timer:
+            self.after_cancel(self._fx_timer)
+        self._fx_timer = self.after(500, self.update_fx_list)
+
     def update_fx_list(self):
-        """Refreshes FX rate based on currency and date."""
+        """Refreshes FX rate based on currency and date, with a prompt if overwriting."""
         selected_currency = self.currency_var.get()
         if selected_currency == self.manager.base_currency:
             self.lbl_fx.grid_forget()
@@ -375,30 +382,62 @@ class BaseTransactionWindow(ctk.CTkToplevel):
 
         try:
             full_date = self.date_var.get()
-            if not full_date or len(full_date) < 10: return
+            if not full_date or not self.is_valid_date(full_date):
+                return
 
             injected_fx = self.mem.get("fx_rate")
             if injected_fx:
-                self.fx_entry.delete(0, 'end')
-                self.fx_entry.insert(0, str(injected_fx))
-                self.fx_entry.configure(text_color="white", font=("JetBrains Mono", 13))
-                self.fx_tooltip.text = "Injected rate from original transaction"
+                self._apply_fx_update(str(injected_fx), "Injected rate from original transaction")
                 self.mem["fx_rate"] = None
                 return
 
             result = self.manager.get_historical_fx_rate(selected_currency, full_date)
-            if result:
-                self.fx_entry.delete(0, 'end')
-                self.fx_entry.insert(0, str(result[0]))
-                self.fx_entry.configure(text_color="white", font=("JetBrains Mono", 13))
-                self.fx_tooltip.text = f"Suggested rate from: {result[1].strftime('%Y-%m-%d')}"
+            new_rate_str = str(result[0]) if result else self.fx_placeholder
+            new_tooltip = f"Suggested rate from: {result[1].strftime('%Y-%m-%d')}" if result else "No historical rate found."
+
+            current_fx = self.fx_entry.get()
+            has_existing = current_fx != self.fx_placeholder and current_fx.strip() != "" and self.is_float(current_fx)
+
+            if has_existing and current_fx != new_rate_str:
+                self._ask_fx_override(new_rate_str, new_tooltip)
             else:
-                self.fx_entry.delete(0, 'end')
-                self.fx_entry.insert(0, self.fx_placeholder)
-                self.fx_entry.configure(text_color="gray", font=("JetBrains Mono", 13))
-                self.fx_tooltip.text = "No historical rate found."
+                self._apply_fx_update(new_rate_str, new_tooltip)
+
         except Exception as e:
             print(f"FX Sync Error: {e}")
+
+    def _apply_fx_update(self, new_rate_str, new_tooltip):
+        """Executes the UI update for the FX entry field."""
+        self.fx_entry.delete(0, 'end')
+        self.fx_entry.insert(0, new_rate_str)
+        if new_rate_str == self.fx_placeholder:
+            self.fx_entry.configure(text_color="gray", font=("JetBrains Mono", 13))
+        else:
+            self.fx_entry.configure(text_color="white", font=("JetBrains Mono", 13))
+        self.fx_tooltip.text = new_tooltip
+        self.validate_form()
+
+    def _ask_fx_override(self, new_rate_str, new_tooltip):
+        """Spawns a confirmation dialog before overwriting an entered FX rate."""
+        if new_rate_str == self.fx_placeholder:
+            msg = "No historical exchange rate found for this date.\n\nDo you want to clear your currently entered rate?"
+        else:
+            msg = f"You have an existing exchange rate entered.\n\nUpdate it to the suggested rate ( {new_rate_str} )?"
+
+        def apply_new():
+            self._apply_fx_update(new_rate_str, new_tooltip)
+
+        def keep_old():
+            self.validate_form()
+
+        show_popup(
+            parent=self,
+            title="Update Rate?",
+            message=msg,
+            show_cancel=True,
+            ok_command=apply_new,
+            cancel_command=keep_old
+        )
 
     @staticmethod
     def is_float(val):

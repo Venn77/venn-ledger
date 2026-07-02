@@ -144,9 +144,10 @@ class TransactionsView(ctk.CTkFrame):
                                                                                                            padx=(0, 10))
 
         self.project_filter_var = ctk.StringVar(value="All Projects")
-        projects = ["All Projects"] + [p.name for p in
-                                       self.db_session.query(Project).order_by(
-                                           Project.name.asc()).all()]
+        projects = ["All Projects", "No Project"] + [p.name for p in
+                                       self.db_session.query(Project)
+                                       .order_by(collate(Project.name, 'NOCASE'))
+                                       .all()]
         self.project_menu = ctk.CTkOptionMenu(
             self.project_filter_frame,
             values=projects,
@@ -244,7 +245,14 @@ class TransactionsView(ctk.CTkFrame):
             query = query.filter(column("acc_id") == self.app.filter_account_id)
 
         selected_proj = self.project_filter_var.get()
-        if selected_proj != "All Projects":
+        if selected_proj == "No Project":
+            query = query.filter(
+                or_(
+                    column("proj_name").is_(None),
+                    column("proj_name") == ""
+                )
+            )
+        elif selected_proj != "All Projects":
             query = query.filter(column("proj_name") == selected_proj)
 
         allowed_types = []
@@ -740,7 +748,7 @@ class TransactionsView(ctk.CTkFrame):
         """Called automatically when switching back to this tab.
         Fetches the latest ledger data from the database."""
         curr_val = self.project_filter_var.get()
-        projects = ["All Projects"] + [p.name for p in
+        projects = ["All Projects", "No Project"] + [p.name for p in
                                        self.db_session.query(Project).order_by(
                                            collate(Project.name, 'NOCASE')).all()]
         self.project_menu.configure(values=projects)

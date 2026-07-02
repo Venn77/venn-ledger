@@ -463,6 +463,13 @@ class BaseTransactionWindow(ctk.CTkToplevel):
                 self.error_label.configure(text="⚠ Select a valid Currency")
             return
 
+        if hasattr(self, 'project_combo'):
+            proj_val = self.project_combo.get().strip()
+            if proj_val.lower() in ["all projects", "no project"]:
+                self.save_btn.configure(state="disabled", fg_color="gray30", text_color="white")
+                self.error_label.configure(text=f"⚠ '{proj_val}' is a reserved system name")
+                return
+
         spec_ok, spec_err = self.validate_specific_fields()
         if not spec_ok:
             self.save_btn.configure(state="disabled", fg_color="gray30", text_color="white")

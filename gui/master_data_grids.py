@@ -115,6 +115,9 @@ class SimpleMasterDataGrid(ctk.CTkFrame):
     def add_new(self):
         def _save(new_name, new_desc):
             try:
+                if self.model.__name__ == "Project" and new_name.strip().lower() in ["all projects", "no project"]:
+                    return False, "This is a reserved system name."
+
                 existing_item = self.db_session.query(self.model).filter_by(name=new_name).first()
 
                 if existing_item:
@@ -151,6 +154,9 @@ class SimpleMasterDataGrid(ctk.CTkFrame):
 
         def _update(new_name, new_desc):
             try:
+                if self.model.__name__ == "Project" and new_name.strip().lower() in ["all projects", "no project"]:
+                    return False, "This is a reserved system name."
+
                 existing_item = self.db_session.query(self.model).filter_by(name=new_name).first()
                 if existing_item and existing_item.id != item.id:
                     status = "active" if existing_item.active_bool else "deactivated"

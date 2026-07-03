@@ -55,7 +55,7 @@ class Currency(Base):
 class ExchangeRate(Base):
     __tablename__ = 'exchange_rates'
     # Foreign Keys
-    currency_code = Column(String(3), ForeignKey('currencies.code'), nullable=False)
+    currency_code = Column(String(10), ForeignKey('currencies.code'), nullable=False)
     id = Column(Integer, primary_key=True)
     fx_multiplier = Column(Float, default=1.0, comment="Conversion rate if currency is not the base currency")
     timestamp = Column(DateTime, nullable=False, server_default=func.now(), comment="UTC timestamp of entry")
@@ -118,7 +118,7 @@ class Payer(Base):
 class Account(Base):
     __tablename__ = 'accounts'
     #Foreign Keys
-    currency_code = Column(String(3), ForeignKey('currencies.code'), nullable=False)
+    currency_code = Column(String(10), ForeignKey('currencies.code'), nullable=False)
     id = Column(Integer, primary_key=True)
     name = Column(String(50), unique=True, nullable=False, comment="The name of the account")
     description = Column(String, comment="A brief summary of the account's purpose")
@@ -164,7 +164,7 @@ class Project(Base):
 class Expense(Base):
     __tablename__ = 'expenses'
     # Foreign Keys
-    currency_code = Column(String(3), ForeignKey('currencies.code'), nullable=False)
+    currency_code = Column(String(10), ForeignKey('currencies.code'), nullable=False)
     category_id = Column(Integer, ForeignKey('categories.id'))
     vendor_id = Column(Integer, ForeignKey('vendors.id'))
     payment_method_id = Column(Integer, ForeignKey('payment_methods.id'), nullable=False)
@@ -191,7 +191,7 @@ class Expense(Base):
 class Gain(Base):
     __tablename__ = 'gains'
     # Foreign Keys
-    currency_code = Column(String(3), ForeignKey('currencies.code'), nullable=False)
+    currency_code = Column(String(10), ForeignKey('currencies.code'), nullable=False)
     stream_id = Column(Integer, ForeignKey('streams.id'))
     payer_id = Column(Integer, ForeignKey('payers.id'))
     account_id = Column(Integer, ForeignKey('accounts.id'), nullable=False)

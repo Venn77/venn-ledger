@@ -119,7 +119,7 @@ class FinanceApp(ctk.CTk):
             self.sidebar,
             text=APP_VERSION,
             font=("JetBrains Mono", 11),
-            text_color="gray40"
+            text_color="gray50"
         )
         self.version_lbl.pack(side="bottom", pady=(0, 10))
 

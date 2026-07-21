@@ -9,7 +9,101 @@ from gui.dialogs import (
     AccountDialog, PMDialog, show_popup
 )
 
-class SimpleMasterDataGrid(ctk.CTkFrame):
+
+class PaginationMixin:
+    """Adds basic pagination to master data grids."""
+    def __init__(self):
+        self.current_page = None
+        self.page_size = None
+        self.total_pages = None
+        self.total_db_items = None
+        self.nav_bar = None
+        self._page_timer = None
+
+    def load_data(self):
+        raise NotImplementedError
+    def after(self, ms, callback, *args):
+        raise NotImplementedError
+    def after_cancel(self, timer_id):
+        raise NotImplementedError
+    def update_idletasks(self):
+        raise NotImplementedError
+
+    def init_pagination(self, page_size=100):
+        self.current_page = 0
+        self.page_size = page_size
+        self.total_pages = 0
+        self.total_db_items = 0
+        self.nav_bar = ctk.CTkFrame(self, fg_color="transparent")
+        self._page_timer = None
+
+    def paginate_query(self, query):
+        self.total_db_items = query.count()
+        self.total_pages = max(1, (self.total_db_items + self.page_size - 1) // self.page_size)
+        if self.current_page >= self.total_pages:
+            self.current_page = max(0, self.total_pages - 1)
+
+        offset = self.current_page * self.page_size
+        return query.offset(offset).limit(self.page_size).all()
+
+    def render_pagination_controls(self):
+        for widget in self.nav_bar.winfo_children():
+            widget.destroy()
+
+        if self.total_db_items <= self.page_size:
+            self.nav_bar.pack_forget()
+            return
+
+        self.nav_bar.pack(fill="x", pady=5)
+
+        prev_state = "normal" if self.current_page > 0 else "disabled"
+        next_state = "normal" if self.current_page < self.total_pages - 1 else "disabled"
+
+        left_frame = ctk.CTkFrame(self.nav_bar, fg_color="transparent")
+        left_frame.pack(side="left", padx=10)
+
+        ctk.CTkButton(left_frame, text="‹", width=30, height=24, state=prev_state, fg_color="gray30",
+                      command=self.prev_page).pack(side="left", padx=(0, 5))
+        ctk.CTkLabel(left_frame, text=f"Page {self.current_page + 1} of {self.total_pages}",
+                     font=("JetBrains Mono", 11), text_color="gray50").pack(side="left", padx=5)
+        ctk.CTkButton(left_frame, text="›", width=30, height=24, state=next_state, fg_color="gray30",
+                      command=self.next_page).pack(side="left", padx=5)
+
+        ctk.CTkLabel(self.nav_bar, text=f"Total: {self.total_db_items}",
+                     font=("JetBrains Mono", 11), text_color="gray50").pack(side="right", padx=10)
+
+    def _schedule_page_render(self):
+        """Debounces rapid page clicks."""
+        if hasattr(self, '_page_timer') and self._page_timer:
+            self.after_cancel(self._page_timer)
+        self._page_timer = self.after(300, self._execute_page_render)
+
+    def _execute_page_render(self):
+        self._page_timer = None
+        self.load_data()
+        self.reset_scroll_to_top()
+
+    def prev_page(self):
+        if self.current_page > 0:
+            self.current_page -= 1
+            self.render_pagination_controls()
+            self._schedule_page_render()
+
+    def next_page(self):
+        if self.current_page < self.total_pages - 1:
+            self.current_page += 1
+            self.render_pagination_controls()
+            self._schedule_page_render()
+
+    def reset_scroll_to_top(self):
+        """Forces the scrollable frame back to the top."""
+        self.update_idletasks()
+        if hasattr(self, 'scroll') and hasattr(self.scroll, "_parent_canvas"):
+            # noinspection PyProtectedMember
+            self.scroll._parent_canvas.yview_moveto(0)
+
+
+class SimpleMasterDataGrid(ctk.CTkFrame, PaginationMixin):
     """Renders a dynamic grid for simple CRUD operations on db."""
     def __init__(self, parent, db_session, model, title, has_desc=False):
         super().__init__(parent, fg_color="transparent")
@@ -18,7 +112,7 @@ class SimpleMasterDataGrid(ctk.CTkFrame):
         self.title = title
         self.has_desc = has_desc
         self.current_results = None
-        self.total_items = None
+        self.page_items = None
 
         header_frame = ctk.CTkFrame(self, fg_color="transparent")
         header_frame.pack(fill="x", pady=(0, 10))
@@ -33,6 +127,7 @@ class SimpleMasterDataGrid(ctk.CTkFrame):
         self.scroll = ctk.CTkScrollableFrame(self)
         self.scroll.pack(fill="both", expand=True)
 
+        self.init_pagination(page_size=100)
         self.load_data()
 
     def load_data(self):
@@ -40,24 +135,26 @@ class SimpleMasterDataGrid(ctk.CTkFrame):
             self.after_cancel(self._render_job)
 
         self.scroll.pack_forget()
+        if hasattr(self, 'nav_bar'): self.nav_bar.pack_forget()
         self.loading_frame.pack(fill="both", expand=True)
         self.loading_lbl.configure(text="Fetching data...")
 
         for widget in self.scroll.winfo_children():
             widget.destroy()
 
-        self.current_results = self.db_session.query(self.model).order_by(collate(self.model.name, 'NOCASE')).all()
-        self.total_items = len(self.current_results)
+        query = self.db_session.query(self.model).order_by(collate(self.model.name, 'NOCASE'))
+        self.current_results = self.paginate_query(query)
+        self.page_items = len(self.current_results)
 
-        if self.total_items > 0:
+        if self.page_items > 0:
             self._render_batch(start_idx=0, batch_size=25)
         else:
             self._finish_loading()
 
     def _render_batch(self, start_idx, batch_size):
-        end_idx = min(start_idx + batch_size, len(self.current_results))
+        end_idx = min(start_idx + batch_size, self.page_items)
 
-        self.loading_lbl.configure(text=f"Loading... {end_idx} / {self.total_items}")
+        self.loading_lbl.configure(text=f"Loading... {end_idx} / {self.page_items}")
 
         for idx in range(start_idx, end_idx):
             item = self.current_results[idx]
@@ -92,7 +189,7 @@ class SimpleMasterDataGrid(ctk.CTkFrame):
             ctk.CTkLabel(row, text=status_text, text_color=status_color, width=60, font=("JetBrains Mono", 11)).pack(
                 side="right", padx=10)
 
-        if end_idx < self.total_items:
+        if end_idx < self.page_items:
             self._render_job = self.after(10, self._render_batch, end_idx, batch_size)
         else:
             self._finish_loading()
@@ -100,6 +197,7 @@ class SimpleMasterDataGrid(ctk.CTkFrame):
     def _finish_loading(self):
         self.loading_frame.pack_forget()
         self.scroll.pack(fill="both", expand=True)
+        self.render_pagination_controls()
 
     def toggle_status(self, item_id):
         try:
@@ -179,7 +277,7 @@ class SimpleMasterDataGrid(ctk.CTkFrame):
         SimpleDataDialog(self, f"Edit {self.model.__name__}", initial_name=item.name, initial_desc=initial_desc,
                          has_desc=self.has_desc, on_submit=_update)
 
-class CurrencyGrid(ctk.CTkFrame):
+class CurrencyGrid(ctk.CTkFrame, PaginationMixin):
     """Renders a dynamic grid for CRUD operations on currencies table."""
     def __init__(self, parent, db_session):
         super().__init__(parent, fg_color="transparent")
@@ -192,11 +290,17 @@ class CurrencyGrid(ctk.CTkFrame):
 
         self.scroll = ctk.CTkScrollableFrame(self)
         self.scroll.pack(fill="both", expand=True)
+
+        self.init_pagination(page_size=100)
         self.load_data()
 
     def load_data(self):
         for widget in self.scroll.winfo_children(): widget.destroy()
-        items = self.db_session.query(Currency).order_by(collate(Currency.code, 'NOCASE')).all()
+        if hasattr(self, 'nav_bar'): self.nav_bar.pack_forget()
+
+        query = self.db_session.query(Currency).order_by(collate(Currency.code, 'NOCASE'))
+        items = self.paginate_query(query)
+
         for item in items:
             row = ctk.CTkFrame(self.scroll, fg_color="gray20", corner_radius=6)
             row.pack(fill="x", pady=2, padx=2)
@@ -227,6 +331,8 @@ class CurrencyGrid(ctk.CTkFrame):
             color = "#4CD964" if item.active_bool else "gray50"
             ctk.CTkLabel(row, text=status, text_color=color, width=60, font=("JetBrains Mono", 11)).pack(side="right",
                                                                                                          padx=10)
+
+        self.render_pagination_controls()
 
     def toggle(self, code):
         try:
@@ -274,13 +380,13 @@ class CurrencyGrid(ctk.CTkFrame):
         CurrencyDialog(self, "Edit Currency Name", initial_code=item.code, initial_name=item.name, is_edit=True,
                        on_submit=_update)
 
-class ExchangeRateGrid(ctk.CTkFrame):
+class ExchangeRateGrid(ctk.CTkFrame, PaginationMixin):
     """Renders a dynamic grid for CRUD operations on exchange_rates table."""
     def __init__(self, parent, db_session):
         super().__init__(parent, fg_color="transparent")
         self.db_session = db_session
         self.current_results = None
-        self.total_items = None
+        self.page_items = None
 
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", pady=(0, 10))
@@ -298,6 +404,8 @@ class ExchangeRateGrid(ctk.CTkFrame):
 
         self.scroll = ctk.CTkScrollableFrame(self)
         self.scroll.pack(fill="both", expand=True)
+
+        self.init_pagination(page_size=100)
         self.load_data()
 
     def load_data(self):
@@ -305,30 +413,29 @@ class ExchangeRateGrid(ctk.CTkFrame):
             self.after_cancel(self._render_job)
 
         self.scroll.pack_forget()
+        if hasattr(self, 'nav_bar'): self.nav_bar.pack_forget()
         self.loading_frame.pack(fill="both", expand=True)
         self.loading_lbl.configure(text="Fetching data...")
 
         for widget in self.scroll.winfo_children(): widget.destroy()
 
-        self.current_results = (
-                    self.db_session.query(ExchangeRate)
-                    .join(Currency)
-                    .filter(Currency.is_base == False)
-                    .order_by(ExchangeRate.timestamp.desc())
-                    .limit(500)
-                    .all()
-            )
-        self.total_items = len(self.current_results)
+        query = (self.db_session.query(ExchangeRate)
+                 .join(Currency)
+                 .filter(Currency.is_base == False)
+                 .order_by(ExchangeRate.timestamp.desc()))
 
-        if self.total_items > 0:
+        self.current_results = self.paginate_query(query)
+        self.page_items = len(self.current_results)
+
+        if self.page_items > 0:
             self._render_batch(start_idx=0, batch_size=25)
         else:
             self._finish_loading()
 
     def _render_batch(self, start_idx, batch_size):
-        end_idx = min(start_idx + batch_size, len(self.current_results))
+        end_idx = min(start_idx + batch_size, self.page_items)
 
-        self.loading_lbl.configure(text=f"Loading... {end_idx} / {self.total_items}")
+        self.loading_lbl.configure(text=f"Loading... {end_idx} / {self.page_items}")
 
         for idx in range(start_idx, end_idx):
             r = self.current_results[idx]
@@ -346,7 +453,7 @@ class ExchangeRateGrid(ctk.CTkFrame):
                           hover_color="#8b2525",
                           command=lambda i=r.id: self.delete(i)).pack(side="right", padx=10)
 
-        if end_idx < self.total_items:
+        if end_idx < self.page_items:
             self._render_job = self.after(10, self._render_batch, end_idx, batch_size)
         else:
             self._finish_loading()
@@ -357,11 +464,13 @@ class ExchangeRateGrid(ctk.CTkFrame):
         if not act_currencies:
             self.btn_add.configure(state="disabled")
             self.scroll.pack_forget()
+            if hasattr(self, 'nav_bar'): self.nav_bar.pack_forget()
             self.lbl_warning.pack(pady=5)
         else:
             self.btn_add.configure(state="normal")
             self.lbl_warning.pack_forget()
             self.scroll.pack(fill="both", expand=True)
+            self.render_pagination_controls()
 
     def delete(self, rate_id):
         rate = self.db_session.get(ExchangeRate, rate_id)
@@ -449,7 +558,7 @@ class ExchangeRateGrid(ctk.CTkFrame):
             on_submit=_save
         )
 
-class AccountGrid(ctk.CTkFrame):
+class AccountGrid(ctk.CTkFrame, PaginationMixin):
     def __init__(self, parent, db_session):
         super().__init__(parent, fg_color="transparent")
         self.db_session = db_session
@@ -460,11 +569,17 @@ class AccountGrid(ctk.CTkFrame):
 
         self.scroll = ctk.CTkScrollableFrame(self)
         self.scroll.pack(fill="both", expand=True)
+
+        self.init_pagination(page_size=100)
         self.load_data()
 
     def load_data(self):
         for widget in self.scroll.winfo_children(): widget.destroy()
-        items = self.db_session.query(Account).order_by(collate(Account.name, 'NOCASE')).all()
+        if hasattr(self, 'nav_bar'): self.nav_bar.pack_forget()
+
+        query = self.db_session.query(Account).order_by(collate(Account.name, 'NOCASE'))
+        items = self.paginate_query(query)
+
         for item in items:
             row = ctk.CTkFrame(self.scroll, fg_color="gray20", corner_radius=6)
             row.pack(fill="x", pady=2, padx=2)
@@ -486,6 +601,8 @@ class AccountGrid(ctk.CTkFrame):
             status, color = ("Active", "#4CD964") if item.active_bool else ("Inactive", "gray50")
             ctk.CTkLabel(row, text=status, text_color=color, width=60, font=("JetBrains Mono", 11)).pack(side="right",
                                                                                                          padx=10)
+
+        self.render_pagination_controls()
 
     def toggle(self, acc):
         if acc.active_bool and acc.balance != 0:
@@ -579,7 +696,7 @@ class AccountGrid(ctk.CTkFrame):
         AccountDialog(self, currency_data=curr_data, initial_name=acc.name, initial_desc=acc.description, initial_curr=acc.currency_code,
                       initial_bal=str(acc.initial_balance), is_edit=True, on_submit=_update)
 
-class PMGrid(ctk.CTkFrame):
+class PMGrid(ctk.CTkFrame, PaginationMixin):
     def __init__(self, parent, db_session):
         super().__init__(parent, fg_color="transparent")
         self.db_session = db_session
@@ -590,11 +707,18 @@ class PMGrid(ctk.CTkFrame):
 
         self.scroll = ctk.CTkScrollableFrame(self)
         self.scroll.pack(fill="both", expand=True)
+
+        self.init_pagination(page_size=100)
         self.load_data()
 
     def load_data(self, _event=None):
         for widget in self.scroll.winfo_children(): widget.destroy()
-        items = self.db_session.query(PaymentMethod).join(Account).order_by(collate(Account.name, 'NOCASE'), collate(PaymentMethod.name, 'NOCASE')).all()
+        if hasattr(self, 'nav_bar'): self.nav_bar.pack_forget()
+
+        query = self.db_session.query(PaymentMethod).join(Account).order_by(collate(Account.name, 'NOCASE'),
+                                                                            collate(PaymentMethod.name, 'NOCASE'))
+        items = self.paginate_query(query)
+
         for item in items:
             row = ctk.CTkFrame(self.scroll, fg_color="gray20", corner_radius=6)
             row.pack(fill="x", pady=2, padx=2)
@@ -621,6 +745,8 @@ class PMGrid(ctk.CTkFrame):
             status, color = ("Active", "#4CD964") if item.active_bool else ("Inactive", "gray50")
             ctk.CTkLabel(row, text=status, text_color=color, width=60, font=("JetBrains Mono", 11)).pack(side="right",
                                                                                                          padx=10)
+
+        self.render_pagination_controls()
 
     def toggle(self, item_id):
         try:

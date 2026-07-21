@@ -124,7 +124,7 @@ class FinanceApp(ctk.CTk):
         self.version_lbl.pack(side="bottom", pady=(0, 10))
 
         self.nav_group = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        self.nav_group.pack(side="bottom", fill="x", pady=20, padx=15)
+        self.nav_group.pack(side="bottom", fill="x", pady=10, padx=15)
 
         self.btn_view_ledger = ctk.CTkButton(self.nav_group, text="Transactions", image=self.bar_chart_icon, compound="left",
                                              anchor="w", command=lambda: self.switch_view("transactions"))

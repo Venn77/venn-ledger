@@ -2,7 +2,7 @@ import customtkinter as ctk
 import matplotlib.pyplot as plt
 import json, os, sys, traceback
 from typing import Any
-from config import CONFIG_PATH, IS_COMPILED, ERROR_LOG_PATH
+from config import CONFIG_PATH, APP_VERSION, IS_COMPILED, ERROR_LOG_PATH
 from database.models import Session, Account, Transfer, Currency
 from core import manager as finance_manager
 from utils.icon_manager import get_icon
@@ -114,6 +114,14 @@ class FinanceApp(ctk.CTk):
         self.reorder_btn = ctk.CTkButton(self.sidebar, text="Reorder Accounts", image=self.reorder_icon, compound="left", fg_color="transparent",
                                          border_width=1, command=self.toggle_reorder_mode)
         self.reorder_btn.pack(pady=(10, 5), padx=20, fill="x")
+
+        self.version_lbl = ctk.CTkLabel(
+            self.sidebar,
+            text=APP_VERSION,
+            font=("JetBrains Mono", 11),
+            text_color="gray40"
+        )
+        self.version_lbl.pack(side="bottom", pady=(0, 10))
 
         self.nav_group = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         self.nav_group.pack(side="bottom", fill="x", pady=20, padx=15)

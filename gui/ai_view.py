@@ -13,6 +13,7 @@ from utils.fs_utils import open_text_config
 from utils.icon_manager import get_icon
 from customtkinter import filedialog
 from gui.widgets import ToolTip
+from gui.dialogs import show_popup
 from gui.ai_grids import AIStagingGrid
 
 
@@ -66,6 +67,14 @@ class AIImportView(ctk.CTkFrame):
         self.btn_edit_rules.pack(side="right", padx=5)
         ToolTip(self.btn_edit_rules, "Edit the LLM System Prompt and examples")
 
+        self.btn_parser_guide = ctk.CTkButton(
+            header_row, text="?", width=24, height=24, corner_radius=12,
+            fg_color="gray30", hover_color="gray40", font=("JetBrains Mono", 12, "bold"),
+            command=self._show_parser_guide
+        )
+        self.btn_parser_guide.pack(side="right", padx=(0, 5))
+        ToolTip(self.btn_parser_guide, "How to customize the AI parser")
+
         self.ai_config_frame = ctk.CTkFrame(self, fg_color="gray15", corner_radius=8)
         self.ai_config_frame.pack(fill="x", pady=(0, 15), padx=2)
 
@@ -75,7 +84,16 @@ class AIImportView(ctk.CTkFrame):
         # File Selection
         ctk.CTkLabel(cmd_bar, text="Target File:", font=("JetBrains Mono", 12, "bold"), anchor="w").pack(
             side="left")
-        self.lbl_container = ctk.CTkFrame(cmd_bar, width=300, height=28, fg_color="gray20", corner_radius=4)
+
+        self.btn_format_guide = ctk.CTkButton(
+            cmd_bar, text="?", width=24, height=24, corner_radius=12,
+            fg_color="gray30", hover_color="gray40", font=("JetBrains Mono", 12, "bold"),
+            command=self._show_format_guide
+        )
+        self.btn_format_guide.pack(side="left", padx=(5, 0))
+        ToolTip(self.btn_format_guide, "Required file format guide")
+
+        self.lbl_container = ctk.CTkFrame(cmd_bar, width=270, height=28, fg_color="gray20", corner_radius=4)
         self.lbl_container.pack_propagate(False)
         self.lbl_container.pack(side="left", padx=(10, 0))
 
@@ -161,6 +179,42 @@ class AIImportView(ctk.CTkFrame):
         self.grid_container = ctk.CTkFrame(self.ai_staging_frame, fg_color="transparent")
 
         self.ai_cancel_event = threading.Event()
+
+    def _show_format_guide(self):
+        """Displays a guide for the required text file format."""
+        msg = (
+            "The parser expects a specific daily journal format:\n\n"
+            "1. DATE HEADERS\n\n"
+            "Each day MUST start with 'DD/MM:' or 'DD/MM (note):'\n\n"
+            "2. TRANSACTION LINES\n\n"
+            "Format: [Category] [Vendor] [Amount] [Currency?] [Method] [Description]\n\n"
+            "EXAMPLES\n\n"
+            "23/07:\n"
+            "Groceries Supermarket 45.50 debit Weekend food\n"
+            "Transport Train 12 cash\n\n"
+            "24/07 (Trip to city):\n"
+            "Dining PizzaHut 24.99 credit\n\n"
+            "FOREIGN CURRENCY & CUSTOM RATES\n\n"
+            "Add a currency code after the amount to auto-fetch historical rates.\n"
+            "To force a custom rate, include 'FX [rate]' in the description:\n"
+            "Housing Hotel 150 USD (FX 1.14 - including tax) credit"
+        )
+
+        show_popup(self, title="Required File Format", message=msg, show_ok=True, width=450, height=480, message_wraplength=400)
+
+    def _show_parser_guide(self):
+        """Displays a comprehensive guide on tailoring the LLM prompt."""
+        msg = (
+            "To get 100% parsing accuracy, you MUST tailor the AI to your specific Master Data setup.\n\n"
+            "1. SKIP TERMS\n\n"
+            "Add words here (like 'Transfer' or 'Withdrawal') that the parser should completely ignore. One term per line.\n\n"
+            "2. PARSER RULES\n\n"
+            "This opens the raw instructions sent to the AI model. "
+            "You should update the <mapping_table> and <examples> to perfectly match the precise Category and Payment Method names you created in the Master Data tab.\n\n"
+            "For example: If your database uses 'Amex Card' instead of 'Credit Card', change it in the mapping table so the AI outputs the exact match!"
+        )
+
+        show_popup(self, title="Customizing the AI", message=msg, show_ok=True, width=480, height=360, message_wraplength=430)
 
     def _ai_browse_file(self):
         """Opens the OS file picker."""

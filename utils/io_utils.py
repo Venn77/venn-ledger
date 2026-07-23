@@ -19,14 +19,14 @@ def clean_date(date_str):
 
 def extract_exchange_rate(description):
     """
-    Finds the pattern 'TC' followed by a number in the description.
+    Finds the pattern 'FX' (or legacy 'TC') followed by a number in the description.
     Returns the float value or None.
     """
     if not description:
         return None
 
-    # Pattern: 'TC' + any spaces + digits/dots
-    match = re.search(r'TC\s*([\d.]+)', description, re.IGNORECASE)
+    # Pattern: 'FX 1.14', 'fx 1.14', 'TC 1.14', 'tc1.14'
+    match = re.search(r'(?:FX|TC)\s*([\d.]+)', description, re.IGNORECASE)
 
     if match:
         try:

@@ -52,7 +52,7 @@ def open_calendar(parent, target_var, include_time=False):
 
     ctk.CTkButton(parent.cal_window, text="Confirm", command=set_date).pack(pady=10)
 
-def show_popup(parent, title, message, is_error=False, show_ok=True, show_cancel=False, ok_command=None, cancel_command=None):
+def show_popup(parent, title, message, is_error=False, show_ok=True, show_cancel=False, ok_command=None, cancel_command=None, width=400, height=180, message_wraplength=350):
     """
     Shows a dark-mode popup message.
     May include OK, Continue, or Cancel actions.
@@ -68,7 +68,7 @@ def show_popup(parent, title, message, is_error=False, show_ok=True, show_cancel
     else:
         border_color = "#4CD964" # Green for success
 
-    popup = ctk.CTkFrame(root_window, width=400, height=180, corner_radius=0, fg_color=border_color)
+    popup = ctk.CTkFrame(root_window, width=width, height=height, corner_radius=0, fg_color=border_color)
     popup.place(relx=0.5, rely=0.5, anchor="center")
     popup.pack_propagate(False)
 
@@ -80,7 +80,7 @@ def show_popup(parent, title, message, is_error=False, show_ok=True, show_cancel
 
     ctk.CTkLabel(main_container, text=title, font=("JetBrains Mono", 16, "bold"), text_color=border_color).pack(
         pady=(15, 5))
-    ctk.CTkLabel(main_container, text=message, font=("JetBrains Mono", 12), wraplength=350).pack(pady=(0, 15))
+    ctk.CTkLabel(main_container, text=message, font=("JetBrains Mono", 12), wraplength=message_wraplength).pack(pady=(0, 15))
 
     btn_frame = ctk.CTkFrame(main_container, fg_color="transparent")
     btn_frame.pack(pady=(0, 10))

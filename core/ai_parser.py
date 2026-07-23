@@ -4,28 +4,18 @@ from utils.fs_utils import ensure_file_has_content
 
 
 DEFAULT_SKIP_TERMS_TEXT = """->
-TC
-Extracción
+Extraction
 Transfer
-Mp TC
-MP TC
 Withdrawal
-MP:"""
+"""
 
 DEFAULT_PROMPT_TEMPLATE = """<role>You are a literal data extraction pipe. ZERO reasoning. ZERO spelling correction.</role>
 
 <mapping_table>
-- 'santander' -> 'Santander Debit'
-- 'bizum'     -> 'Santander Bizum'
-- 'mp'        -> 'Mercado Pago'
 - 'cash'      -> 'Cash ({default_currency})'
-- 'laliga'    -> 'Santander LaLiga'
-- 'lacaixa'   -> 'LaCaixa IKEA'
-- 'wizink'    -> 'Wizink'
-- 'master'    -> 'Ciudad Master'
-- 'visa'      -> 'Ciudad Visa'
-- 'wise'      -> If currency is USD: 'Wise (USD)'; if JPY: 'Wise (JPY)'; else: 'Wise ({default_currency})'
-- 'revolut'   -> If currency is EUR: 'Revolut (EUR)'; if JPY: 'Revolut (JPY)'; else: 'Revolut ({default_currency})'
+- 'debit'     -> 'Debit Card ({default_currency})'
+- 'credit'    -> If currency is USD: 'Credit Card (USD)'; if JPY: 'Credit Card (JPY)'; etc; else: 'Credit Card ({default_currency})'
+- 'bank'      -> If currency is EUR: 'Bank Transfer (EUR)'; if JPY: 'Bank Transfer (JPY)'; etc; else: 'Bank Transfer ({default_currency})'
 </mapping_table>
 
 <rules>
@@ -41,116 +31,81 @@ DEFAULT_PROMPT_TEMPLATE = """<role>You are a literal data extraction pipe. ZERO 
 
 <examples>
 Input:
-FIXED CATEGORY: Water Service
-LINE: Aigues Sabadell 34.97 santander
+FIXED CATEGORY: Utilities
+LINE: Water Service 34.97 debit
 
 Output:
-{{"amount": 34.97, "currency": "{default_currency}", "category": "Water Service", "vendor": "Aigues Sabadell", "payment_method": "Santander Debit", "description": ""}}
+{"amount": 34.97, "currency": "{default_currency}", "category": "Utilities", "vendor": "Water Service", "payment_method": "Debit Card ({default_currency})", "description": ""}
 
 Input:
-FIXED CATEGORY: Vacation
-LINE: Uber 72.73 santander from Shibuya to Haneda
+FIXED CATEGORY: Transport
+LINE: Taxi 72.73 debit from Airport to Hotel
 
 Output:
-{{"amount": 72.73, "currency": "{default_currency}", "category": "Vacation", "vendor": "Uber", "payment_method": "Santander Debit", "description": "from Shibuya to Haneda"}}
+{"amount": 72.73, "currency": "{default_currency}", "category": "Transport", "vendor": "Uber", "payment_method": "Debit Card ({default_currency})", "description": "from Airport to Hotel"}
 
 Input:
-FIXED CATEGORY: Incidental
-LINE: Castellana 200 40.00 santander corte del jamón
+FIXED CATEGORY: Utilities
+LINE: PowerCo 73.79 debit
 
 Output:
-{{"amount": 40.0, "currency": "{default_currency}", "category": "Incidental", "vendor": "Castellana 200", "payment_method": "Santander Debit", "description": "corte del jamón"}}
- 
-Input:
-FIXED CATEGORY: Vacation
-LINE: Saily 7.00 santander 30 days eSIM 3GB
-
-Output:
-{{"amount": 7.0, "currency": "{default_currency}", "category": "Vacation", "vendor": "Saily", "payment_method": "Santander Debit", "description": "30 days eSIM 3GB"}}
+{"amount": 73.79, "currency": "{default_currency}", "category": "Utilities", "vendor": "PowerCo", "payment_method": "Debit Card ({default_currency})", "description": ""}
 
 Input:
-FIXED CATEGORY: Gas
-LINE: Naturgy 73.79 santander
+FIXED CATEGORY: Groceries
+LINE: Supermarket 100.00 cash Monthly purchase
 
 Output:
-{{"amount": 73.79, "currency": "{default_currency}", "category": "Gas", "vendor": "Naturgy", "payment_method": "Santander Debit", "description": ""}}
+{"amount": 100.0, "currency": "{default_currency}", "category": "Groceries", "vendor": "Supermarket", "payment_method": "Cash ({default_currency})", "description": "Monthly purchase"}
 
 Input:
-FIXED CATEGORY: Gifts
-LINE: LEVEL 1292.25 laliga Eze-Bcn f/Celes
+FIXED CATEGORY: Entertainment
+LINE: Streaming Service 14.99 USD bank HD Plan
 
 Output:
-{{"amount": 1292.25, "currency": "{default_currency}", "category": "Gifts", "vendor": "LEVEL", "payment_method": "Santander LaLiga", "description": "Eze-Bcn f/Celes"}}
+{"amount": 14.99, "currency": "USD", "category": "Entertainment", "vendor": "Streaming Service", "payment_method": "Bank Transfer (USD)", "description": "HD Plan"}
 
 Input:
-FIXED CATEGORY: 420
-LINE: Planta Santa 100.00 cash 18.33g (5.46 each)
+FIXED CATEGORY: Housing
+LINE: Hotel 1500.75 USD (1316.45 FX 1.14 -including tax) credit
 
 Output:
-{{"amount": 100.0, "currency": "{default_currency}", "category": "420", "vendor": "Planta Santa", "payment_method": "Cash ({default_currency})", "description": "18.33g (5.46 each)"}}
+{"amount": 1500.75, "currency": "USD", "category": "Housing", "vendor": "Hotel", "payment_method": "Credit Card (USD)", "description": "(1316.45 FX 1.14 -including tax)"}
 
 Input:
-FIXED CATEGORY: Subscription
-LINE: DistroKid 24.99 USD (21.59 TC 1.17) wise Yearly fee
+FIXED CATEGORY: Dining Out
+LINE: Burger Joint 33.90 debit With friends
 
 Output:
-{{"amount": 24.99, "currency": "USD", "category": "Subscription", "vendor": "DistroKid", "payment_method": "Wise (USD)", "description": "(21.59 TC 1.17) Yearly fee"}}
+{"amount": 33.90, "currency": "{default_currency}", "category": "Dining Out", "vendor": "Burger Joint", "payment_method": "Debit Card ({default_currency})", "description": "With friends"}
 
 Input:
-FIXED CATEGORY: Incidental
-LINE: TMB 20.65 wizink T Usual f/Celes (because 10€ cashback)
+FIXED CATEGORY: Health
+LINE: Pharmacy 8.99 debit Nasal spray
 
 Output:
-{{"amount": 20.65, "currency": "{default_currency}", "category": "Incidental", "vendor": "TMB", "payment_method": "Wizink", "description": "T Usual f/Celes (because 10€ cashback)"}}
+{"amount": 8.99, "currency": "{default_currency}", "category": "Health", "vendor": "Pharmacy", "payment_method": "Debit Card ({default_currency})", "description": "Nasal spray"}
 
 Input:
-FIXED CATEGORY: Subscription
-LINE: Spotify 3133.47 ARS (2.45 TC 1280 -incluye 21% IVA) mp
+FIXED CATEGORY: Shopping
+LINE: Clothing Store 9000 JPY debit Birthday present
 
 Output:
-{{"amount": 3133.47, "currency": "ARS", "category": "Subscription", "vendor": "Spotify", "payment_method": "Mercado Pago", "description": "(2.45 TC 1280 -incluye 21% IVA)"}}
+{"amount": 9000, "currency": "JPY", "category": "Shopping", "vendor": "Clothing Store", "payment_method": "Debit Card (JPY)", "description": "Birthday present"}
 
 Input:
-FIXED CATEGORY: Lunch
-LINE: Five Guys 33.90 santander w/Celes
+FIXED CATEGORY: Dining Out
+LINE: Diner 1430 bank Lunch meeting
 
 Output:
-{{"amount": 33.90, "currency": "{default_currency}", "category": "Lunch", "vendor": "Five Guys", "payment_method": "Santander Debit", "description": "w/Celes"}}
-
-Input:
-FIXED CATEGORY: Medical
-LINE: Pharmacy 8.99 santander Nasal spray
-
-Output:
-{{"amount": 8.99, "currency": "{default_currency}", "category": "Medical", "vendor": "Pharmacy", "payment_method": "Santander Debit", "description": "Nasal spray"}}
-
-Input:
-FIXED CATEGORY: Gifts
-LINE: Agustina Rojas 78750.00 ARS (46.96 TC 1677) mp Birthday boots f/Agustina
-
-Output:
-{{"amount": 78750.00, "currency": "ARS", "category": "Gifts", "vendor": "Agustina Rojas", "payment_method": "Mercado Pago", "description": "(46.96 TC 1677) Birthday boots f/Agustina"}}
-
-Input:
-FIXED CATEGORY: Household Supplies
-LINE: Amazon 13.99 santander iAmoy replacement brush & filters f/Deebot Slim2 vaccuum cleaner
-
-Output:
-{{"amount": 13.99, "currency": "{default_currency}", "category": "Household Supplies", "vendor": "Amazon", "payment_method": "Santander Debit", "description": "iAmoy replacement brush & filters f/Deebot Slim2 vacuum cleaner"}}
-
-Input:
-FIXED CATEGORY: Breakfast
-LINE: Denny's 1430 wise w/Celes
-
-Output:
-{{"amount": 1430, "currency": "{default_currency}", "category": "Breakfast", "vendor": "Denny's", "payment_method": "Wise ({default_currency})", "description": "w/Celes"}}
+{"amount": 1430, "currency": "{default_currency}", "category": "Dining Out", "vendor": "Diner", "payment_method": "Bank Transfer ({default_currency})", "description": "Lunch meeting"}
 </examples>
 
 <verification_protocol>
 Before finalizing the JSON:
 1. QUANTITY CHECK: Is the 'Amount' actually a price? (e.g., Is it 40.00 or is it part of a vendor name like 'Castellana 200'?) 
 2. CURRENCY VALIDITY: If the Amount is not followed by a currency code (e.g., USD, JPY, ARS) does the currency match {default_currency}?
-3. REMAINDER CHECK: Did the input line have words after the HINT (e.g., '2TB Storage', 'May rent', 'Meeting + Negotiation with DOMO')? If yes, and your 'description' is empty, you have failed. Re-extract and include all words.
+3. REMAINDER CHECK: Did the input line have words after the HINT? If yes, and your 'description' is empty, you have failed. Re-extract and include all words.
 </verification_protocol>"""
 
 

@@ -7,7 +7,7 @@ from gui.master_data_grids import (
 from gui.dialogs import show_popup
 from customtkinter import filedialog
 import datetime, os, threading
-from utils.fs_utils import export_data_to_csv, backup_sqlite_db
+from utils.fs_utils import export_data_to_csv, create_full_backup_zip
 from utils.cld_utils import upload_to_drive
 from utils.icon_manager import get_icon
 
@@ -42,7 +42,7 @@ class SettingsView(ctk.CTkFrame):
         ctk.CTkButton(self.btn_frame, text="Export to CSV", image=self.csv_icon, anchor="center", width=150, fg_color="#1f538d", hover_color="#14375e",
                       command=self.ui_export_csv).pack(side="left", padx=(0, 10))
 
-        ctk.CTkButton(self.btn_frame, text="Backup Database", image=self.backup_db_icon, anchor="center", width=150, fg_color="#4CD964", text_color="black",
+        ctk.CTkButton(self.btn_frame, text="Backup Data", image=self.backup_db_icon, anchor="center", width=150, fg_color="#4CD964", text_color="black",
                       hover_color="#3cb050",
                       command=self.ui_backup_database).pack(side="left")
 
@@ -144,7 +144,7 @@ class SettingsView(ctk.CTkFrame):
 
     def ui_export_csv(self):
         """UI wrapper for the CSV export process."""
-        default_name = f"VennExpense_Export_{datetime.date.today().strftime('%Y%m%d')}.csv"
+        default_name = f"VennLedger_Export_{datetime.date.today().strftime('%Y%m%d')}.csv"
         filepath = filedialog.asksaveasfilename(
             defaultextension=".csv",
             initialfile=default_name,
@@ -163,21 +163,19 @@ class SettingsView(ctk.CTkFrame):
             show_popup(self,"Export Failed", message, is_error=True)
 
     def ui_backup_database(self):
-        """UI wrapper for the SQLite backup process."""
-        default_name = f"VennExpense_Backup_{datetime.date.today().strftime('%Y%m%d')}.db"
+        """UI wrapper for the local ZIP backup process."""
+        default_name = f"VennLedger_Backup_{datetime.date.today().strftime('%Y%m%d')}.zip"
         filepath = filedialog.asksaveasfilename(
-            defaultextension=".db",
+            defaultextension=".zip",
             initialfile=default_name,
-            title="Backup Database",
-            filetypes=[("SQLite Database", "*.db"), ("All Files", "*.*")]
+            title="Backup Data",
+            filetypes=[("ZIP Archive", "*.zip"), ("All Files", "*.*")]
         )
 
         if not filepath:
             return
 
-        source_db = DB_PATH
-
-        success, message = backup_sqlite_db(self.db_session, source_db, filepath)
+        success, message = create_full_backup_zip(self.db_session, DB_PATH, filepath)
 
         if success:
             show_popup(self,"Backup Successful", message, is_error=False)
@@ -200,20 +198,20 @@ class SettingsView(ctk.CTkFrame):
             self._start_cloud_backup_process(waiting_for_auth=False)
 
     def _start_cloud_backup_process(self, waiting_for_auth=False):
-        """Performs local db backup before initiating cloud backup."""
+        """Performs local zip backup before initiating cloud backup."""
         def abort_backup():
             self._backup_cancelled = True
 
         title = "Authenticating..." if waiting_for_auth else "Cloud Backup"
-        msg = "Waiting for Google Login in your browser..." if waiting_for_auth else "Uploading database to Drive..."
+        msg = "Waiting for Google Login in your browser..." if waiting_for_auth else "Uploading data to Drive..."
 
         self.loading_popup = show_popup(self, title, msg, show_ok=False, show_cancel=waiting_for_auth, cancel_command=abort_backup)
         self.update()
 
-        filename = f"VennExpense_CloudBackup_{datetime.date.today().strftime('%Y%m%d')}.db"
+        filename = f"VennLedger_CloudBackup_{datetime.date.today().strftime('%Y%m%d')}.zip"
         temp_filepath = os.path.join(USER_CONFIG_DIR, filename)
 
-        success, message = backup_sqlite_db(self.app.db_session, DB_PATH, temp_filepath)
+        success, message = create_full_backup_zip(self.app.db_session, DB_PATH, temp_filepath)
 
         if not success:
             if hasattr(self, 'loading_popup') and self.loading_popup.winfo_exists():
@@ -221,7 +219,7 @@ class SettingsView(ctk.CTkFrame):
                 delattr(self, 'loading_popup')
                 self.update()
 
-            show_popup(self, "Error", f"Failed to prepare database:\n{message}", is_error=True)
+            show_popup(self, "Error", f"Failed to prepare backup:\n{message}", is_error=True)
             return
 
         threading.Thread(target=self._cloud_backup_worker, args=(temp_filepath, filename), daemon=True).start()

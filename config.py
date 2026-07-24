@@ -5,6 +5,8 @@ APP_VERSION = "v0.99"
 
 IS_COMPILED = getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS')
 
+BUNDLE_DIR: str
+
 if IS_COMPILED:
     # noinspection PyProtectedMember
     BUNDLE_DIR = getattr(sys, '_MEIPASS')

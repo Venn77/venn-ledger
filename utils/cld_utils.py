@@ -46,6 +46,7 @@ def upload_to_drive(filepath, filename):
                 return False, error_msg
 
             flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_PATH, SCOPES)
+            # noinspection PyUnresolvedReferences
             creds = flow.run_local_server(port=0)
 
         with open(TOKEN_PATH, 'w') as token:
@@ -61,7 +62,7 @@ def upload_to_drive(filepath, filename):
             'name': filename,
             'parents': [folder_id]
         }
-        media = MediaFileUpload(filepath, mimetype='application/octet-stream')
+        media = MediaFileUpload(filepath, mimetype='application/zip')
 
         service.files().create(body=file_metadata, media_body=media, fields='id').execute()
 

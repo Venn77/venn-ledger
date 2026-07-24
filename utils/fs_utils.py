@@ -1,5 +1,5 @@
 import csv
-import shutil
+import zipfile
 import os, sys, subprocess
 from sqlalchemy import text
 from config import USER_CONFIG_DIR
@@ -98,19 +98,28 @@ def export_data_to_csv(db_session, filepath):
     except Exception as e:
         return False, f"An error occurred during export:\n{e}"
 
-def backup_sqlite_db(db_session, source_db_path, dest_filepath):
-    """Forces a WAL checkpoint and copies the database file."""
+def create_full_backup_zip(db_session, source_db_path, dest_zip_path):
+    """Forces a WAL checkpoint, then ZIPs the database and config files (excluding secrets)."""
     try:
         db_session.execute(text("PRAGMA wal_checkpoint(TRUNCATE);"))
         db_session.commit()
 
-        shutil.copy2(source_db_path, dest_filepath)
+        with zipfile.ZipFile(dest_zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            zipf.write(source_db_path, arcname="tracker.db")
 
-        return True, "Your database has been safely backed up."
+            if os.path.exists(USER_CONFIG_DIR):
+                for item in os.listdir(USER_CONFIG_DIR):
+                    if item in ["credentials.json", "token.json"] or item.endswith(".zip"):
+                        continue
+
+                    item_path = os.path.join(USER_CONFIG_DIR, item)
+                    if os.path.isfile(item_path):
+                        zipf.write(str(item_path), arcname=f"config/{item}")
+
+        return True, "Your database and configuration have been safely backed up."
 
     except Exception as e:
         return False, f"An error occurred during backup:\n{e}"
-
 
 def ensure_file_has_content(file_path, default_content, allow_empty=False):
     """

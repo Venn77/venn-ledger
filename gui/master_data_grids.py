@@ -349,6 +349,8 @@ class CurrencyGrid(ctk.CTkFrame, PaginationMixin):
             show_popup(self, "Database Error", f"Failed to toggle currency:\n{e}", is_error=True)
 
     def add_new(self):
+        base_curr = self.db_session.query(Currency).filter_by(is_base=True).first()
+        base_code = base_curr.code if base_curr else "BASE"
         def _save(code, name, q_method, decimals):
             try:
                 if self.db_session.get(Currency, code): return False, "Currency Code already exists."
@@ -364,7 +366,7 @@ class CurrencyGrid(ctk.CTkFrame, PaginationMixin):
                 self.db_session.rollback()
                 return False, f"Database error: {str(e)}"
 
-        CurrencyDialog(self, "Add Currency", on_submit=_save)
+        CurrencyDialog(self, "Add Currency", base_currency=base_code, on_submit=_save)
 
     def edit(self, item):
         def _update(_code, name):
@@ -553,7 +555,7 @@ class ExchangeRateGrid(ctk.CTkFrame, PaginationMixin):
         FXDialog(
             self,
             currency_data=curr_dict,
-            base_code=base_curr.code,
+            base_currency=base_curr.code,
             base_decimals=base_curr.decimals,
             on_submit=_save
         )

@@ -167,14 +167,16 @@ class SimpleDataDialog(ctk.CTkToplevel):
                 self.err_lbl.configure(text=msg)
 
 class CurrencyDialog(ctk.CTkToplevel):
-    """Custom popup for creating Currencies (requires a 3-letter code)."""
-    def __init__(self, parent, title, initial_code="", initial_name="", is_edit=False, on_submit=None):
+    """Custom popup for creating Currencies (requires a 10-letter code)."""
+    def __init__(self, parent, title, initial_code="", initial_name="", is_edit=False, on_submit=None, base_currency="BASE"):
         super().__init__(parent)
         self.title(title)
         self.is_edit = is_edit
         self.on_submit = on_submit
+        self.base_currency = base_currency
+        self._example_timer = None
 
-        height = 220 if is_edit else 410
+        height = 220 if is_edit else 440
         width = 300
         self.geometry(f"{width}x{height}")
         self.attributes("-topmost", True)
@@ -194,6 +196,9 @@ class CurrencyDialog(ctk.CTkToplevel):
         self.code_entry.insert(0, initial_code)
         if is_edit:
             self.code_entry.configure(state="disabled")
+        else:
+            self.code_entry.bind("<KeyRelease>", self._schedule_example_update)
+
         self.code_entry.pack(pady=(2, 10))
 
         ctk.CTkLabel(self, text="Currency Name:", font=("JetBrains Mono", 11, "bold")).pack()
@@ -219,17 +224,18 @@ class CurrencyDialog(ctk.CTkToplevel):
                 values=["Divide (Foreign ÷ Rate = Base)", "Multiply (Foreign × Rate = Base)"],
                 variable=self.quote_var,
                 width=240,
-                command=self._update_example
+                command=self._force_example_update
             )
             self.quote_dropdown.pack(pady=(2, 0))
 
             self.example_lbl = ctk.CTkLabel(
                 self,
-                text="e.g., 100 USD ÷ 1.20 Rate = 83.33 EUR",
+                text="",
                 text_color="#5AC8FA",
                 font=("JetBrains Mono", 10)
             )
             self.example_lbl.pack(pady=(0, 10))
+            self._render_example_text()
 
         self.err_lbl = ctk.CTkLabel(self, text="", text_color="#FF6B6B", font=("JetBrains Mono", 10), height=15)
         self.err_lbl.pack()
@@ -241,12 +247,40 @@ class CurrencyDialog(ctk.CTkToplevel):
                                                                                                         padx=10)
         ctk.CTkButton(btn_frame, text="Save", width=80, command=self.submit).pack(side="left", padx=10)
 
-    def _update_example(self, selection):
-        """Swaps the example text based on the math method chosen."""
+    def _schedule_example_update(self, _event=None):
+        """Debounces the text entry so the example can be updated."""
+        if self._example_timer:
+            self.after_cancel(self._example_timer)
+        self._example_timer = self.after(300, self._render_example_text)
+
+    def _force_example_update(self, _selection=None):
+        """Immediately updates the label when the dropdown is clicked."""
+        self._render_example_text()
+
+    def _render_example_text(self):
+        """Dynamically injects the typed code and base currency into the math example."""
+        if self.is_edit:
+            return
+
+        typed_code = self.code_entry.get().strip().upper()
+        if not typed_code:
+            typed_code = "XXX"
+
+        selection = self.quote_var.get()
         if "Multiply" in selection:
-            self.example_lbl.configure(text="e.g., 100 USD × 150 Rate = 15,000 JPY")
+            msg = (
+                f"\nUse this if your rate looks like:\n"
+                f"1 {typed_code} = [Rate] {self.base_currency}\n\n"
+                f"Math: 100 {typed_code} × 1.15 Rate = 115 {self.base_currency}"
+            )
         else:
-            self.example_lbl.configure(text="e.g., 100 USD ÷ 1.20 Rate = 83.33 EUR")
+            msg = (
+                f"\nUse this if your rate looks like:\n"
+                f"1 {self.base_currency} = [Rate] {typed_code}\n\n"
+                f"Math: 1500 {typed_code} ÷ 150 Rate = 10 {self.base_currency}"
+            )
+
+        self.example_lbl.configure(text=msg)
 
     def submit(self):
         code_val = self.code_entry.get().strip().upper()
@@ -282,17 +316,17 @@ class CurrencyDialog(ctk.CTkToplevel):
 
 class FXDialog(ctk.CTkToplevel):
     """Custom popup for adding a new Exchange Rate."""
-    def __init__(self, parent, currency_data, base_code, base_decimals, on_submit=None):
+    def __init__(self, parent, currency_data, base_currency, base_decimals, on_submit=None):
         super().__init__(parent)
         self.title("New Exchange Rate")
-        height = 380
+        height = 410
         width = 300
         self.geometry(f"{width}x{height}")
         self.attributes("-topmost", True)
         self.grab_set()
 
         self.currency_data = currency_data
-        self.base_code = base_code
+        self.base_code = base_currency
         self.base_decimals = base_decimals
         self.on_submit = on_submit
 
@@ -364,12 +398,16 @@ class FXDialog(ctk.CTkToplevel):
         if method == "multiply":
             result = 100.0 * rate
             math_sym = "×"
+            msg = f"\n1 {code} = {rate:,.4f} {self.base_code}\n"
         else:
             result = 100.0 / rate
             math_sym = "÷"
+            msg = f"\n1 {self.base_code} = {rate:,.4f} {code}\n"
+
+        msg += f"Math: 100 {code} {math_sym} {rate} = {result:,.{self.base_decimals}f} {self.base_code}"
 
         self.preview_lbl.configure(
-            text=f"e.g., 100 {code} {math_sym} {rate} = {result:,.{self.base_decimals}f} {self.base_code}",
+            text=msg,
             text_color="#5AC8FA"
         )
 

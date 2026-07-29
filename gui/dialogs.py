@@ -1,5 +1,6 @@
 import customtkinter as ctk
 from tkcalendar import Calendar
+from utils.icon_manager import set_app_window_icon
 import datetime
 
 
@@ -11,6 +12,7 @@ def open_calendar(parent, target_var, include_time=False):
         parent.cal_window.focus_force()
         return
     parent.cal_window = ctk.CTkToplevel(parent)
+    set_app_window_icon(parent.cal_window)
     parent.cal_window.title("Select Date")
     parent.cal_window.attributes("-topmost", True)
     # noinspection PyTypeChecker
@@ -112,6 +114,7 @@ class SimpleDataDialog(ctk.CTkToplevel):
         height = 220 if has_desc else 160
         width = 300
         self.geometry(f"{width}x{height}")
+        set_app_window_icon(self)
         self.attributes("-topmost", True)
         self.grab_set()
 
@@ -179,6 +182,7 @@ class CurrencyDialog(ctk.CTkToplevel):
         height = 220 if is_edit else 440
         width = 300
         self.geometry(f"{width}x{height}")
+        set_app_window_icon(self)
         self.attributes("-topmost", True)
         self.grab_set()
 
@@ -322,6 +326,7 @@ class FXDialog(ctk.CTkToplevel):
         height = 410
         width = 300
         self.geometry(f"{width}x{height}")
+        set_app_window_icon(self)
         self.attributes("-topmost", True)
         self.grab_set()
 
@@ -449,6 +454,7 @@ class AccountDialog(ctk.CTkToplevel):
         width = 320
         height = 350
         self.geometry(f"{width}x{height}")
+        set_app_window_icon(self)
         self.attributes("-topmost", True)
         self.grab_set()
         self.on_submit = on_submit
@@ -544,6 +550,7 @@ class PMDialog(ctk.CTkToplevel):
         width = 300
         height = 220
         self.geometry(f"{width}x{height}")
+        set_app_window_icon(self)
         self.attributes("-topmost", True)
         self.grab_set()
         self.on_submit = on_submit

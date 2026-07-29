@@ -8,6 +8,7 @@ from database.models import (
 from gui.widgets import SearchableComboBox, ToolTip
 from gui.dialogs import open_calendar, show_popup
 from utils.io_utils import format_input_float
+from utils.icon_manager import set_app_window_icon
 
 
 class BaseTransactionWindow(ctk.CTkToplevel):
@@ -19,6 +20,7 @@ class BaseTransactionWindow(ctk.CTkToplevel):
 
         self.minsize(450, 585)
         self.maxsize(450, 585)
+        set_app_window_icon(self)
         self.manager = manager
         self.transaction_data = transaction_data
         self.is_edit_mode = transaction_data is not None and transaction_data.get("id") is not None

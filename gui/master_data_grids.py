@@ -8,6 +8,7 @@ from gui.dialogs import (
     SimpleDataDialog, CurrencyDialog, FXDialog,
     AccountDialog, PMDialog, show_popup
 )
+from utils.icon_manager import set_app_window_icon
 
 
 class PaginationMixin:
@@ -482,6 +483,7 @@ class ExchangeRateGrid(ctk.CTkFrame, PaginationMixin):
         width = 250
         height = 150
         popup.geometry(f"{width}x{height}")
+        set_app_window_icon(popup)
         popup.attributes("-topmost", True)
         popup.grab_set()
 
@@ -611,6 +613,7 @@ class AccountGrid(ctk.CTkFrame, PaginationMixin):
             popup = ctk.CTkToplevel(self)
             popup.title("Warning")
             popup.geometry("350x180")
+            set_app_window_icon(popup)
             popup.attributes("-topmost", True)
             popup.grab_set()
             self.update_idletasks()

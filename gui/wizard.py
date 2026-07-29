@@ -1,6 +1,7 @@
 import customtkinter as ctk
 from config import CURRENCY_SYMBOLS
 from core.manager import seed_fresh_database
+from utils.icon_manager import set_app_window_icon
 
 
 class FirstRunWizard(ctk.CTkToplevel):
@@ -12,6 +13,7 @@ class FirstRunWizard(ctk.CTkToplevel):
 
         self.title("Welcome")
         self.geometry("450x550")
+        set_app_window_icon(self)
         self.attributes("-topmost", True)
         self.resizable(False, False)
 

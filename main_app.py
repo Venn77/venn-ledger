@@ -1,17 +1,11 @@
-import json, os, sys, traceback, ctypes
-
-if sys.platform == "win32":
-    my_appid = "com.vennledger.desktop.v1"
-    getattr(ctypes.windll.shell32, "SetCurrentProcessExplicitAppUserModelID")(my_appid)
-
-import tkinter as tk
+import json, os, sys, traceback
 import customtkinter as ctk
 import matplotlib.pyplot as plt
 from typing import Any
-from config import CONFIG_PATH, APP_VERSION, IS_COMPILED, ERROR_LOG_PATH, ASSETS_DIR
+from config import CONFIG_PATH, APP_VERSION, IS_COMPILED, ERROR_LOG_PATH
 from database.models import Session, Account, Transfer, Currency
 from core import manager as finance_manager
-from utils.icon_manager import get_icon
+from utils.icon_manager import get_icon, set_app_window_icon
 from gui.transaction_forms import AddExpenseWindow, AddGainWindow, AddTransferWindow
 from gui.transactions_view import TransactionsView
 from gui.settings_view import SettingsView
@@ -37,7 +31,7 @@ class FinanceApp(ctk.CTk):
             self.report_callback_exception = global_exception_handler
         self.title("Venn Ledger 2026")
         self.geometry("1440x700")
-        self._set_window_icon()
+        set_app_window_icon(self)
         self.minsize(1440,700)
         self.maxsize(1440,980)
         ctk.set_appearance_mode("dark")
@@ -57,20 +51,6 @@ class FinanceApp(ctk.CTk):
             FirstRunWizard(self, self.db_session, self._finish_init)
         else:
             self._finish_init()
-
-    def _set_window_icon(self):
-        """Sets the window icon appropriately based on the operating system."""
-        ico_path = os.path.join(ASSETS_DIR, "app_icon.ico")
-        png_path = os.path.join(ASSETS_DIR, "app_icon.png")
-
-        if sys.platform == "win32":
-            if os.path.exists(ico_path):
-                self.iconbitmap(ico_path)
-
-        elif sys.platform.startswith("linux"):
-            if os.path.exists(png_path):
-                photo = tk.PhotoImage(file=png_path)
-                self.iconphoto(True, photo)
 
     def _finish_init(self):
         """Called either immediately (if DB exists) or after the Wizard finishes."""
@@ -474,6 +454,7 @@ class FinanceApp(ctk.CTk):
                 info_popup = ctk.CTkToplevel(self)
                 info_popup.title("Action Blocked")
                 info_popup.geometry("350x150")
+                set_app_window_icon(info_popup)
                 info_popup.attributes("-topmost", True)
                 info_popup.grab_set()
 
@@ -492,6 +473,7 @@ class FinanceApp(ctk.CTk):
         popup = ctk.CTkToplevel(self)
         popup.title("Confirm Delete")
         popup.geometry("350x170")
+        set_app_window_icon(popup)
         popup.attributes("-topmost", True)
         popup.grab_set()
 

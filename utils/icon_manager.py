@@ -1,6 +1,7 @@
-import os
-from PIL import Image
+import os, sys
+import tkinter as tk
 import customtkinter as ctk
+from PIL import Image
 from config import ASSETS_DIR
 
 
@@ -34,5 +35,20 @@ def get_icon(filename, size=(20, 20), light_filename=None):
     except FileNotFoundError as e:
         print(f"Warning: Icon file missing - {e}")
         return None
+
+def set_app_window_icon(window):
+    """Sets the window title bar and taskbar icon across operating systems."""
+    ico_path = os.path.join(ASSETS_DIR, "app_icon.ico")
+    png_path = os.path.join(ASSETS_DIR, "app_icon.png")
+
+    if sys.platform == "win32":
+        if os.path.exists(ico_path):
+            window.after(200, lambda: window.iconbitmap(ico_path))
+
+    elif sys.platform.startswith("linux"):
+        if os.path.exists(png_path):
+            photo = tk.PhotoImage(file=png_path)
+            window._icon_photo = photo
+            window.iconphoto(True, photo)
 
 

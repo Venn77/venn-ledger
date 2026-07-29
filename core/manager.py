@@ -71,7 +71,11 @@ class TransactionManager:
                 item.active_bool = True
             return item
 
-        new_item = model(name=name)
+        if hasattr(model, "description"):
+            new_item = model(name=name, description="")
+        else:
+            new_item = model(name=name)
+
         self.db_session.add(new_item)
         self.db_session.flush()
         return new_item

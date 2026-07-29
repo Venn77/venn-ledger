@@ -249,7 +249,7 @@ class SimpleMasterDataGrid(ctk.CTkFrame, PaginationMixin):
         SimpleDataDialog(self, f"Add {self.model.__name__}", has_desc=self.has_desc, on_submit=_save)
 
     def edit_item(self, item):
-        initial_desc = item.description if self.has_desc and hasattr(item, 'description') else ""
+        initial_desc = (item.description or "") if self.has_desc and hasattr(item, 'description') else ""
 
         def _update(new_name, new_desc):
             try:

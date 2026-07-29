@@ -138,7 +138,7 @@ class SimpleDataDialog(ctk.CTkToplevel):
         if self.has_desc:
             ctk.CTkLabel(self, text="Description:", font=("JetBrains Mono", 12, "bold")).pack()
             self.desc_entry = ctk.CTkEntry(self, width=240)
-            self.desc_entry.insert(0, initial_desc)
+            self.desc_entry.insert(0, initial_desc or "")
             self.desc_entry.pack(pady=(5, 10))
 
         self.err_lbl = ctk.CTkLabel(self, text="", text_color="#FF6B6B", font=("JetBrains Mono", 10), height=15)
@@ -477,7 +477,7 @@ class AccountDialog(ctk.CTkToplevel):
 
         ctk.CTkLabel(self, text="Description:", font=("JetBrains Mono", 11, "bold")).pack()
         self.desc_entry = ctk.CTkEntry(self, width=260)
-        self.desc_entry.insert(0, initial_desc)
+        self.desc_entry.insert(0, initial_desc or "")
         self.desc_entry.pack(pady=(2, 10))
 
         ctk.CTkLabel(self, text="Currency:", font=("JetBrains Mono", 11, "bold")).pack()

@@ -246,7 +246,7 @@ class SettingsView(ctk.CTkFrame):
         if success:
             show_popup(self, "Success", message, is_error=False)
         else:
-            show_popup(self, "Cloud Error", message, is_error=True)
+            show_popup(self, "Cloud Error", message, is_error=True, height=280)
 
     def refresh_view(self):
         """Called automatically when switching back to this tab.

@@ -1,5 +1,5 @@
 import os
-from config import CREDENTIALS_PATH, TOKEN_PATH
+from config import CREDENTIALS_PATH, TOKEN_PATH, USER_CONFIG_DIR
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
@@ -41,7 +41,7 @@ def upload_to_drive(filepath, filename):
                     "Missing credentials.json!\n\n"
                     "Please download your OAuth 2.0 Client ID from Google Cloud Console "
                     "and place the 'credentials.json' file in the following folder:\n\n"
-                    f"{CREDENTIALS_PATH}"
+                    f"{USER_CONFIG_DIR}"
                 )
                 return False, error_msg
 

@@ -84,7 +84,7 @@ class SettingsView(ctk.CTkFrame):
         current_tab = self.settings_tabview.get()
 
         if not self.loaded_tabs[current_tab]:
-            print(f"[Lazy Load] Building grids for tab: {current_tab}...")
+            # print(f"[Lazy Load] Building grids for tab: {current_tab}...")
             self.build_tab_content(current_tab)
             self.loaded_tabs[current_tab] = True
 

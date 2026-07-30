@@ -549,7 +549,7 @@ class BaseTransactionWindow(ctk.CTkToplevel):
 
         except Exception as e:
             self.error_label.configure(text=f"⚠ Database Error: {str(e)}", text_color="red")
-            print(f"Submission Error: {e}")
+            # print(f"Submission Error: {e}")
 
     def finalize_and_refresh(self):
         """Kills the popup and triggers the main app reload."""

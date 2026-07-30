@@ -454,9 +454,9 @@ class AIImportView(ctk.CTkFrame):
 
         self.btn_import_all.configure(command=grid.execute_import)
 
-        print("--- THREAD COMPLETE. DATA RECEIVED IN GUI ---")
-        for res in parsed_results:
-            print(res)
+        # print("--- THREAD COMPLETE. DATA RECEIVED IN GUI ---")
+        # for res in parsed_results:
+        #     print(res)
 
     def refresh_view(self):
         """Called when this tab is brought to the front.

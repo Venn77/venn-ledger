@@ -1,7 +1,7 @@
 import os, sys
 
 
-APP_VERSION = "v0.99"
+APP_VERSION = "v1.0.0"
 
 IS_COMPILED = getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS')
 

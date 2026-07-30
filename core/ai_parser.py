@@ -247,7 +247,7 @@ def get_structured_data(combined_text, categories, system_prompt, cancel_event=N
                 expected_cat = matches[0]
                 # Strip the word that triggered the fuzzy match (usually the first word)
                 line_to_process = line[len(first_word):].strip()
-                print(f"Fuzzy Match: '{first_word}' -> '{expected_cat}'. Processing: '{line_to_process}'")
+                # print(f"Fuzzy Match: '{first_word}' -> '{expected_cat}'. Processing: '{line_to_process}'")
             else:
                 print(f"Skipping: No category match for {line}")
                 continue
@@ -274,9 +274,9 @@ def get_structured_data(combined_text, categories, system_prompt, cancel_event=N
             item['date'] = current_date
             item['line'] = line
             final_results.append(item)
-            print(f"LLM sees: {line_to_process}")
-            print(f"✅ {line}")
-            print(f">>> [{item['date']}] {item['vendor']}: {item['amount']} {item['currency']} [{item['category']}] [{item['payment_method']}] [{item['description']}]\n")
+            # print(f"LLM sees: {line_to_process}")
+            # print(f"✅ {line}")
+            # print(f">>> [{item['date']}] {item['vendor']}: {item['amount']} {item['currency']} [{item['category']}] [{item['payment_method']}] [{item['description']}]\n")
 
         except json.JSONDecodeError as e:
             print(f"Skipping line due to JSON formatting error: {e}")

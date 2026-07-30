@@ -168,7 +168,7 @@ class FinanceApp(ctk.CTk):
                 view.grid_remove()
 
         if self.views[view_name] is None:
-            print(f"[Lazy Load] Building {view_name} screen...")
+            # print(f"[Lazy Load] Building {view_name} screen...")
             if view_name == "transactions":
                 self.views[view_name] = TransactionsView(self, self.manager, self.db_session)
             elif view_name == "ai":
@@ -516,9 +516,9 @@ class FinanceApp(ctk.CTk):
         """Ensures the DB session is safely closed before quitting."""
         try:
             self.db_session.close()
-            print("Database session closed successfully.")
+            # print("Database session closed successfully.")
             self.db_session.get_bind().dispose()
-            print("Database connection fully severed.")
+            # print("Database connection fully severed.")
             plt.close('all')
         except Exception as e:
             print(f"Error closing database session: {e}")

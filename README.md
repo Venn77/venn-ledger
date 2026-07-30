@@ -1,3 +1,12 @@
+<!-- Hero Image (Full Width) -->
+<img src="https://github.com/user-attachments/assets/0eda019e-63fb-48db-b0c7-8bde8cc449f5" width="100%" alt="VennLedger Main View"><br>
+
+<!-- Supporting Images (Side-by-Side) -->
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/758b7832-6333-4aa9-9102-f54ee413e25c" width="49%" alt="Master Data Management">
+  <img src="https://github.com/user-attachments/assets/e31e6665-46cd-45c5-853d-fe6e01386007" width="49%" alt="AI Import Demo">
+</p>
+
 # VennLedger
 
 **A powerful, privacy-first desktop finance tracker engineered for the modern power user.** 

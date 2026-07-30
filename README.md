@@ -55,9 +55,21 @@ Before installing VennLedger, you **must** have Ollama installed and the require
 
 ---
 
-## 💻 Installation (Source)
+## 📥 Download & Install
 
-Follow these steps to get VennLedger running in your local development environment:
+You don't need to install Python to run VennLedger. Standalone executables are available for Windows and Linux.
+
+1. Go to the **[Releases](../../releases)** page.
+2. **Windows:** Download `VennLedger_Setup_v1.0.0.exe` and run the installer.
+3. **Linux / SteamOS:** Download `VennLedger_Linux_v1.0.0.zip`, extract the file, and ensure it has executable permissions (`chmod +x VennLedger-Linux`). 
+
+*(Note: On the very first run, VennLedger will guide you through a First-Run Wizard to set up your Base Currency and initial account balances).*
+
+---
+
+## 💻 Installation (Build from Source)
+
+Follow these steps if you prefer to run VennLedger in your local development environment:
 
 **1. Clone the repository:**
 ```bash
@@ -65,7 +77,7 @@ git clone https://github.com/Venn77/venn-ledger.git
 cd VennLedger
 ```
 
-**2. Create and activate a virtual environment (Recommended):**
+**2. Create and activate a virtual environment:**
 ```bash
 # Windows
 python -m venv venv
@@ -104,9 +116,53 @@ To enable the **Backup to Drive** feature, you must provide your own Google Clou
 
 ---
 
-## 🤖 AI Setup & Customization
+## 🤖 AI Journal Format & Customization
 
-To achieve 100% parsing accuracy, the AI must be tailored to your specific Master Data (your custom categories, payment methods, etc.). 
+VennLedger's AI parser expects a specific daily journal format to accurately extract your transactions.
+
+### The Text Format
+**Date Headers:** Each day MUST start with `DD/MM:` or `DD/MM (note):`
+
+**Transaction Lines:** `[Category] [Vendor] [Amount] [Currency?] [Method] [Description]`
+
+**Foreign Currency & Custom Rates:**
+Add a currency code after the amount to auto-fetch historical rates. To force a custom rate, include `FX [rate]` in the description.
+
+**Example Journal:**
+```text
+09/07 (Japan Trip Planning):
+Travel Tokyo Inn Hotel 120000 JPY revolut 5 Nights Hotel Deposit (FX 165.0)
+
+10/07:
+Dining Out Bistro Bella 85 USD wise Airport Lounge & Dinner (FX 1.08)
+Groceries FreshMarket Groceries 98.30 debit Weekly Grocery Run
+
+15/07:
+Tech & Office Amazon 450 credit Ergonomic Standing Desk Frame
+Entertainment Amazon 29.99 credit Board Game Night
+
+17/07:
+Tech & Office Amazon 210 credit 4K Monitor Mount & Cables
+
+19/07:
+Dining Out Peet's Coffee 13.75 cash Coffee & Pastries with team
+
+24/07 (Standard Errands):
+Transport Metro Transit 54 debit Monthly Transit Pass
+Groceries FreshMarket Groceries 88.90 debit Weekly Grocery Run
+
+26/07:
+Dining Out Bistro Bella 68 credit Friday Dinner with Friends
+
+28/07:
+Housing Cloud Hosting Co 1250 debit Monthly Apartment Rent
+```
+
+---
+
+## ⚙️ Tailoring the AI to Your Database
+
+To achieve 100% parsing accuracy, the AI must be configured to recognize your custom Master Data. 
 
 Navigate to the **AI Import** tab in VennLedger to customize the parser:
 

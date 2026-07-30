@@ -1,0 +1,38 @@
+name: Build Linux Executable
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          # Install Linux UI dependencies required by Tkinter/CustomTkinter
+          sudo apt-get install -y python3-tk python3-dev
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build Linux Executable
+        run: |
+          # Note the colon (:) for the add-data separator on Linux
+          pyinstaller --noconfirm --onefile --windowed --name "VennLedger-Linux" --icon="assets/app_icon.png" --add-data "assets:assets" main_app.py
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VennLedger-Linux-Build
+          path: |
+            dist/VennLedger-Linux
+            LICENSE

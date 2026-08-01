@@ -27,7 +27,7 @@ jobs:
       - name: Build Linux Executable
         run: |
           # Note the colon (:) for the add-data separator on Linux
-          pyinstaller --noconfirm --onefile --windowed --name "VennLedger-Linux" --icon="assets/app_icon.png" --add-data "assets:assets" main_app.py
+          pyinstaller --noconfirm --onefile --windowed --name "VennLedger-Linux" --icon="assets/app_icon.png" --add-data "assets:assets" --hidden-import="PIL._tkinter_finder" main_app.py
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4

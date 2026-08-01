@@ -1,6 +1,7 @@
 import json, os, sys, traceback
 import customtkinter as ctk
 import matplotlib.pyplot as plt
+from tkinter import TclError
 from typing import Any
 from config import CONFIG_PATH, APP_VERSION, IS_COMPILED, ERROR_LOG_PATH
 from database.models import Session, Account, Transfer, Currency
@@ -79,7 +80,16 @@ class FinanceApp(ctk.CTk):
 
         self.deiconify()
         # noinspection PyTypeChecker
-        self.after(0, lambda: self.state('zoomed'))
+        if sys.platform == "win32":
+            self.after(0, lambda: self.state('zoomed'))
+        else:
+            def _maximize_linux():
+                try:
+                    self.attributes('-zoomed', True)
+                except TclError:
+                    pass
+
+            self.after(0, _maximize_linux)
 
     def _build_sidebar(self):
         """Builds the permanent sidebar and navigation buttons."""
@@ -452,11 +462,11 @@ class FinanceApp(ctk.CTk):
                 if on_cancel: on_cancel()
 
                 info_popup = ctk.CTkToplevel(self)
+                info_popup.withdraw()
                 info_popup.title("Action Blocked")
                 info_popup.geometry("350x150")
                 set_app_window_icon(info_popup)
                 info_popup.attributes("-topmost", True)
-                info_popup.grab_set()
 
                 self.update_idletasks()
                 x = self.winfo_x() + (self.winfo_width() // 2) - 175
@@ -468,14 +478,17 @@ class FinanceApp(ctk.CTk):
                 ctk.CTkLabel(info_popup, text="It is currently open in an Edit window.",
                              font=("JetBrains Mono", 11)).pack(pady=(0, 20))
                 ctk.CTkButton(info_popup, text="OK", width=80, fg_color="#1f538d", command=info_popup.destroy).pack()
+                info_popup.deiconify()
+                info_popup.wait_visibility()
+                info_popup.grab_set()
                 return
 
         popup = ctk.CTkToplevel(self)
+        popup.withdraw()
         popup.title("Confirm Delete")
         popup.geometry("350x170")
         set_app_window_icon(popup)
         popup.attributes("-topmost", True)
-        popup.grab_set()
 
         self.update_idletasks()
         x = self.winfo_x() + (self.winfo_width() // 2) - 175
@@ -511,6 +524,10 @@ class FinanceApp(ctk.CTk):
                                                                                                          padx=10)
         ctk.CTkButton(btn_frame, text="Delete", width=80, fg_color="#8b2525", hover_color="#611a1a",
                       command=confirm).pack(side="left", padx=10)
+
+        popup.deiconify()
+        popup.wait_visibility()
+        popup.grab_set()
 
     def on_closing(self):
         """Ensures the DB session is safely closed before quitting."""

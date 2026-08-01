@@ -74,9 +74,6 @@ def show_popup(parent, title, message, is_error=False, show_ok=True, show_cancel
     popup.place(relx=0.5, rely=0.5, anchor="center")
     popup.pack_propagate(False)
 
-    popup.focus_set()
-    popup.grab_set()
-
     main_container = ctk.CTkFrame(popup, corner_radius=0)
     main_container.pack(fill="both", expand=True, padx=1, pady=1)
 
@@ -103,12 +100,17 @@ def show_popup(parent, title, message, is_error=False, show_ok=True, show_cancel
         ctk.CTkButton(btn_frame, text=btn_text, width=100, fg_color="#1f538d", hover_color="#14375e",
                       command=lambda: cleanup_and_execute(ok_command)).pack(side="left", padx=10)
 
+    popup.wait_visibility()
+    popup.focus_set()
+    popup.grab_set()
+
     return popup
 
 class SimpleDataDialog(ctk.CTkToplevel):
     """Generic popup form for creating/editing Master Data."""
     def __init__(self, parent, title, initial_name="", initial_desc="", has_desc=False, on_submit=None):
         super().__init__(parent)
+        self.withdraw()
         self.title(title)
 
         height = 220 if has_desc else 160
@@ -116,7 +118,6 @@ class SimpleDataDialog(ctk.CTkToplevel):
         self.geometry(f"{width}x{height}")
         set_app_window_icon(self)
         self.attributes("-topmost", True)
-        self.grab_set()
 
         self.on_submit = on_submit
         self.has_desc = has_desc
@@ -154,6 +155,10 @@ class SimpleDataDialog(ctk.CTkToplevel):
         self.name_entry.focus_set()
         self.bind("<Return>", lambda e: self.submit())
 
+        self.deiconify()
+        self.wait_visibility()
+        self.grab_set()
+
     def submit(self):
         name_val = self.name_entry.get().strip()
         desc_val = self.desc_entry.get().strip() if self.has_desc else None
@@ -173,6 +178,7 @@ class CurrencyDialog(ctk.CTkToplevel):
     """Custom popup for creating Currencies (requires a 10-letter code)."""
     def __init__(self, parent, title, initial_code="", initial_name="", is_edit=False, on_submit=None, base_currency="BASE"):
         super().__init__(parent)
+        self.withdraw()
         self.title(title)
         self.is_edit = is_edit
         self.on_submit = on_submit
@@ -184,7 +190,6 @@ class CurrencyDialog(ctk.CTkToplevel):
         self.geometry(f"{width}x{height}")
         set_app_window_icon(self)
         self.attributes("-topmost", True)
-        self.grab_set()
 
         self.update_idletasks()
         ref_frame = parent
@@ -250,6 +255,10 @@ class CurrencyDialog(ctk.CTkToplevel):
         ctk.CTkButton(btn_frame, text="Cancel", width=80, fg_color="gray40", command=self.destroy).pack(side="left",
                                                                                                         padx=10)
         ctk.CTkButton(btn_frame, text="Save", width=80, command=self.submit).pack(side="left", padx=10)
+
+        self.deiconify()
+        self.wait_visibility()
+        self.grab_set()
 
     def _schedule_example_update(self, _event=None):
         """Debounces the text entry so the example can be updated."""
@@ -322,13 +331,13 @@ class FXDialog(ctk.CTkToplevel):
     """Custom popup for adding a new Exchange Rate."""
     def __init__(self, parent, currency_data, base_currency, base_decimals, on_submit=None):
         super().__init__(parent)
+        self.withdraw()
         self.title("New Exchange Rate")
         height = 410
         width = 300
         self.geometry(f"{width}x{height}")
         set_app_window_icon(self)
         self.attributes("-topmost", True)
-        self.grab_set()
 
         self.currency_data = currency_data
         self.base_code = base_currency
@@ -386,6 +395,10 @@ class FXDialog(ctk.CTkToplevel):
         ctk.CTkButton(btn_frame, text="Save", width=80, command=self.submit).pack(side="left", padx=10)
 
         self._update_preview()
+
+        self.deiconify()
+        self.wait_visibility()
+        self.grab_set()
 
     def _update_preview(self, _event=None):
         code = self.code_var.get()
@@ -450,13 +463,13 @@ class AccountDialog(ctk.CTkToplevel):
     def __init__(self, parent, currency_data, initial_name="", initial_desc="", initial_curr="", initial_bal="0.00",
                  is_edit=False, on_submit=None):
         super().__init__(parent)
+        self.withdraw()
         self.title("Edit Account" if is_edit else "New Account")
         width = 320
         height = 350
         self.geometry(f"{width}x{height}")
         set_app_window_icon(self)
         self.attributes("-topmost", True)
-        self.grab_set()
         self.on_submit = on_submit
 
         self.currency_data = currency_data
@@ -504,6 +517,10 @@ class AccountDialog(ctk.CTkToplevel):
                                                                                                         padx=10)
         ctk.CTkButton(btn_frame, text="Save", width=80, command=self.submit).pack(side="left", padx=10)
 
+        self.deiconify()
+        self.wait_visibility()
+        self.grab_set()
+
     def _reformat_balance(self, selection):
         """Reapplies the correct decimal formatting when the currency dropdown changes."""
         decimals = self.currency_data.get(selection, 2)
@@ -546,13 +563,13 @@ class AccountDialog(ctk.CTkToplevel):
 class PMDialog(ctk.CTkToplevel):
     def __init__(self, parent, active_accounts, initial_name="", initial_acc="", on_submit=None):
         super().__init__(parent)
+        self.withdraw()
         self.title("Payment Method")
         width = 300
         height = 220
         self.geometry(f"{width}x{height}")
         set_app_window_icon(self)
         self.attributes("-topmost", True)
-        self.grab_set()
         self.on_submit = on_submit
 
         self.update_idletasks()
@@ -583,6 +600,10 @@ class PMDialog(ctk.CTkToplevel):
         ctk.CTkButton(btn_frame, text="Cancel", width=80, fg_color="gray40", command=self.destroy).pack(side="left",
                                                                                                         padx=10)
         ctk.CTkButton(btn_frame, text="Save", width=80, command=self.submit).pack(side="left", padx=10)
+
+        self.deiconify()
+        self.wait_visibility()
+        self.grab_set()
 
     def submit(self):
         name = self.name_entry.get().strip()

@@ -479,13 +479,13 @@ class ExchangeRateGrid(ctk.CTkFrame, PaginationMixin):
         rate = self.db_session.get(ExchangeRate, rate_id)
         context_text = f"[{rate.timestamp.strftime('%Y-%m-%d')}] {rate.currency_code} | {rate.fx_multiplier}" if rate else ""
         popup = ctk.CTkToplevel(self)
+        popup.withdraw()
         popup.title("Confirm")
         width = 250
         height = 150
         popup.geometry(f"{width}x{height}")
         set_app_window_icon(popup)
         popup.attributes("-topmost", True)
-        popup.grab_set()
 
         self.update_idletasks()
         x = self.winfo_x() + (self.winfo_width() // 2) - (width // 2)
@@ -523,6 +523,10 @@ class ExchangeRateGrid(ctk.CTkFrame, PaginationMixin):
                                                                                                          padx=5)
         ctk.CTkButton(btn_frame, text="Delete", width=70, fg_color="#8b2525", hover_color="#611a1a",
                       command=_confirm).pack(side="left", padx=5)
+
+        popup.deiconify()
+        popup.wait_visibility()
+        popup.grab_set()
 
     def add_new(self):
         base_curr = self.db_session.query(Currency).filter_by(is_base=True).first()
@@ -611,11 +615,11 @@ class AccountGrid(ctk.CTkFrame, PaginationMixin):
     def toggle(self, acc):
         if acc.active_bool and acc.balance != 0:
             popup = ctk.CTkToplevel(self)
+            popup.withdraw()
             popup.title("Warning")
             popup.geometry("350x180")
             set_app_window_icon(popup)
             popup.attributes("-topmost", True)
-            popup.grab_set()
             self.update_idletasks()
             popup.geometry(f"+{self.winfo_x() + 100}+{self.winfo_y() + 100}")
 
@@ -632,6 +636,11 @@ class AccountGrid(ctk.CTkFrame, PaginationMixin):
                                                                                                       padx=10)
             ctk.CTkButton(bf, text="Deactivate", width=80, fg_color="#b13e3e", command=_confirm).pack(side="left",
                                                                                                       padx=10)
+
+            popup.deiconify()
+            popup.wait_visibility()
+            popup.grab_set()
+
         else:
             self._execute_toggle(acc)
 

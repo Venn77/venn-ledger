@@ -7,6 +7,7 @@ from utils.icon_manager import set_app_window_icon
 class FirstRunWizard(ctk.CTkToplevel):
     def __init__(self, parent, db_session, on_complete_callback):
         super().__init__(parent)
+        self.withdraw()
         self.parent_app = parent
         self.db_session = db_session
         self.on_complete_callback = on_complete_callback
@@ -18,7 +19,6 @@ class FirstRunWizard(ctk.CTkToplevel):
         self.resizable(False, False)
 
         self.protocol("WM_DELETE_WINDOW", self._on_close_attempt)
-        self.grab_set()
 
         self.update_idletasks()
         screen_width = self.winfo_screenwidth()
@@ -28,6 +28,10 @@ class FirstRunWizard(ctk.CTkToplevel):
         self.geometry(f"+{x}+{y}")
 
         self._build_ui()
+
+        self.deiconify()
+        self.wait_visibility()
+        self.grab_set()
 
     def _build_ui(self):
         ctk.CTkLabel(self, text="Welcome to VennLedger!", font=("JetBrains Mono", 20, "bold")).pack(pady=(20, 5))

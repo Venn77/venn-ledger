@@ -144,16 +144,20 @@ def ensure_file_has_content(file_path, default_content, allow_empty=False):
 
 def open_text_config(filename, default_content, allow_empty=False):
     """Ensures a text-based config file is healthy, then opens it in the OS default text editor."""
-    file_path = os.path.join(USER_CONFIG_DIR, filename)
+    raw_path = str(os.path.join(USER_CONFIG_DIR, filename))
+    file_path = os.path.abspath(os.path.expanduser(raw_path))
 
     ensure_file_has_content(file_path, default_content, allow_empty)
 
     try:
-        # Windows command
-        os.startfile(file_path)
-    except AttributeError:
-        # Fallback Mac/Linux
-        if sys.platform == "darwin":
-            subprocess.call(['open', file_path])
+        if sys.platform == "win32":
+            os.startfile(file_path)
+        elif sys.platform == "darwin":
+            subprocess.Popen(['open', file_path])
         else:
-            subprocess.call(['xdg-open', file_path])
+            subprocess.Popen(['xdg-open', file_path])
+
+    except Exception as e:
+        print(f"Failed to open config file: {e}")
+
+

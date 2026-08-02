@@ -35,67 +35,25 @@ class AIImportView(ctk.CTkFrame):
                                       font=("JetBrains Mono", 22, "bold"))
         self.ai_header.pack(side="left", anchor="w")
 
-        self.btn_edit_skip = ctk.CTkButton(
-            header_row,
-            text="Skip Terms",
-            image=self.edit_skip_icon,
-            width=110,
-            height=24,
-            font=("JetBrains Mono", 11),
-            fg_color="gray25",
-            hover_color="gray35",
-            command=lambda: open_text_config("ai_skip_terms.txt", DEFAULT_SKIP_TERMS_TEXT, allow_empty=True)
-        )
-        self.btn_edit_skip.pack(side="right", padx=(5, 0))
-        ToolTip(self.btn_edit_skip, "Edit terms the parser should ignore (e.g. Transfer, Withdrawal)")
-
-        self.btn_edit_rules = ctk.CTkButton(
-            header_row,
-            text="Parser Rules",
-            image=self.edit_rules_icon,
-            width=110,
-            height=24,
-            font=("JetBrains Mono", 11),
-            fg_color="gray25",
-            hover_color="gray35",
-            command=lambda: open_text_config(
-                "ai_prompt_template.txt",
-                DEFAULT_PROMPT_TEMPLATE,
-                allow_empty=False
-            )
-        )
-        self.btn_edit_rules.pack(side="right", padx=5)
-        ToolTip(self.btn_edit_rules, "Edit the LLM System Prompt and examples")
-
-        self.btn_parser_guide = ctk.CTkButton(
-            header_row, text="?", width=24, height=24, corner_radius=12,
-            fg_color="gray30", hover_color="gray40", font=("JetBrains Mono", 12, "bold"),
-            command=self._show_parser_guide
-        )
-        self.btn_parser_guide.pack(side="right", padx=(0, 5))
-        ToolTip(self.btn_parser_guide, "How to customize the AI parser")
-
         self.ai_config_frame = ctk.CTkFrame(self, fg_color="gray15", corner_radius=8)
         self.ai_config_frame.pack(fill="x", pady=(0, 15), padx=2)
 
-        cmd_bar = ctk.CTkFrame(self.ai_config_frame, fg_color="transparent")
-        cmd_bar.pack(fill="x", pady=12, padx=15)
-
-        # File Selection
-        ctk.CTkLabel(cmd_bar, text="Target File:", font=("JetBrains Mono", 12, "bold"), anchor="w").pack(
-            side="left")
+        row1 = ctk.CTkFrame(self.ai_config_frame, fg_color="transparent")
+        row1.pack(fill="x", pady=(12, 6), padx=15)
+        # File
+        ctk.CTkLabel(row1, text="Target File:", font=("JetBrains Mono", 12, "bold")).pack(side="left")
 
         self.btn_format_guide = ctk.CTkButton(
-            cmd_bar, text="?", width=24, height=24, corner_radius=12,
+            row1, text="?", width=24, height=24, corner_radius=12,
             fg_color="gray30", hover_color="gray40", font=("JetBrains Mono", 12, "bold"),
             command=self._show_format_guide
         )
-        self.btn_format_guide.pack(side="left", padx=(5, 0))
+        self.btn_format_guide.pack(side="left", padx=(5, 10))
         ToolTip(self.btn_format_guide, "Required file format guide")
 
-        self.lbl_container = ctk.CTkFrame(cmd_bar, width=270, height=28, fg_color="gray20", corner_radius=4)
+        self.lbl_container = ctk.CTkFrame(row1, height=28, fg_color="gray20", corner_radius=4)
         self.lbl_container.pack_propagate(False)
-        self.lbl_container.pack(side="left", padx=(10, 0))
+        self.lbl_container.pack(side="left", fill="x", expand=True, padx=(0, 10))
 
         self.ai_full_filepath = ""
         self.ai_filepath_var = ctk.StringVar(value="No file selected...")
@@ -104,46 +62,77 @@ class AIImportView(ctk.CTkFrame):
         self.ai_file_lbl.pack(fill="both", expand=True, padx=10)
         self.file_tooltip = ToolTip(self.ai_file_lbl, "Please select a text file.")
 
-        self.btn_browse = ctk.CTkButton(cmd_bar, text="Browse", width=70, fg_color="gray30", hover_color="gray40",
+        self.btn_browse = ctk.CTkButton(row1, text="Browse", width=70, fg_color="gray30", hover_color="gray40",
                                         command=self._ai_browse_file)
-        self.btn_browse.pack(side="left", padx=(5, 15))
+        self.btn_browse.pack(side="left", padx=(0, 20))
+
+        # AI Config Buttons
+        self.btn_parser_guide = ctk.CTkButton(
+            row1, text="?", width=24, height=24, corner_radius=12,
+            fg_color="gray30", hover_color="gray40", font=("JetBrains Mono", 12, "bold"),
+            command=self._show_parser_guide
+        )
+        self.btn_parser_guide.pack(side="right")
+        ToolTip(self.btn_parser_guide, "How to customize the AI parser")
+
+        self.btn_edit_rules = ctk.CTkButton(
+            row1, text="Parser Rules", image=self.edit_rules_icon, width=110, height=24,
+            font=("JetBrains Mono", 11), fg_color="gray25", hover_color="gray35",
+            command=lambda: open_text_config("ai_prompt_template.txt", DEFAULT_PROMPT_TEMPLATE, allow_empty=False)
+        )
+        self.btn_edit_rules.pack(side="right", padx=(0, 5))
+        ToolTip(self.btn_edit_rules, "Edit the LLM System Prompt and examples")
+
+        self.btn_edit_skip = ctk.CTkButton(
+            row1, text="Skip Terms", image=self.edit_skip_icon, width=110, height=24,
+            font=("JetBrains Mono", 11), fg_color="gray25", hover_color="gray35",
+            command=lambda: open_text_config("ai_skip_terms.txt", DEFAULT_SKIP_TERMS_TEXT, allow_empty=True)
+        )
+        self.btn_edit_skip.pack(side="right", padx=(0, 5))
+        ToolTip(self.btn_edit_skip, "Edit terms the parser should ignore")
+
+        row2 = ctk.CTkFrame(self.ai_config_frame, fg_color="transparent")
+        row2.pack(fill="x", pady=(6, 12), padx=15)
 
         # Dropdowns
-        active_currencies = [c.code for c in self.db_session.query(Currency).filter_by(active_bool=True).order_by(collate(Currency.name, 'NOCASE')).all()]
+        active_currencies = [c.code for c in self.db_session.query(Currency).filter_by(active_bool=True).order_by(
+            collate(Currency.name, 'NOCASE')).all()]
         active_projects = ["None"] + [p.name for p in
-                                      self.db_session.query(Project).filter_by(active_bool=True).order_by(collate(Project.name, 'NOCASE')).all()]
+                                      self.db_session.query(Project).filter_by(active_bool=True).order_by(
+                                          collate(Project.name, 'NOCASE')).all()]
         current_year = str(datetime.datetime.now().year)
         years = [str(y) for y in range(int(current_year) - 2, int(current_year) + 3)]
 
-        ctk.CTkLabel(cmd_bar, text="Year:", font=("JetBrains Mono", 11, "bold")).pack(side="left")
-        self.ai_year_combo = ctk.CTkComboBox(cmd_bar, values=years, width=80)
+        ctk.CTkLabel(row2, text="Year:", font=("JetBrains Mono", 11, "bold")).pack(side="left")
+        self.ai_year_combo = ctk.CTkComboBox(row2, values=years, width=80)
         self.ai_year_combo.set(current_year)
-        self.ai_year_combo.pack(side="left", padx=(10, 15))
+        self.ai_year_combo.pack(side="left", padx=(10, 25))
         ToolTip(self.ai_year_combo, "Select from dropdown or manually type a year.")
 
-        ctk.CTkLabel(cmd_bar, text="Default Currency:", font=("JetBrains Mono", 11, "bold")).pack(side="left")
-        self.ai_curr_combo = ctk.CTkComboBox(cmd_bar, values=active_currencies, state="readonly", width=70)
+        ctk.CTkLabel(row2, text="Default Currency:", font=("JetBrains Mono", 11, "bold")).pack(side="left")
+        self.ai_curr_combo = ctk.CTkComboBox(row2, values=active_currencies, state="readonly", width=70)
         if self.manager.base_currency in active_currencies: self.ai_curr_combo.set(self.manager.base_currency)
-        self.ai_curr_combo.pack(side="left", padx=(10, 15))
+        self.ai_curr_combo.pack(side="left", padx=(10, 25))
         ToolTip(self.ai_curr_combo, "Select from dropdown.")
 
-        ctk.CTkLabel(cmd_bar, text="Tag Project:", font=("JetBrains Mono", 11, "bold")).pack(side="left")
-        self.ai_proj_combo = ctk.CTkComboBox(cmd_bar, values=active_projects, state="readonly", width=130)
+        ctk.CTkLabel(row2, text="Tag Project:", font=("JetBrains Mono", 11, "bold")).pack(side="left")
+        self.ai_proj_combo = ctk.CTkComboBox(row2, values=active_projects, state="readonly", width=130)
         self.ai_proj_combo.set("None")
         self.ai_proj_combo.pack(side="left", padx=(10, 20))
         ToolTip(self.ai_proj_combo, "Select from dropdown.")
 
-        self.btn_start_ai = ctk.CTkButton(cmd_bar, text="⚡ Start Parsing", fg_color="#1f538d", width=120,
+        # Action Buttons
+        self.btn_start_ai = ctk.CTkButton(row2, text="⚡ Start Parsing", fg_color="#1f538d", width=120,
                                           font=("JetBrains Mono", 12, "bold"), command=self._start_ai_thread)
-        self.btn_start_ai.pack(side="left")
 
-        self.btn_cancel_ai = ctk.CTkButton(cmd_bar, text="✕ Cancel", fg_color="#b13e3e", hover_color="#611a1a",
+        self.btn_cancel_ai = ctk.CTkButton(row2, text="✕ Cancel", fg_color="#b13e3e", hover_color="#611a1a",
                                            width=120, font=("JetBrains Mono", 12, "bold"),
                                            command=self._cancel_ai_thread)
 
-        self.btn_clear_ai = ctk.CTkButton(cmd_bar, text="↺ Clear Session", fg_color="gray40", hover_color="gray50",
-                                          width=120, font=("JetBrains Mono", 12, "bold"),
-                                          command=self._reset_ai_view)
+        self.btn_clear_ai = ctk.CTkButton(row2, text="↺ Clear Session", fg_color="gray40", hover_color="gray50",
+                                          width=120, font=("JetBrains Mono", 12, "bold"), command=self._reset_ai_view)
+
+        self.btn_start_ai.pack(side="right")
 
         self.progress_container = ctk.CTkFrame(self, fg_color="transparent", height=50)
         self.progress_container.pack_propagate(False)
@@ -200,7 +189,7 @@ class AIImportView(ctk.CTkFrame):
             "Housing Hotel 150 USD (FX 1.14 - including tax) credit"
         )
 
-        show_popup(self, title="Required File Format", message=msg, show_ok=True, width=450, height=480, message_wraplength=400)
+        show_popup(self, title="Required File Format", message=msg, show_ok=True, width=450, height=510, message_wraplength=400)
 
     def _show_parser_guide(self):
         """Displays a comprehensive guide on tailoring the LLM prompt."""
@@ -214,7 +203,7 @@ class AIImportView(ctk.CTkFrame):
             "For example: If your database uses 'Amex Card' instead of 'Credit Card', change it in the mapping table so the AI outputs the exact match!"
         )
 
-        show_popup(self, title="Customizing the AI", message=msg, show_ok=True, width=480, height=360, message_wraplength=430)
+        show_popup(self, title="Customizing the AI", message=msg, show_ok=True, width=480, height=390, message_wraplength=430)
 
     def _ai_browse_file(self):
         """Opens the OS file picker."""
@@ -269,7 +258,7 @@ class AIImportView(ctk.CTkFrame):
         self.ai_proj_combo.configure(state="disabled")
         self.btn_start_ai.pack_forget()
         self.btn_clear_ai.pack_forget()
-        self.btn_cancel_ai.pack(side="left")
+        self.btn_cancel_ai.pack(side="right")
         self.btn_cancel_ai.configure(state="normal")
         self.ai_status_lbl.configure(text="Connecting to Mistral 7B... Please wait.", text_color="#5AC8FA")
 
@@ -369,14 +358,14 @@ class AIImportView(ctk.CTkFrame):
 
             self.btn_cancel_ai.pack_forget()
             self.btn_clear_ai.pack_forget()
-            self.btn_start_ai.pack(side="left")
+            self.btn_start_ai.pack(side="right")
 
             self.staging_header.pack_forget()
 
         else:
             self.btn_cancel_ai.pack_forget()
             self.btn_start_ai.pack_forget()
-            self.btn_clear_ai.pack(side="left")
+            self.btn_clear_ai.pack(side="right")
             self.btn_clear_ai.configure(state="normal")
             self.preview_container.pack(fill="both", expand=True)
 
@@ -411,7 +400,7 @@ class AIImportView(ctk.CTkFrame):
         self.btn_browse.configure(state="normal")
 
         self.btn_cancel_ai.pack_forget()
-        self.btn_start_ai.pack(side="left")
+        self.btn_start_ai.pack(side="right")
         self.btn_start_ai.configure(state="normal")
 
         color = "orange" if "cancelled" in error_msg.lower() else "#FF6B6B"
@@ -422,7 +411,7 @@ class AIImportView(ctk.CTkFrame):
     def _on_ai_parsing_complete(self, parsed_results, year, project):
         """Runs on main thread: Receives data and build the staging grid."""
         self.btn_cancel_ai.pack_forget()
-        self.btn_clear_ai.pack(side="left")
+        self.btn_clear_ai.pack(side="right")
 
         self.ai_progress_bar.pack_forget()
 

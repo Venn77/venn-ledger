@@ -2,6 +2,7 @@ import customtkinter as ctk
 import tkinter as tk
 import datetime
 from utils.io_utils import extract_exchange_rate, validate_parsed_record
+from utils.ctk_utils import apply_dynamic_ellipsis
 
 
 class ToolTip:
@@ -14,8 +15,12 @@ class ToolTip:
         self.id = None
         self.widget.bind("<Enter>", self._schedule)
         self.widget.bind("<Leave>", self.hide_tip)
+        self.widget.bind("<ButtonPress>", self.hide_tip, add="+")
 
     def _schedule(self, _event=None):
+        if self.id:
+            self.widget.after_cancel(self.id)
+            self.id = None
         self.id = self.widget.after(self.delay, self.show_tip)
 
     def show_tip(self, _event=None):
@@ -24,6 +29,7 @@ class ToolTip:
 
         self.tip_window = tk.Toplevel(self.widget)
         self.tip_window.wm_overrideredirect(True)
+        self.tip_window.configure(bg="#1a1a1a")
         self.tip_window.attributes("-topmost", True)
 
         frame = ctk.CTkFrame(self.tip_window, fg_color="#181818", border_color="#5AC8FA", border_width=1,
@@ -361,7 +367,7 @@ class AIStagingRow(ctk.CTkFrame):
             self.grid_ref.check_master_validation()
 
 class TransactionRow(ctk.CTkFrame):
-    def __init__(self, master, main_app, data, char_limit, ent_char_limit, dec_map):
+    def __init__(self, master, main_app, data, dec_map):
         super().__init__(master, fg_color="gray15")
         self.main_app = main_app
         self.data = data
@@ -377,30 +383,45 @@ class TransactionRow(ctk.CTkFrame):
         style = colors.get(data.type, {"text": "white", "prefix": ""})
 
         # Render Columns
+        self.grid_columnconfigure(5, weight=1)
         # Date
-        self._add_lbl(data.ts.strftime("%Y-%m-%d"), width=75)
+        self._grid_lbl(data.ts.strftime("%Y-%m-%d"), col=0, width=75)
         # Vendor or Stream
-        if data.entity and len(data.entity) > ent_char_limit:
-            display_ent = data.entity[:ent_char_limit].strip() + "..."
-        else:
-            display_ent = data.entity
-        lbl_ent = self._add_lbl(display_ent or "Unknown", width=180, anchor="w", bold=True)
+        entity = data.entity or "Unknown"
+        self.ent_frame = ctk.CTkFrame(self, fg_color="transparent", width=180, height=24)
+        self.ent_frame.grid(row=0, column=1, padx=10, pady=2, sticky="w")
+        self.ent_frame.pack_propagate(False)  # Force frame to respect the 180px width
+
+        lbl_ent = ctk.CTkLabel(self.ent_frame, text=entity, anchor="w",
+                               text_color="white", font=("JetBrains Mono", 11, "bold"))
+        lbl_ent.place(relx=0, rely=0.5, relwidth=1.0, anchor="w")
+
+        apply_dynamic_ellipsis(self.ent_frame, lbl_ent, entity)
         if data.entity: ToolTip(lbl_ent, data.entity)
         # Category
-        self._add_lbl(data.category, width=120)
+        category = data.category or "Not Set"
+        self._grid_lbl(category, col=2, width=120)
         # Account or PM
-        self._add_lbl(data.pm_or_acc or "???", width=100, anchor="w", color="gray60")
+        self._grid_lbl(data.pm_or_acc or "???", col=3, width=100, anchor="w", color="gray60")
         # Project
-        self._add_lbl(data.proj_name or "", width=100, anchor="w", color="#5AC8FA")
+        self._grid_lbl(data.proj_name or "", col=4, width=100, anchor="w", color="#5AC8FA")
+
         # Description
-        desc_px_width = char_limit * 7 - 25
-        display_desc = (data.desc[:char_limit] + "...") if data.desc and len(data.desc) > char_limit else data.desc
-        lbl_desc = self._add_lbl(display_desc or "", width=desc_px_width, anchor="w", color="gray50")
-        if data.desc: ToolTip(lbl_desc, data.desc)
-        # Row Actions (Buttons will be packed only when cursor hovers over row)
+        desc = data.desc or ""
+        self.desc_frame = ctk.CTkFrame(self, fg_color="transparent", height=24)
+        self.desc_frame.grid(row=0, column=5, padx=10, pady=2, sticky="ew")
+
+        lbl_desc = ctk.CTkLabel(self.desc_frame, text=desc, anchor="w",
+                                text_color="gray50", font=("JetBrains Mono", 11))
+        lbl_desc.place(relx=0, rely=0.5, relwidth=1.0, anchor="w")
+
+        apply_dynamic_ellipsis(self.desc_frame, lbl_desc, desc)
+        if desc: ToolTip(lbl_desc, desc)
+
+        # Row Actions (visible when hovering over row)
         self.actions_frame = ctk.CTkFrame(self, fg_color="transparent", width=96, height=24)
         self.actions_frame.pack_propagate(False)
-        self.actions_frame.pack(side="left", padx=(10, 10))
+        self.actions_frame.grid(row=0, column=6, padx=(10, 10))
 
         btn_kwargs = {
             "width": 24,
@@ -422,12 +443,11 @@ class TransactionRow(ctk.CTkFrame):
         # Delete Button
         del_kwargs = btn_kwargs.copy()
         del_kwargs["hover_color"] = "#8b2525"
-
         self.btn_del = ctk.CTkButton(self.actions_frame, text="X", command=self._trigger_delete, **del_kwargs)
         ToolTip(self.btn_del, "Delete Transaction")
         # Amount
         amt_str = f"{style['prefix']}{data.amount:,.{dec_map.get(data.currency, 2)}f} {data.currency}"
-        lbl_amt = self._add_lbl(amt_str, width=170, anchor="e", color=style['text'], bold=True)
+        lbl_amt = self._grid_lbl(amt_str, col=7, width=170, anchor="e", color=style['text'], bold=True, sticky="e")
         if data.currency != main_app.manager.base_currency and "transfer" not in data.type:
             ToolTip(lbl_amt, f"Converted: {style['prefix']}{data.base_val:,.{main_app.manager.base_currency_decimals}f} {main_app.manager.base_currency} (Rate: {data.fx_rate})")
 
@@ -487,10 +507,10 @@ class TransactionRow(ctk.CTkFrame):
         bind_enter(self)
         self._bind_mouse_scroll(self)
 
-    def _add_lbl(self, text, width=0, anchor="center", expand=False, color="white", bold=False, side="left"):
+    def _grid_lbl(self, text, col, width=0, anchor="center", color="white", bold=False, sticky="w"):
         font = ("JetBrains Mono", 11, "bold") if bold else ("JetBrains Mono", 11)
         lbl = ctk.CTkLabel(self, text=text, width=width, anchor=anchor, text_color=color, font=font)
-        lbl.pack(side=side, padx=10, fill="x" if expand else None, expand=expand)
+        lbl.grid(row=0, column=col, padx=10, pady=2, sticky=sticky)
         return lbl
 
     def _bind_mouse_scroll(self, widget):

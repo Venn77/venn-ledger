@@ -36,10 +36,20 @@ class FinanceApp(ctk.CTk):
         if IS_COMPILED:
             self.report_callback_exception = global_exception_handler
         self.title("Venn Ledger 2026")
-        self.geometry("1440x700")
         set_app_window_icon(self)
-        self.minsize(1440,700)
-        self.maxsize(1440,980)
+
+        screen_w = self.winfo_screenwidth()
+        screen_h = self.winfo_screenheight()
+
+        app_w = min(1440, screen_w)
+        app_h = min(700, screen_h)
+
+        min_w = min(1200, screen_w)
+        min_h = min(600, screen_h)
+
+        self.geometry(f"{app_w}x{app_h}")
+        self.minsize(min_w, min_h)
+        self.maxsize(max(1440, screen_w), max(980, screen_h))
         ctk.set_appearance_mode("dark")
         self.db_session = Session()
         base_exists = self.db_session.query(Currency).filter_by(is_base=True).first()

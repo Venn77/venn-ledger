@@ -284,11 +284,7 @@ class TransactionsView(ctk.CTkFrame):
 
         results = query.order_by(desc(column("ts")),asc(column("type")),desc(column("id"))).offset(offset).limit(self.page_size).all()
 
-        char_limit = self.get_dynamic_char_limit()
-
-        ent_char_limit = char_limit - 7
-
-        self.grid_component.render_rows(results, char_limit, ent_char_limit, self.dec_map)
+        self.grid_component.render_rows(results, self.dec_map)
 
         self.update_pagination_ui(total_count, query)
 
@@ -623,19 +619,6 @@ class TransactionsView(ctk.CTkFrame):
             return start, end
 
         return None, None
-
-    def get_dynamic_char_limit(self):
-        """Calculates how many characters can fit in the Description gap."""
-        self.update_idletasks()
-        current_width = 1400
-        # Sum of static widths + sidebar:
-        static_space = 800+250+140
-
-        available_pixels = current_width - static_space
-
-        char_limit = int(available_pixels / 7)
-
-        return max(20, char_limit)
 
     def _search_focus_in(self):
         if self.search_entry.get() == self.search_placeholder:

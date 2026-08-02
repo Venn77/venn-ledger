@@ -189,7 +189,7 @@ class AIImportView(ctk.CTkFrame):
             "Housing Hotel 150 USD (FX 1.14 - including tax) credit"
         )
 
-        show_popup(self, title="Required File Format", message=msg, show_ok=True, width=450, height=510, message_wraplength=400)
+        show_popup(self, title="Required File Format", message=msg, show_ok=True, width=450, height=550, message_wraplength=400)
 
     def _show_parser_guide(self):
         """Displays a comprehensive guide on tailoring the LLM prompt."""
@@ -203,7 +203,7 @@ class AIImportView(ctk.CTkFrame):
             "For example: If your database uses 'Amex Card' instead of 'Credit Card', change it in the mapping table so the AI outputs the exact match!"
         )
 
-        show_popup(self, title="Customizing the AI", message=msg, show_ok=True, width=480, height=390, message_wraplength=430)
+        show_popup(self, title="Customizing the AI", message=msg, show_ok=True, width=480, height=440, message_wraplength=430)
 
     def _ai_browse_file(self):
         """Opens the OS file picker."""

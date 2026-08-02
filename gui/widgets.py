@@ -388,34 +388,22 @@ class TransactionRow(ctk.CTkFrame):
         self._grid_lbl(data.ts.strftime("%Y-%m-%d"), col=0, width=75)
         # Vendor or Stream
         entity = data.entity or "Unknown"
-        self.ent_frame = ctk.CTkFrame(self, fg_color="transparent", width=180, height=24)
-        self.ent_frame.grid(row=0, column=1, padx=10, pady=2, sticky="w")
-        self.ent_frame.pack_propagate(False)  # Force frame to respect the 180px width
-
-        lbl_ent = ctk.CTkLabel(self.ent_frame, text=entity, anchor="w",
-                               text_color="white", font=("JetBrains Mono", 11, "bold"))
-        lbl_ent.place(relx=0, rely=0.5, relwidth=1.0, anchor="w")
-
-        apply_dynamic_ellipsis(self.ent_frame, lbl_ent, entity)
-        if data.entity: ToolTip(lbl_ent, data.entity)
+        lbl_ent = self._grid_lbl(entity, col=1, width=180, anchor="w", bold=True)
+        if entity != "Unknown": ToolTip(lbl_ent, entity)
         # Category
         category = data.category or "Not Set"
-        self._grid_lbl(category, col=2, width=120)
+        lbl_cat = self._grid_lbl(category, col=2, width=120)
+        ToolTip(lbl_cat, category)
         # Account or PM
-        self._grid_lbl(data.pm_or_acc or "???", col=3, width=100, anchor="w", color="gray60")
+        lbl_acc = self._grid_lbl(data.pm_or_acc or "???", col=3, width=100, anchor="w", color="gray60")
+        ToolTip(lbl_acc, data.pm_or_acc or "Unknown Account")
         # Project
-        self._grid_lbl(data.proj_name or "", col=4, width=100, anchor="w", color="#5AC8FA")
-
+        proj = data.proj_name or ""
+        lbl_proj = self._grid_lbl(proj, col=4, width=100, anchor="w", color="#5AC8FA")
+        if proj: ToolTip(lbl_proj, proj)
         # Description
         desc = data.desc or ""
-        self.desc_frame = ctk.CTkFrame(self, fg_color="transparent", height=24)
-        self.desc_frame.grid(row=0, column=5, padx=10, pady=2, sticky="ew")
-
-        lbl_desc = ctk.CTkLabel(self.desc_frame, text=desc, anchor="w",
-                                text_color="gray50", font=("JetBrains Mono", 11))
-        lbl_desc.place(relx=0, rely=0.5, relwidth=1.0, anchor="w")
-
-        apply_dynamic_ellipsis(self.desc_frame, lbl_desc, desc)
+        lbl_desc = self._grid_lbl(desc, col=5, anchor="w", color="gray50", sticky="ew")
         if desc: ToolTip(lbl_desc, desc)
 
         # Row Actions (visible when hovering over row)
@@ -509,8 +497,14 @@ class TransactionRow(ctk.CTkFrame):
 
     def _grid_lbl(self, text, col, width=0, anchor="center", color="white", bold=False, sticky="w"):
         font = ("JetBrains Mono", 11, "bold") if bold else ("JetBrains Mono", 11)
-        lbl = ctk.CTkLabel(self, text=text, width=width, anchor=anchor, text_color=color, font=font)
-        lbl.grid(row=0, column=col, padx=10, pady=2, sticky=sticky)
+        frame = ctk.CTkFrame(self, fg_color="transparent", height=24)
+        if width > 0:
+            frame.configure(width=width)
+            frame.pack_propagate(False)
+        frame.grid(row=0, column=col, padx=10, pady=2, sticky=sticky)
+        lbl = ctk.CTkLabel(frame, text=text, text_color=color, font=font, anchor=anchor)
+        lbl.place(relx=0, rely=0.5, relwidth=1.0, anchor="w")
+        apply_dynamic_ellipsis(frame, lbl, text)
         return lbl
 
     def _bind_mouse_scroll(self, widget):

@@ -12,6 +12,7 @@ from config import CONFIG_PATH, APP_VERSION, IS_COMPILED, ERROR_LOG_PATH
 from database.models import Session, Account, Transfer, Currency
 from core import manager as finance_manager
 from utils.icon_manager import get_icon, set_app_window_icon
+from utils.ctk_utils import calculate_dialog_geometry
 from gui.transaction_forms import AddExpenseWindow, AddGainWindow, AddTransferWindow
 from gui.transactions_view import TransactionsView
 from gui.settings_view import SettingsView
@@ -44,8 +45,8 @@ class FinanceApp(ctk.CTk):
         app_w = min(1440, screen_w)
         app_h = min(700, screen_h)
 
-        min_w = min(1200, screen_w)
-        min_h = min(600, screen_h)
+        min_w = min(1280, screen_w)
+        min_h = min(650, screen_h)
 
         self.geometry(f"{app_w}x{app_h}")
         self.minsize(min_w, min_h)
@@ -501,14 +502,12 @@ class FinanceApp(ctk.CTk):
         popup = ctk.CTkToplevel(self)
         popup.withdraw()
         popup.title("Confirm Delete")
-        popup.geometry("350x170")
+        p_width = 350
+        p_height = 170
         set_app_window_icon(popup)
         popup.attributes("-topmost", True)
 
-        self.update_idletasks()
-        x = self.winfo_x() + (self.winfo_width() // 2) - 175
-        y = self.winfo_y() + (self.winfo_height() // 2) - 85
-        popup.geometry(f"+{x}+{y}")
+        popup.geometry(calculate_dialog_geometry(self, p_width, p_height))
 
         def cancel_action():
             if on_cancel: on_cancel()

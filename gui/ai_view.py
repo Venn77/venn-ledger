@@ -110,13 +110,13 @@ class AIImportView(ctk.CTkFrame):
         ToolTip(self.ai_year_combo, "Select from dropdown or manually type a year.")
 
         ctk.CTkLabel(row2, text="Default Currency:", font=("JetBrains Mono", 11, "bold")).pack(side="left")
-        self.ai_curr_combo = ctk.CTkComboBox(row2, values=active_currencies, state="readonly", width=70)
+        self.ai_curr_combo = ctk.CTkComboBox(row2, values=active_currencies, state="readonly", width=120)
         if self.manager.base_currency in active_currencies: self.ai_curr_combo.set(self.manager.base_currency)
         self.ai_curr_combo.pack(side="left", padx=(10, 25))
         ToolTip(self.ai_curr_combo, "Select from dropdown.")
 
         ctk.CTkLabel(row2, text="Tag Project:", font=("JetBrains Mono", 11, "bold")).pack(side="left")
-        self.ai_proj_combo = ctk.CTkComboBox(row2, values=active_projects, state="readonly", width=130)
+        self.ai_proj_combo = ctk.CTkComboBox(row2, values=active_projects, state="readonly", width=220)
         self.ai_proj_combo.set("None")
         self.ai_proj_combo.pack(side="left", padx=(10, 20))
         ToolTip(self.ai_proj_combo, "Select from dropdown.")

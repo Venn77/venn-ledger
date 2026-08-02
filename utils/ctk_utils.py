@@ -46,3 +46,24 @@ def apply_dynamic_ellipsis(container_frame, label_widget, full_text):
     container_frame.bind("<Configure>", _resize_text, add="+")
 
 
+def calculate_dialog_geometry(widget, width, height):
+    """
+    Calculates X anchored to the reference widget, and Y anchored to the mouse pointer.
+    Includes a safety clamp just in case the window is pushed against a screen edge.
+    """
+    widget.update_idletasks()
+
+    x = widget.winfo_rootx() + (widget.winfo_width() // 2) - (width // 2)
+
+    mouse_y = widget.winfo_pointery()
+    y = mouse_y - (height // 2)
+
+    screen_h = widget.winfo_screenheight()
+    if y < 40:
+        y = 40
+    elif y + height > screen_h - 40:
+        y = screen_h - height - 40
+
+    return f"{width}x{height}+{x}+{y}"
+
+

@@ -1,6 +1,7 @@
 import customtkinter as ctk
 from tkcalendar import Calendar
 from utils.icon_manager import set_app_window_icon
+from utils.ctk_utils import calculate_dialog_geometry
 import datetime
 
 
@@ -15,6 +16,9 @@ def open_calendar(parent, target_var, include_time=False):
     set_app_window_icon(parent.cal_window)
     parent.cal_window.title("Select Date")
     parent.cal_window.attributes("-topmost", True)
+
+    parent.cal_window.geometry(calculate_dialog_geometry(parent, 300, 300))
+
     # noinspection PyTypeChecker
     parent.cal_window.after(10, lambda: ctk.set_appearance_mode("dark"))
     # noinspection PyTypeChecker
@@ -122,14 +126,7 @@ class SimpleDataDialog(ctk.CTkToplevel):
         self.on_submit = on_submit
         self.has_desc = has_desc
 
-        self.update_idletasks()
-        ref_frame = parent
-        while ref_frame.master and ref_frame.master != parent.winfo_toplevel():
-            ref_frame = ref_frame.master
-
-        x = ref_frame.winfo_rootx() + (ref_frame.winfo_width() // 2) - (width // 2)
-        y = ref_frame.winfo_rooty() + (ref_frame.winfo_height() // 2) - (height // 2)
-        self.geometry(f"+{x}+{y}")
+        self.geometry(calculate_dialog_geometry(parent, width, height))
 
         ctk.CTkLabel(self, text="Name:", font=("JetBrains Mono", 12, "bold")).pack(pady=(15, 0))
         self.name_entry = ctk.CTkEntry(self, width=240)
@@ -191,14 +188,7 @@ class CurrencyDialog(ctk.CTkToplevel):
         set_app_window_icon(self)
         self.attributes("-topmost", True)
 
-        self.update_idletasks()
-        ref_frame = parent
-        while ref_frame.master and ref_frame.master != parent.winfo_toplevel():
-            ref_frame = ref_frame.master
-
-        x = ref_frame.winfo_rootx() + (ref_frame.winfo_width() // 2) - (width // 2)
-        y = ref_frame.winfo_rooty() + (ref_frame.winfo_height() // 2) - (height // 2)
-        self.geometry(f"+{x}+{y}")
+        self.geometry(calculate_dialog_geometry(parent, width, height))
 
         ctk.CTkLabel(self, text="Currency Code (Max 10 chars):", font=("JetBrains Mono", 11, "bold")).pack(pady=(15, 0))
         self.code_entry = ctk.CTkEntry(self, width=240)
@@ -344,14 +334,7 @@ class FXDialog(ctk.CTkToplevel):
         self.base_decimals = base_decimals
         self.on_submit = on_submit
 
-        self.update_idletasks()
-        ref_frame = parent
-        while ref_frame.master and ref_frame.master != parent.winfo_toplevel():
-            ref_frame = ref_frame.master
-
-        x = ref_frame.winfo_rootx() + (ref_frame.winfo_width() // 2) - (width // 2)
-        y = ref_frame.winfo_rooty() + (ref_frame.winfo_height() // 2) - (height // 2)
-        self.geometry(f"+{x}+{y}")
+        self.geometry(calculate_dialog_geometry(parent, width, height))
 
         ctk.CTkLabel(self, text="Foreign Currency:", font=("JetBrains Mono", 11, "bold")).pack(pady=(15, 0))
         self.code_var = ctk.StringVar(value=list(currency_data.keys())[0])
@@ -360,7 +343,8 @@ class FXDialog(ctk.CTkToplevel):
             values=list(currency_data.keys()),
             variable=self.code_var,
             width=240,
-            command=self._update_preview
+            command=self._update_preview,
+            dynamic_resizing=False
         )
         self.code_dropdown.pack(pady=(2, 10))
 
@@ -474,14 +458,7 @@ class AccountDialog(ctk.CTkToplevel):
 
         self.currency_data = currency_data
 
-        self.update_idletasks()
-        ref_frame = parent
-        while ref_frame.master and ref_frame.master != parent.winfo_toplevel():
-            ref_frame = ref_frame.master
-
-        x = ref_frame.winfo_rootx() + (ref_frame.winfo_width() // 2) - (width // 2)
-        y = ref_frame.winfo_rooty() + (ref_frame.winfo_height() // 2) - (height // 2)
-        self.geometry(f"+{x}+{y}")
+        self.geometry(calculate_dialog_geometry(parent, width, height))
 
         ctk.CTkLabel(self, text="Account Name:", font=("JetBrains Mono", 11, "bold")).pack(pady=(15, 0))
         self.name_entry = ctk.CTkEntry(self, width=260)
@@ -572,14 +549,7 @@ class PMDialog(ctk.CTkToplevel):
         self.attributes("-topmost", True)
         self.on_submit = on_submit
 
-        self.update_idletasks()
-        ref_frame = parent
-        while ref_frame.master and ref_frame.master != parent.winfo_toplevel():
-            ref_frame = ref_frame.master
-
-        x = ref_frame.winfo_rootx() + (ref_frame.winfo_width() // 2) - (width // 2)
-        y = ref_frame.winfo_rooty() + (ref_frame.winfo_height() // 2) - (height // 2)
-        self.geometry(f"+{x}+{y}")
+        self.geometry(calculate_dialog_geometry(parent, width, height))
 
         ctk.CTkLabel(self, text="Method Name (e.g. Santander Debit):", font=("JetBrains Mono", 11, "bold")).pack(
             pady=(15, 0))

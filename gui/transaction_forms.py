@@ -72,7 +72,7 @@ class BaseTransactionWindow(ctk.CTkToplevel):
                       self.db_session.query(Currency).filter_by(active_bool=True).order_by(collate(Currency.code, 'NOCASE')).all()]
         self.lbl_currency = ctk.CTkLabel(self, text="Currency", font=("JetBrains Mono", 13, "bold"), anchor="w")
         self.currency_menu = ctk.CTkOptionMenu(self, values=currencies, variable=self.currency_var,
-                                               command=self.on_currency_change)
+                                               command=self.on_currency_change, dynamic_resizing=False, width=280)
 
         self.lbl_fx = ctk.CTkLabel(self, text="Exchange Rate", font=("JetBrains Mono", 13, "bold"), anchor="w")
         self.fx_entry = ctk.CTkEntry(self)
@@ -82,7 +82,7 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         self.date_entry = ctk.CTkEntry(self.date_frame, textvariable=self.date_var, width=150)
         self.today_btn = ctk.CTkButton(self.date_frame, text="T", width=30, command=lambda: self.set_relative_date(0))
         self.yesterday_btn = ctk.CTkButton(self.date_frame, text="Y", width=30, command=lambda: self.set_relative_date(1))
-        self.date_btn = ctk.CTkButton(self.date_frame, text="📅", width=40, command=lambda: open_calendar(self, self.date_var, include_time=True))
+        self.date_btn = ctk.CTkButton(self.date_frame, text="🗓", width=40, command=lambda: open_calendar(self, self.date_var, include_time=True))
 
         self.lbl_desc = ctk.CTkLabel(self, text="Description", font=("JetBrains Mono", 13, "bold"), anchor="w")
         self.desc_entry = ctk.CTkEntry(self)
@@ -91,7 +91,7 @@ class BaseTransactionWindow(ctk.CTkToplevel):
 
         self.all_projects = [p.name for p in self.db_session.query(Project).filter_by(active_bool=True).order_by(
             collate(Project.name, 'NOCASE')).all()]
-        self.project_combo = SearchableComboBox(self, placeholder=self.proj_placeholder, values=self.all_projects,
+        self.project_combo = SearchableComboBox(self, placeholder=self.proj_placeholder, values=self.all_projects, width=280,
                                                 command=lambda _: self.validate_form())
         self.project_combo.inject_value(self.mem.get("project"))
         # noinspection PyProtectedMember
@@ -603,7 +603,7 @@ class AddExpenseWindow(BaseTransactionWindow):
         self.lbl_category = ctk.CTkLabel(self, text="Category", font=("JetBrains Mono", 13, "bold"), anchor="w")
         self.all_categories = [c.name for c in
                                self.db_session.query(Category).filter_by(active_bool=True).order_by(collate(Category.name, 'NOCASE')).all()]
-        self.category_combo = SearchableComboBox(self, placeholder=self.cat_placeholder, values=self.all_categories,
+        self.category_combo = SearchableComboBox(self, placeholder=self.cat_placeholder, values=self.all_categories, width=280,
                                                  command=lambda _: self.validate_form())
         self.category_combo.inject_value(self.mem.get("category"))
         # noinspection PyProtectedMember
@@ -613,7 +613,7 @@ class AddExpenseWindow(BaseTransactionWindow):
         self.lbl_vendor = ctk.CTkLabel(self, text="Vendor", font=("JetBrains Mono", 13, "bold"), anchor="w")
         self.all_vendors = [v.name for v in
                             self.db_session.query(Vendor).filter_by(active_bool=True).order_by(collate(Vendor.name, 'NOCASE')).all()]
-        self.vendor_combo = SearchableComboBox(self, placeholder=self.ven_placeholder, values=self.all_vendors,
+        self.vendor_combo = SearchableComboBox(self, placeholder=self.ven_placeholder, values=self.all_vendors, width=280,
                                                command=lambda _: self.validate_form())
         self.vendor_combo.inject_value(self.mem.get("entity"))
         # noinspection PyProtectedMember
@@ -621,7 +621,7 @@ class AddExpenseWindow(BaseTransactionWindow):
 
         # Payment Method
         self.lbl_pm = ctk.CTkLabel(self, text="Payment Method", font=("JetBrains Mono", 13, "bold"), anchor="w")
-        self.pm_menu = ctk.CTkOptionMenu(self, values=[])
+        self.pm_menu = ctk.CTkOptionMenu(self, values=[], dynamic_resizing=False, width=280)
 
         # Initialize PM list based on currency
         self.on_currency_change(self.mem["currency"])
@@ -727,7 +727,7 @@ class AddGainWindow(BaseTransactionWindow):
         self.lbl_stream = ctk.CTkLabel(self, text="Stream", font=("JetBrains Mono", 13, "bold"), anchor="w")
         self.all_streams = [s.name for s in
                                self.db_session.query(Stream).filter_by(active_bool=True).order_by(collate(Stream.name, 'NOCASE')).all()]
-        self.stream_combo = SearchableComboBox(self, placeholder=self.stream_placeholder, values=self.all_streams,
+        self.stream_combo = SearchableComboBox(self, placeholder=self.stream_placeholder, values=self.all_streams, width=280,
                                                  command=lambda _: self.validate_form())
         self.stream_combo.inject_value(self.mem.get("stream"))
         # noinspection PyProtectedMember
@@ -737,7 +737,7 @@ class AddGainWindow(BaseTransactionWindow):
         self.lbl_payer = ctk.CTkLabel(self, text="Payer", font=("JetBrains Mono", 13, "bold"), anchor="w")
         self.all_payers = [p.name for p in
                             self.db_session.query(Payer).filter_by(active_bool=True).order_by(collate(Payer.name, 'NOCASE')).all()]
-        self.payer_combo = SearchableComboBox(self, placeholder=self.payer_placeholder, values=self.all_payers,
+        self.payer_combo = SearchableComboBox(self, placeholder=self.payer_placeholder, values=self.all_payers, width=280,
                                                command=lambda _: self.validate_form())
         self.payer_combo.inject_value(self.mem.get("entity"))
         # noinspection PyProtectedMember
@@ -745,7 +745,7 @@ class AddGainWindow(BaseTransactionWindow):
 
         # Account
         self.lbl_acc = ctk.CTkLabel(self, text="Account", font=("JetBrains Mono", 13, "bold"), anchor="w")
-        self.acc_menu = ctk.CTkOptionMenu(self, values=[])
+        self.acc_menu = ctk.CTkOptionMenu(self, values=[], dynamic_resizing=False, width=280)
 
         # Initialize Account list based on currency
         self.on_currency_change(self.mem["currency"])
@@ -863,10 +863,10 @@ class AddTransferWindow(BaseTransactionWindow):
         self.dest_amount_placeholder = "Received Amount (e.g. 15.50)"
 
         self.lbl_origin = ctk.CTkLabel(self, text="From Account", font=("JetBrains Mono", 13, "bold"), anchor="w")
-        self.origin_menu = ctk.CTkOptionMenu(self, values=self.all_acc_names, command=self._sync_account_data)
+        self.origin_menu = ctk.CTkOptionMenu(self, values=self.all_acc_names, command=self._sync_account_data, dynamic_resizing=False, width=280)
 
         self.lbl_destination = ctk.CTkLabel(self, text="To Account", font=("JetBrains Mono", 13, "bold"), anchor="w")
-        self.dest_menu = ctk.CTkOptionMenu(self, values=self.all_acc_names, command=self._sync_account_data)
+        self.dest_menu = ctk.CTkOptionMenu(self, values=self.all_acc_names, command=self._sync_account_data, dynamic_resizing=False, width=280)
 
         self.swap_btn = ctk.CTkButton(self, text="⇅ Swap", width=50, height=24, fg_color="transparent", text_color="gray60", hover_color="gray25", font=("JetBrains Mono", 12),
                                       command=self.swap_accounts)

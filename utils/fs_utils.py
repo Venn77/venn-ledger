@@ -162,7 +162,7 @@ def open_text_config(filename, default_content, allow_empty=False):
             if "LD_LIBRARY_PATH_ORIG" in clean_env:
                 clean_env["LD_LIBRARY_PATH"] = clean_env["LD_LIBRARY_PATH_ORIG"]
 
-            linux_editors = ["kwrite", "kate", "gedit", "xdg-open"]
+            linux_editors = ["kwrite", "kate", "gedit", "mousepad", "xed", "pluma", "xdg-open"]
 
             opened = False
             for editor in linux_editors:

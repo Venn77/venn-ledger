@@ -67,7 +67,8 @@ class TransactionsView(ctk.CTkFrame):
             values=["All Time", "Today", "Last 7 Days", "This Month", "Last Month", "This Year", "Custom..."],
             variable=self.date_filter_var,
             command=self.on_date_filter_change,
-            width=120
+            width=115,
+            dynamic_resizing=False
         )
         self.date_menu.pack(side="left")
 
@@ -108,40 +109,40 @@ class TransactionsView(ctk.CTkFrame):
 
         self.custom_date_frame = ctk.CTkFrame(self.filter_bar, fg_color="transparent")
 
-        ctk.CTkLabel(self.custom_date_frame, text="From:").pack(side="left", padx=2)
-        self.start_entry = ctk.CTkEntry(self.custom_date_frame, textvariable=self.start_date_var, width=90)
-        self.start_entry.pack(side="left", padx=2)
+        ctk.CTkLabel(self.custom_date_frame, text="From:").pack(side="left", padx=(5, 2))
+        self.start_entry = ctk.CTkEntry(self.custom_date_frame, textvariable=self.start_date_var, width=80)
+        self.start_entry.pack(side="left")
 
         self.start_cal_btn = ctk.CTkButton(
-            self.custom_date_frame, text="📅", width=30,
+            self.custom_date_frame, text="🗓", width=28,
             command=lambda: open_calendar(self, self.start_date_var, include_time=False)
         )
-        self.start_cal_btn.pack(side="left", padx=(0, 10))
+        self.start_cal_btn.pack(side="left", padx=(2, 5))
 
-        ctk.CTkLabel(self.custom_date_frame, text="To:").pack(side="left", padx=2)
-        self.end_entry = ctk.CTkEntry(self.custom_date_frame, textvariable=self.end_date_var, width=90)
-        self.end_entry.pack(side="left", padx=2)
+        ctk.CTkLabel(self.custom_date_frame, text="To:").pack(side="left", padx=(5, 2))
+        self.end_entry = ctk.CTkEntry(self.custom_date_frame, textvariable=self.end_date_var, width=80)
+        self.end_entry.pack(side="left")
 
         self.end_cal_btn = ctk.CTkButton(
-            self.custom_date_frame, text="📅", width=30,
+            self.custom_date_frame, text="🗓", width=28,
             command=lambda: open_calendar(self, self.end_date_var, include_time=False)
         )
-        self.end_cal_btn.pack(side="left", padx=(0, 10))
+        self.end_cal_btn.pack(side="left", padx=(2, 5))
 
-        self.apply_date_btn = ctk.CTkButton(self.custom_date_frame, text="Apply", width=60, command=self.load_transactions)
-        self.apply_date_btn.pack(side="left", padx=5)
+        self.apply_date_btn = ctk.CTkButton(self.custom_date_frame, text="Apply", width=50, command=self.load_transactions)
+        self.apply_date_btn.pack(side="left", padx=2)
 
         self.type_filter_frame = ctk.CTkFrame(self.filter_bar, fg_color="transparent")
-        self.type_filter_frame.pack(side="right", padx=(20, 0))
+        self.type_filter_frame.pack(side="right", padx=(10, 0))
 
-        ctk.CTkLabel(self.type_filter_frame, text="Type:", font=("JetBrains Mono", 12, "bold")).pack(side="left",
-                                                                                                     padx=(0, 10))
+        # ctk.CTkLabel(self.type_filter_frame, text="Type:", font=("JetBrains Mono", 12, "bold")).pack(side="left",
+        #                                                                                              padx=(0, 5))
 
         self.project_filter_frame = ctk.CTkFrame(self.filter_bar, fg_color="transparent")
-        self.project_filter_frame.pack(side="right", padx=(20, 0))
+        self.project_filter_frame.pack(side="right", padx=(10, 0))
 
-        ctk.CTkLabel(self.project_filter_frame, text="Project:", font=("JetBrains Mono", 12, "bold")).pack(side="left",
-                                                                                                           padx=(0, 10))
+        # ctk.CTkLabel(self.project_filter_frame, text="Project:", font=("JetBrains Mono", 12, "bold")).pack(side="left",
+        #                                                                                                    padx=(0, 10))
 
         self.project_filter_var = ctk.StringVar(value="All Projects")
         projects = ["All Projects", "No Project"] + [p.name for p in
@@ -153,7 +154,8 @@ class TransactionsView(ctk.CTkFrame):
             values=projects,
             variable=self.project_filter_var,
             command=self._on_project_filter_change,
-            width=140
+            width=170,
+            dynamic_resizing=False
         )
         self.project_menu.pack(side="left")
 
@@ -687,7 +689,7 @@ class TransactionsView(ctk.CTkFrame):
         else:
             self.time_nav_frame.pack_forget()
             if selection == "Custom...":
-                self.custom_date_frame.pack(side="left", padx=20)
+                self.custom_date_frame.pack(side="left", padx=5)
             else:
                 self.custom_date_frame.pack_forget()
                 self.current_page = 0

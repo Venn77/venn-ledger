@@ -9,6 +9,7 @@ from gui.dialogs import (
     AccountDialog, PMDialog, show_popup
 )
 from utils.icon_manager import set_app_window_icon
+from utils.ctk_utils import calculate_dialog_geometry
 
 
 class PaginationMixin:
@@ -487,10 +488,7 @@ class ExchangeRateGrid(ctk.CTkFrame, PaginationMixin):
         set_app_window_icon(popup)
         popup.attributes("-topmost", True)
 
-        self.update_idletasks()
-        x = self.winfo_x() + (self.winfo_width() // 2) - (width // 2)
-        y = self.winfo_y() + (self.winfo_height() // 2) - (height // 2)
-        popup.geometry(f"+{x}+{y}")
+        popup.geometry(calculate_dialog_geometry(self, width, height))
 
         ctk.CTkLabel(popup, text="Delete this exchange rate?", font=("JetBrains Mono", 12)).pack(pady=(20, 5))
         ctk.CTkLabel(popup, text=context_text, font=("JetBrains Mono", 11), text_color="orange").pack(pady=(0, 15))
@@ -617,11 +615,12 @@ class AccountGrid(ctk.CTkFrame, PaginationMixin):
             popup = ctk.CTkToplevel(self)
             popup.withdraw()
             popup.title("Warning")
-            popup.geometry("350x180")
+            p_width = 350
+            p_height = 180
+            popup.geometry(f"{p_width}x{p_height}")
             set_app_window_icon(popup)
             popup.attributes("-topmost", True)
-            self.update_idletasks()
-            popup.geometry(f"+{self.winfo_x() + 100}+{self.winfo_y() + 100}")
+            popup.geometry(calculate_dialog_geometry(self, p_width, p_height))
 
             msg = f"Account '{acc.name}' has a balance of {acc.balance:,.{acc.currency.decimals}f}.\n\nDeactivating it hides it from menus and\ndeactivates its Payment Methods, but the\nbalance will STILL count toward Net Worth.\n\nProceed?"
             ctk.CTkLabel(popup, text=msg, font=("JetBrains Mono", 11)).pack(pady=15)

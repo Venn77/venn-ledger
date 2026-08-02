@@ -77,6 +77,7 @@ class FinanceApp(ctk.CTk):
         self.trending_up_icon = get_icon("trending_up.png", size=(18, 18), light_filename="trending_up_lm.png")
         self.settings_icon = get_icon("settings.png", size=(18, 18), light_filename="settings_lm.png")
         self.reorder_icon = get_icon("swap_vert.png", size=(15, 15), light_filename="swap_vert_lm.png")
+        self.calendar_icon = get_icon("calendar_white.png", size=(14, 14))
 
         # 1. Grid Configuration
         self.grid_columnconfigure(1, weight=1)

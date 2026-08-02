@@ -199,17 +199,22 @@ class SettingsView(ctk.CTkFrame):
 
     def _start_cloud_backup_process(self, waiting_for_auth=False):
         """Performs local zip backup before initiating cloud backup."""
+        filename = f"VennLedger_CloudBackup_{datetime.date.today().strftime('%Y%m%d')}.zip"
+        temp_filepath = os.path.join(USER_CONFIG_DIR, filename)
+
         def abort_backup():
             self._backup_cancelled = True
+            if os.path.exists(temp_filepath):
+                try:
+                    os.remove(temp_filepath)
+                except OSError:
+                    pass
 
         title = "Authenticating..." if waiting_for_auth else "Cloud Backup"
         msg = "Waiting for Google Login in your browser..." if waiting_for_auth else "Uploading data to Drive..."
 
         self.loading_popup = show_popup(self, title, msg, show_ok=False, show_cancel=waiting_for_auth, cancel_command=abort_backup)
         self.update()
-
-        filename = f"VennLedger_CloudBackup_{datetime.date.today().strftime('%Y%m%d')}.zip"
-        temp_filepath = os.path.join(USER_CONFIG_DIR, filename)
 
         success, message = create_full_backup_zip(self.app.db_session, DB_PATH, temp_filepath)
 

@@ -8,7 +8,7 @@ from database.models import (
 from gui.widgets import SearchableComboBox, ToolTip
 from gui.dialogs import open_calendar, show_popup
 from utils.io_utils import format_input_float
-from utils.icon_manager import set_app_window_icon
+from utils.icon_manager import set_app_window_icon, get_icon
 
 
 class BaseTransactionWindow(ctk.CTkToplevel):
@@ -82,7 +82,7 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         self.date_entry = ctk.CTkEntry(self.date_frame, textvariable=self.date_var, width=150)
         self.today_btn = ctk.CTkButton(self.date_frame, text="T", width=30, command=lambda: self.set_relative_date(0))
         self.yesterday_btn = ctk.CTkButton(self.date_frame, text="Y", width=30, command=lambda: self.set_relative_date(1))
-        self.date_btn = ctk.CTkButton(self.date_frame, text="🗓", width=40, command=lambda: open_calendar(self, self.date_var, include_time=True))
+        self.date_btn = ctk.CTkButton(self.date_frame, text="", image=parent.calendar_icon, width=40, command=lambda: open_calendar(self, self.date_var, include_time=True))
 
         self.lbl_desc = ctk.CTkLabel(self, text="Description", font=("JetBrains Mono", 13, "bold"), anchor="w")
         self.desc_entry = ctk.CTkEntry(self)

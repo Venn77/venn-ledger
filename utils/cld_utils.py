@@ -46,8 +46,20 @@ def upload_to_drive(filepath, filename):
                 return False, error_msg
 
             flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_PATH, SCOPES)
-            # noinspection PyUnresolvedReferences
-            creds = flow.run_local_server(port=0)
+
+            original_ld = os.environ.get("LD_LIBRARY_PATH")
+            if original_ld:
+                if "LD_LIBRARY_PATH_ORIG" in os.environ:
+                    os.environ["LD_LIBRARY_PATH"] = os.environ["LD_LIBRARY_PATH_ORIG"]
+                else:
+                    del os.environ["LD_LIBRARY_PATH"]
+
+            try:
+                # noinspection PyUnresolvedReferences
+                creds = flow.run_local_server(port=0)
+            finally:
+                if original_ld:
+                    os.environ["LD_LIBRARY_PATH"] = original_ld
 
         with open(TOKEN_PATH, 'w') as token:
             token.write(creds.to_json())

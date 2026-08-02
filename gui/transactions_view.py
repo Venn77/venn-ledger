@@ -110,21 +110,21 @@ class TransactionsView(ctk.CTkFrame):
         self.custom_date_frame = ctk.CTkFrame(self.filter_bar, fg_color="transparent")
 
         ctk.CTkLabel(self.custom_date_frame, text="From:").pack(side="left", padx=(5, 2))
-        self.start_entry = ctk.CTkEntry(self.custom_date_frame, textvariable=self.start_date_var, width=80)
+        self.start_entry = ctk.CTkEntry(self.custom_date_frame, textvariable=self.start_date_var, width=85)
         self.start_entry.pack(side="left")
 
         self.start_cal_btn = ctk.CTkButton(
-            self.custom_date_frame, text="🗓", width=28,
+            self.custom_date_frame, text="", width=28, image=self.app.calendar_icon,
             command=lambda: open_calendar(self, self.start_date_var, include_time=False)
         )
         self.start_cal_btn.pack(side="left", padx=(2, 5))
 
         ctk.CTkLabel(self.custom_date_frame, text="To:").pack(side="left", padx=(5, 2))
-        self.end_entry = ctk.CTkEntry(self.custom_date_frame, textvariable=self.end_date_var, width=80)
+        self.end_entry = ctk.CTkEntry(self.custom_date_frame, textvariable=self.end_date_var, width=85)
         self.end_entry.pack(side="left")
 
         self.end_cal_btn = ctk.CTkButton(
-            self.custom_date_frame, text="🗓", width=28,
+            self.custom_date_frame, text="", width=28, image=self.app.calendar_icon,
             command=lambda: open_calendar(self, self.end_date_var, include_time=False)
         )
         self.end_cal_btn.pack(side="left", padx=(2, 5))

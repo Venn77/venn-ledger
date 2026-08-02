@@ -1,6 +1,6 @@
 import csv
 import zipfile
-import os, sys, subprocess
+import os, sys, subprocess, shutil
 from sqlalchemy import text
 from config import USER_CONFIG_DIR
 from database.models import Expense, Gain, Transfer, Currency
@@ -155,7 +155,30 @@ def open_text_config(filename, default_content, allow_empty=False):
         elif sys.platform == "darwin":
             subprocess.Popen(['open', file_path])
         else:
-            subprocess.Popen(['xdg-open', file_path])
+            clean_env = os.environ.copy()
+
+            clean_env.pop("LD_LIBRARY_PATH", None)
+
+            if "LD_LIBRARY_PATH_ORIG" in clean_env:
+                clean_env["LD_LIBRARY_PATH"] = clean_env["LD_LIBRARY_PATH_ORIG"]
+
+            linux_editors = ["kwrite", "kate", "gedit", "xdg-open"]
+
+            opened = False
+            for editor in linux_editors:
+                if shutil.which(editor):
+                    try:
+                        subprocess.Popen([editor, file_path],
+                                         env=clean_env,
+                                         stdout=subprocess.DEVNULL,
+                                         stderr=subprocess.DEVNULL)
+                        opened = True
+                        break
+                    except Exception as e:
+                        print(f"Tried {editor} but failed: {e}")
+
+            if not opened:
+                print("Error: Could not find a suitable text editor.")
 
     except Exception as e:
         print(f"Failed to open config file: {e}")

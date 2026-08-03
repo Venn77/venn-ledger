@@ -81,8 +81,8 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         self.lbl_date = ctk.CTkLabel(self, text="Date & Time", font=("JetBrains Mono", 13, "bold"), anchor="w")
         self.date_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.date_entry = ctk.CTkEntry(self.date_frame, textvariable=self.date_var, width=150)
-        self.today_btn = ctk.CTkButton(self.date_frame, text="T", width=30 + BTN_WIDTH_MOD, command=lambda: self.set_relative_date(0))
-        self.yesterday_btn = ctk.CTkButton(self.date_frame, text="Y", width=30 + BTN_WIDTH_MOD, command=lambda: self.set_relative_date(1))
+        self.today_btn = ctk.CTkButton(self.date_frame, text="T", width=30, command=lambda: self.set_relative_date(0))
+        self.yesterday_btn = ctk.CTkButton(self.date_frame, text="Y", width=30, command=lambda: self.set_relative_date(1))
         self.date_btn = ctk.CTkButton(self.date_frame, text="", image=parent.calendar_icon, width=40 + BTN_WIDTH_MOD, command=lambda: open_calendar(self, self.date_var, include_time=True))
 
         self.lbl_desc = ctk.CTkLabel(self, text="Description", font=("JetBrains Mono", 13, "bold"), anchor="w")

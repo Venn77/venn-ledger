@@ -1,6 +1,5 @@
 import customtkinter as ctk
 import datetime
-from config import BTN_WIDTH_MOD
 from database.models import (
     Account, Expense, Gain, Category,
     PaymentMethod, Vendor, Project,
@@ -115,7 +114,7 @@ class TransactionsView(ctk.CTkFrame):
         self.start_entry.pack(side="left")
 
         self.start_cal_btn = ctk.CTkButton(
-            self.custom_date_frame, text="", width=28 + BTN_WIDTH_MOD, image=self.app.calendar_icon,
+            self.custom_date_frame, text="", width=28, image=self.app.calendar_icon,
             command=lambda: open_calendar(self, self.start_date_var, include_time=False)
         )
         self.start_cal_btn.pack(side="left", padx=(2, 5))
@@ -125,7 +124,7 @@ class TransactionsView(ctk.CTkFrame):
         self.end_entry.pack(side="left")
 
         self.end_cal_btn = ctk.CTkButton(
-            self.custom_date_frame, text="", width=28 + BTN_WIDTH_MOD, image=self.app.calendar_icon,
+            self.custom_date_frame, text="", width=28, image=self.app.calendar_icon,
             command=lambda: open_calendar(self, self.end_date_var, include_time=False)
         )
         self.end_cal_btn.pack(side="left", padx=(2, 5))
@@ -136,14 +135,8 @@ class TransactionsView(ctk.CTkFrame):
         self.type_filter_frame = ctk.CTkFrame(self.filter_bar, fg_color="transparent")
         self.type_filter_frame.pack(side="right", padx=(10, 0))
 
-        # ctk.CTkLabel(self.type_filter_frame, text="Type:", font=("JetBrains Mono", 12, "bold")).pack(side="left",
-        #                                                                                              padx=(0, 5))
-
         self.project_filter_frame = ctk.CTkFrame(self.filter_bar, fg_color="transparent")
         self.project_filter_frame.pack(side="right", padx=(10, 0))
-
-        # ctk.CTkLabel(self.project_filter_frame, text="Project:", font=("JetBrains Mono", 12, "bold")).pack(side="left",
-        #                                                                                                    padx=(0, 10))
 
         self.project_filter_var = ctk.StringVar(value="All Projects")
         projects = ["All Projects", "No Project"] + [p.name for p in

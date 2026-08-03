@@ -3,7 +3,7 @@ import customtkinter as ctk
 import matplotlib.pyplot as plt
 from tkinter import TclError
 from typing import Any
-from config import CONFIG_PATH, APP_VERSION, IS_COMPILED, ERROR_LOG_PATH
+from config import CONFIG_PATH, APP_VERSION, IS_COMPILED, ERROR_LOG_PATH, UI_SCALE
 from database.models import Session, Account, Transfer, Currency
 from core import manager as finance_manager
 from utils.icon_manager import get_icon, set_app_window_icon
@@ -34,18 +34,21 @@ class FinanceApp(ctk.CTk):
         self.title("Venn Ledger 2026")
         set_app_window_icon(self)
 
-        screen_w = self.winfo_screenwidth()
-        screen_h = self.winfo_screenheight()
+        physical_screen_w = self.winfo_screenwidth()
+        physical_screen_h = self.winfo_screenheight()
 
-        app_w = min(1440, screen_w)
-        app_h = min(700, screen_h)
+        logical_screen_w = int(physical_screen_w / UI_SCALE)
+        logical_screen_h = int(physical_screen_h / UI_SCALE)
 
-        min_w = min(1280, screen_w)
-        min_h = min(650, screen_h)
+        app_w = min(1440, logical_screen_w)
+        app_h = min(700, logical_screen_h)
+
+        min_w = min(1270, logical_screen_w)
+        min_h = min(650, logical_screen_h)
 
         self.geometry(f"{app_w}x{app_h}")
         self.minsize(min_w, min_h)
-        self.maxsize(max(1440, screen_w), max(980, screen_h))
+        self.maxsize(max(1440, logical_screen_w), max(980, logical_screen_h))
         ctk.set_appearance_mode("dark")
         self.db_session = Session()
         base_exists = self.db_session.query(Currency).filter_by(is_base=True).first()

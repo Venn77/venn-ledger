@@ -33,11 +33,11 @@ CONFIG_PATH = os.path.join(USER_CONFIG_DIR, "ui_prefs.json")
 ERROR_LOG_PATH = os.path.join(LOG_DIR, "error.log")
 
 if sys.platform != "win32":
-    ctk.set_widget_scaling(0.9)
-    ctk.set_window_scaling(0.9)
-    BTN_WIDTH_MOD = 5
+    UI_SCALE = 0.9
+    ctk.set_widget_scaling(UI_SCALE)
+    ctk.set_window_scaling(UI_SCALE)
 else:
-    BTN_WIDTH_MOD = 0
+    UI_SCALE = 1.0
 
 os.makedirs(DB_DIR, exist_ok=True)
 os.makedirs(USER_CONFIG_DIR, exist_ok=True)

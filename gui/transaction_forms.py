@@ -1,11 +1,11 @@
 import customtkinter as ctk
 import datetime, re
 from sqlalchemy import collate
-from config import BTN_WIDTH_MOD
 from database.models import (
     Currency, Project, Category, Vendor,
     PaymentMethod, Account, Stream, Payer
 )
+from config import UI_SCALE
 from gui.widgets import SearchableComboBox, ToolTip
 from gui.dialogs import open_calendar, show_popup
 from utils.io_utils import format_input_float
@@ -17,10 +17,10 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         super().__init__(parent)
         self.title(title)
         self.db_session = db_session
-        self.center_relative_to_parent(width=450, height=585)
-
-        self.minsize(450, 585)
-        self.maxsize(450, 585)
+        base_w = int(450 / UI_SCALE)
+        self.center_relative_to_parent(width=base_w, height=585)
+        self.minsize(base_w, 585)
+        self.maxsize(base_w, 585)
         set_app_window_icon(self)
         self.manager = manager
         self.transaction_data = transaction_data
@@ -83,7 +83,7 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         self.date_entry = ctk.CTkEntry(self.date_frame, textvariable=self.date_var, width=150)
         self.today_btn = ctk.CTkButton(self.date_frame, text="T", width=30, command=lambda: self.set_relative_date(0))
         self.yesterday_btn = ctk.CTkButton(self.date_frame, text="Y", width=30, command=lambda: self.set_relative_date(1))
-        self.date_btn = ctk.CTkButton(self.date_frame, text="", image=parent.calendar_icon, width=40 + BTN_WIDTH_MOD, command=lambda: open_calendar(self, self.date_var, include_time=True))
+        self.date_btn = ctk.CTkButton(self.date_frame, text="", image=parent.calendar_icon, width=40, command=lambda: open_calendar(self, self.date_var, include_time=True))
 
         self.lbl_desc = ctk.CTkLabel(self, text="Description", font=("JetBrains Mono", 13, "bold"), anchor="w")
         self.desc_entry = ctk.CTkEntry(self)

@@ -1,4 +1,5 @@
 import os, sys
+import customtkinter as ctk
 
 
 APP_VERSION = "v1.0.0"
@@ -30,6 +31,13 @@ CREDENTIALS_PATH = os.path.join(USER_CONFIG_DIR, "credentials.json")
 TOKEN_PATH = os.path.join(USER_CONFIG_DIR, "token.json")
 CONFIG_PATH = os.path.join(USER_CONFIG_DIR, "ui_prefs.json")
 ERROR_LOG_PATH = os.path.join(LOG_DIR, "error.log")
+
+if sys.platform != "win32":
+    ctk.set_widget_scaling(0.9)
+    ctk.set_window_scaling(0.9)
+    BTN_WIDTH_MOD = 5
+else:
+    BTN_WIDTH_MOD = 0
 
 os.makedirs(DB_DIR, exist_ok=True)
 os.makedirs(USER_CONFIG_DIR, exist_ok=True)

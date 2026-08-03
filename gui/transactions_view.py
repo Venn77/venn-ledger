@@ -1,5 +1,6 @@
 import customtkinter as ctk
 import datetime
+from config import BTN_WIDTH_MOD
 from database.models import (
     Account, Expense, Gain, Category,
     PaymentMethod, Vendor, Project,
@@ -114,7 +115,7 @@ class TransactionsView(ctk.CTkFrame):
         self.start_entry.pack(side="left")
 
         self.start_cal_btn = ctk.CTkButton(
-            self.custom_date_frame, text="", width=28, image=self.app.calendar_icon,
+            self.custom_date_frame, text="", width=28 + BTN_WIDTH_MOD, image=self.app.calendar_icon,
             command=lambda: open_calendar(self, self.start_date_var, include_time=False)
         )
         self.start_cal_btn.pack(side="left", padx=(2, 5))
@@ -124,7 +125,7 @@ class TransactionsView(ctk.CTkFrame):
         self.end_entry.pack(side="left")
 
         self.end_cal_btn = ctk.CTkButton(
-            self.custom_date_frame, text="", width=28, image=self.app.calendar_icon,
+            self.custom_date_frame, text="", width=28 + BTN_WIDTH_MOD, image=self.app.calendar_icon,
             command=lambda: open_calendar(self, self.end_date_var, include_time=False)
         )
         self.end_cal_btn.pack(side="left", padx=(2, 5))
@@ -154,7 +155,7 @@ class TransactionsView(ctk.CTkFrame):
             values=projects,
             variable=self.project_filter_var,
             command=self._on_project_filter_change,
-            width=170,
+            width=160,
             dynamic_resizing=False
         )
         self.project_menu.pack(side="left")

@@ -1,10 +1,5 @@
 import json, os, sys, traceback
 import customtkinter as ctk
-
-if sys.platform != "win32":
-    ctk.set_widget_scaling(0.9)
-    ctk.set_window_scaling(0.9)
-
 import matplotlib.pyplot as plt
 from tkinter import TclError
 from typing import Any

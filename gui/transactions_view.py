@@ -148,7 +148,7 @@ class TransactionsView(ctk.CTkFrame):
             values=projects,
             variable=self.project_filter_var,
             command=self._on_project_filter_change,
-            width=150,
+            width=170,
             dynamic_resizing=False
         )
         self.project_menu.pack(side="left")

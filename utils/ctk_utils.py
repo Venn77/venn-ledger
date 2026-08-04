@@ -1,6 +1,20 @@
 import customtkinter as ctk
 
 
+def create_ellipsis_label(container, text, width, font, color="white", height=24):
+    """
+    Create a bounded frame with dynamic text ellipsis.
+    'container' is the parent widget holding the fixed-width frame.
+    """
+    frame = ctk.CTkFrame(container, fg_color="transparent", width=width, height=height)
+    frame.pack_propagate(False)
+
+    lbl = ctk.CTkLabel(frame, text=text, anchor="w", font=font, text_color=color)
+    lbl.place(relx=0, rely=0.5, relwidth=1.0, anchor="w")
+
+    apply_dynamic_ellipsis(frame, lbl, text)
+    return frame, lbl
+
 def apply_dynamic_ellipsis(container_frame, label_widget, full_text):
     """
     Binds a resize listener to the container_frame to dynamically truncate

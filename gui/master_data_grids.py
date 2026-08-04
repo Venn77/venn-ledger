@@ -8,8 +8,9 @@ from gui.dialogs import (
     SimpleDataDialog, CurrencyDialog, FXDialog,
     AccountDialog, PMDialog, show_popup
 )
+from gui.widgets import ToolTip
 from utils.icon_manager import set_app_window_icon
-from utils.ctk_utils import calculate_dialog_geometry
+from utils.ctk_utils import calculate_dialog_geometry, create_ellipsis_label
 
 
 class PaginationMixin:
@@ -163,14 +164,15 @@ class SimpleMasterDataGrid(ctk.CTkFrame, PaginationMixin):
             row = ctk.CTkFrame(self.scroll, fg_color="gray20", corner_radius=6)
             row.pack(fill="x", pady=2, padx=2)
 
-            name_lbl = ctk.CTkLabel(row, text=item.name, width=150, anchor="w", font=("JetBrains Mono", 12, "bold"))
-            name_lbl.pack(side="left", padx=10, pady=8)
+            name_frame, name_lbl = create_ellipsis_label(row, item.name, 150, ("JetBrains Mono", 12, "bold"))
+            ToolTip(name_lbl, item.name)
+            name_frame.pack(side="left", padx=10, pady=8)
 
             if self.has_desc and hasattr(item, 'description'):
-                desc_text = (item.description[:30] + '...') if item.description and len(
-                    item.description) > 30 else item.description
-                ctk.CTkLabel(row, text=desc_text or "", width=150, anchor="w", text_color="gray60").pack(side="left",
-                                                                                                         padx=10)
+                desc = item.description or ""
+                desc_frame, desc_lbl = create_ellipsis_label(row, desc, 150, ("JetBrains Mono", 11), "gray60")
+                ToolTip(desc_lbl, desc)
+                desc_frame.pack(side="left", padx=10)
 
             # Action Buttons
             btn_frame = ctk.CTkFrame(row, fg_color="transparent")
@@ -309,14 +311,16 @@ class CurrencyGrid(ctk.CTkFrame, PaginationMixin):
 
             ctk.CTkLabel(row, text=item.code, width=40, font=("JetBrains Mono", 12, "bold"), text_color="#5AC8FA").pack(
                 side="left", padx=(10, 5), pady=8)
-            ctk.CTkLabel(row, text=item.name, width=150, anchor="w", font=("JetBrains Mono", 11)).pack(side="left",
-                                                                                                       padx=5)
+            name_frame, name_lbl = create_ellipsis_label(row, item.name, 150, ("JetBrains Mono", 11))
+            ToolTip(name_lbl, item.name)
+            name_frame.pack(side="left", padx=5)
+
             if item.is_base:
-                ctk.CTkLabel(row, text="[BASE]", text_color="#4CD964", font=("JetBrains Mono", 10, "bold")).pack(
+                ctk.CTkLabel(row, text="[BASE]", text_color="#4CD964", font=("JetBrains Mono", 10, "bold"), width=50).pack(
                     side="left", padx=5)
             else:
                 math_symbol = "[ × ]" if item.quotation_method == "multiply" else "[ ÷ ]"
-                ctk.CTkLabel(row, text=math_symbol, text_color="gray50", font=("JetBrains Mono", 12, "bold")).pack(
+                ctk.CTkLabel(row, text=math_symbol, text_color="gray50", font=("JetBrains Mono", 12, "bold"), width=50).pack(
                     side="left", padx=5)
 
             btn_frame = ctk.CTkFrame(row, fg_color="transparent")
@@ -590,10 +594,13 @@ class AccountGrid(ctk.CTkFrame, PaginationMixin):
             row = ctk.CTkFrame(self.scroll, fg_color="gray20", corner_radius=6)
             row.pack(fill="x", pady=2, padx=2)
 
-            ctk.CTkLabel(row, text=item.name, width=120, anchor="w", font=("JetBrains Mono", 12, "bold")).pack(
-                side="left", padx=10, pady=8)
-            ctk.CTkLabel(row, text=f"{item.balance:,.{item.currency.decimals}f} {item.currency_code}", width=100, anchor="w",
-                         text_color="#5AC8FA", font=("JetBrains Mono", 11, "bold")).pack(side="left", padx=5)
+            name_frame, name_lbl = create_ellipsis_label(row, item.name, 120, ("JetBrains Mono", 12, "bold"))
+            ToolTip(name_lbl, item.name)
+            name_frame.pack(side="left", padx=10, pady=8)
+            balance_text = f"{item.balance:,.{item.currency.decimals}f} {item.currency_code}"
+            balance_frame, balance_lbl = create_ellipsis_label(row, balance_text, 100, ("JetBrains Mono", 11, "bold"), "#5AC8FA")
+            ToolTip(balance_lbl, balance_text)
+            balance_frame.pack(side="left", padx=5)
 
             btn_frame = ctk.CTkFrame(row, fg_color="transparent")
             btn_frame.pack(side="right", padx=10)
@@ -736,13 +743,15 @@ class PMGrid(ctk.CTkFrame, PaginationMixin):
             row = ctk.CTkFrame(self.scroll, fg_color="gray20", corner_radius=6)
             row.pack(fill="x", pady=2, padx=2)
 
-            ctk.CTkLabel(row, text=item.name, width=120, anchor="w", font=("JetBrains Mono", 12, "bold")).pack(
-                side="left", padx=10, pady=8)
+            name_frame, name_lbl = create_ellipsis_label(row, item.name, 120, ("JetBrains Mono", 12, "bold"))
+            ToolTip(name_lbl, item.name)
+            name_frame.pack(side="left", padx=10, pady=8)
 
             acc_color = "gray60" if not item.account.active_bool else "#5AC8FA"
             acc_text = f"→ {item.account.name}"
-            ctk.CTkLabel(row, text=acc_text, width=140, anchor="w", text_color=acc_color,
-                         font=("JetBrains Mono", 11)).pack(side="left", padx=5)
+            acc_frame, acc_lbl = create_ellipsis_label(row, acc_text, 140, ("JetBrains Mono", 11), acc_color)
+            ToolTip(acc_lbl, acc_text)
+            acc_frame.pack(side="left", padx=5)
 
             btn_frame = ctk.CTkFrame(row, fg_color="transparent")
             btn_frame.pack(side="right", padx=10)

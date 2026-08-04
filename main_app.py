@@ -43,7 +43,7 @@ class FinanceApp(ctk.CTk):
         app_w = min(1440, logical_screen_w)
         app_h = min(700, logical_screen_h)
 
-        min_w = min(1270, logical_screen_w)
+        min_w = min(1400, logical_screen_w)
         min_h = min(650, logical_screen_h)
 
         self.geometry(f"{app_w}x{app_h}")

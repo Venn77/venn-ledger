@@ -42,16 +42,28 @@ VennLedger is built on a robust, modern Python stack:
 
 ---
 
-## 🛑 Prerequisites
+## 🛑 Prerequisites (Local AI Engine)
 
-Before installing VennLedger, you **must** have Ollama installed and the required model pulled to your local machine. The AI parsing features will fail to connect if the Ollama daemon is not running.
+Before using the AI Parser, you **must** have Ollama installed and the required AI model pulled to your local machine. The parsing features will fail gracefully if the Ollama daemon is not running.
 
-1. Install [Ollama](https://ollama.com/).
-2. Open your terminal and pull the Mistral 7B model:
+### For Windows Users
+1. Download and install [Ollama Desktop](https://ollama.com/).
+2. Open your **Command Prompt** and run the following command to download the model:
+   ```cmd
+   ollama pull mistral:7b
+   ```
+3. Ensure the Ollama icon is running in your System Tray before launching VennLedger.
+
+### For Linux / Steam Deck Users
+1. Open your **Terminal** (or Konsole in Desktop Mode) and run the official install script:
+   ```bash
+   curl -fsSL [https://ollama.com/install.sh](https://ollama.com/install.sh) | sh
+   ```
+2. Download the required model by running:
    ```bash
    ollama pull mistral:7b
    ```
-3. Ensure the Ollama background service is running before launching VennLedger.
+3. Leave the service running in the background.
 
 ---
 
@@ -103,15 +115,22 @@ python main_app.py
 
 ## ☁️ Google Drive Setup
 
-To enable the **Backup to Drive** feature, you must provide your own Google Cloud OAuth 2.0 credentials.
+To enable the **Backup to Drive** feature, you must provide your own Google Cloud OAuth 2.0 credentials. 
 
-1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
-2. Create a new project and enable the **Google Drive API**.
-3. Navigate to **APIs & Services > Credentials**.
-4. Create a new **OAuth 2.0 Client ID** (Select "Desktop app" as the application type).
-5. Download the JSON file and rename it to exactly `credentials.json`.
+*Need a visual guide? Read Google's official [Desktop App Credentials Guide](https://developers.google.com/workspace/guides/create-credentials#desktop-app).*
+
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/) and click **Create Project**.
+2. Go to **APIs & Services > Library**, search for **Google Drive API**, and click **Enable**.
+3. Go to **APIs & Services > OAuth Consent Screen**:
+   - Choose **External** and click Create.
+   - Fill in the required fields (App Name, User Support Email, Developer Contact).
+   - **Crucial Step:** Under the **Test Users** section, click **Add Users** and enter your own Gmail address. *(If you skip this, Google will block your login later!)*
+4. Go to **APIs & Services > Credentials**:
+   - Click **Create Credentials** > **OAuth client ID**.
+   - Select **Desktop app** as the Application type and click Create.
+5. Click the **Download JSON** button and rename the downloaded file to exactly `credentials.json`.
 6. Open VennLedger, navigate to the **Master Data** (Settings) tab, and click **Open Config Folder**.
-7. Move your `credentials.json` file into this configuration folder.
+7. Move your `credentials.json` file into this folder.
 8. Click **Backup to Drive** in the app. A browser window will open asking you to authorize the app. Once authorized, a `token.json` will be generated automatically for future seamless backups.
 
 ---

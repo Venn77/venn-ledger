@@ -1,5 +1,5 @@
 import customtkinter as ctk
-import threading, datetime
+import threading, datetime, sys
 from database.models import (
     Category, Currency, Project
 )
@@ -23,6 +23,7 @@ class AIImportView(ctk.CTkFrame):
         self.app = parent
         self.manager = manager
         self.db_session = db_session
+        self.engine_setup_icon = get_icon("terminal2_white.png", size=(14, 14))
         self.edit_skip_icon = get_icon("block_white.png", size=(14, 14))
         self.edit_rules_icon = get_icon("settings_white.png", size=(14, 14))
         self.view_grid_icon = get_icon("grid_white.png", size=(15, 15))
@@ -90,6 +91,14 @@ class AIImportView(ctk.CTkFrame):
         )
         self.btn_edit_skip.pack(side="right", padx=(0, 5))
         ToolTip(self.btn_edit_skip, "Edit terms the parser should ignore")
+
+        self.btn_engine_setup = ctk.CTkButton(
+            row1, text="Engine Setup", image=self.engine_setup_icon, width=110, height=24,
+            font=("JetBrains Mono", 11), fg_color="gray25", hover_color="gray35",
+            command=self._show_engine_guide
+        )
+        self.btn_engine_setup.pack(side="right", padx=(0, 5))
+        ToolTip(self.btn_engine_setup, "Instructions for installing the local AI engine")
 
         row2 = ctk.CTkFrame(self.ai_config_frame, fg_color="transparent")
         row2.pack(fill="x", pady=(6, 12), padx=15)
@@ -204,6 +213,37 @@ class AIImportView(ctk.CTkFrame):
         )
 
         show_popup(self, title="Customizing the AI", message=msg, show_ok=True, width=480, height=440, message_wraplength=430)
+
+    def _show_engine_guide(self):
+        """Displays platform-specific instructions for installing Ollama."""
+        if sys.platform != "win32":
+            msg = (
+                "Venn Ledger uses Ollama to process data locally and privately.\n\n"
+                "To set this up on Linux/Steam Deck, open your Terminal (Konsole) and run the following two commands:\n\n"
+                "1. curl -fsSL https://ollama.com/install.sh | sh\n"
+                "2. ollama run mistral:7b\n\n"
+                "Leave the service running in the background before parsing."
+            )
+            popup_height = 320
+        else:
+            msg = (
+                "Venn Ledger uses Ollama to process data locally and privately.\n\n"
+                "1. Download and install Ollama Desktop from ollama.com\n"
+                "2. Open your Command Prompt and run:\n\n"
+                "   ollama run mistral:7b\n\n"
+                "Ensure Ollama is running in your system tray before parsing."
+            )
+            popup_height = 300
+
+        show_popup(
+            self,
+            title="AI Engine Setup",
+            message=msg,
+            show_ok=True,
+            width=480,
+            height=popup_height,
+            message_wraplength=430
+        )
 
     def _ai_browse_file(self):
         """Opens the OS file picker."""
@@ -402,6 +442,9 @@ class AIImportView(ctk.CTkFrame):
         self.btn_cancel_ai.pack_forget()
         self.btn_start_ai.pack(side="right")
         self.btn_start_ai.configure(state="normal")
+
+        if "Cannot connect to Ollama" in error_msg:
+            error_msg += " Click 'Engine Setup' for instructions."
 
         color = "orange" if "cancelled" in error_msg.lower() else "#FF6B6B"
         self.ai_status_lbl.configure(text=f"Stopped: {error_msg}", text_color=color)

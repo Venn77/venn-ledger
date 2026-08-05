@@ -181,7 +181,7 @@ def get_structured_data(combined_text, categories, system_prompt, cancel_event=N
     try:
         ollama.list()
     except Exception:
-        raise ConnectionError("Cannot connect to Ollama. Is the desktop app running?")
+        raise ConnectionError("Cannot connect to Ollama. Is the local AI engine running?")
     # 1. Clean lines and count
     lines = [l.strip() for l in combined_text.split('\n') if l.strip()]
     total_lines = len(lines)

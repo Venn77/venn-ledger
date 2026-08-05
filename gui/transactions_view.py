@@ -67,7 +67,7 @@ class TransactionsView(ctk.CTkFrame):
             values=["All Time", "Today", "Last 7 Days", "This Month", "Last Month", "This Year", "Custom..."],
             variable=self.date_filter_var,
             command=self.on_date_filter_change,
-            width=115,
+            width=130,
             dynamic_resizing=False
         )
         self.date_menu.pack(side="left")

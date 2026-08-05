@@ -36,3 +36,4 @@ jobs:
           path: |
             dist/VennLedger-Linux
             LICENSE
+            README_LINUX.txt

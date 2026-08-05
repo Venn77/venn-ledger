@@ -17,10 +17,10 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         super().__init__(parent)
         self.title(title)
         self.db_session = db_session
-        base_w = int(450 / UI_SCALE)
-        self.center_relative_to_parent(width=base_w, height=585)
-        self.minsize(base_w, 585)
-        self.maxsize(base_w, 585)
+        self.base_w = int(450 / UI_SCALE)
+        self.center_relative_to_parent(width=self.base_w, height=585)
+        self.minsize(self.base_w, 585)
+        self.maxsize(self.base_w, 585)
         set_app_window_icon(self)
         self.manager = manager
         self.transaction_data = transaction_data
@@ -894,8 +894,8 @@ class AddTransferWindow(BaseTransactionWindow):
         self._sync_account_data()
 
     def layout_specific_widgets(self):
-        self.minsize(450, 515)
-        self.maxsize(450, 515)
+        self.minsize(self.base_w, 515)
+        self.maxsize(self.base_w, 515)
         self.lbl_amount.configure(text="Sent Amount")
         self.lbl_currency.grid_forget()
         self.currency_menu.grid_forget()

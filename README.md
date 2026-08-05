@@ -54,8 +54,8 @@ Before using the AI Parser, you **must** have Ollama installed and the required 
    ```
 3. Ensure the Ollama icon is running in your System Tray before launching VennLedger.
 
-### For Linux / Steam Deck Users
-1. Open your **Terminal** (or Konsole in Desktop Mode) and run the official install script:
+### For Standard Linux Users (Ubuntu, Mint, Fedora, Arch)
+1. Open your **Terminal** and run the official install script:
    ```bash
    curl -fsSL [https://ollama.com/install.sh](https://ollama.com/install.sh) | sh
    ```
@@ -65,6 +65,19 @@ Before using the AI Parser, you **must** have Ollama installed and the required 
    ```
 3. Leave the service running in the background.
 
+### For SteamOS / Steam Deck Users
+Because SteamOS has a read-only filesystem, the standard installer will fail. You must download the standalone binary instead:
+
+1. Open **Konsole** (in Desktop Mode) and run this single command to download the engine and set permissions:
+   ```bash
+   curl -L [https://ollama.com/download/ollama-linux-amd64](https://ollama.com/download/ollama-linux-amd64) -o ~/.local/bin/ollama && chmod +x ~/.local/bin/ollama
+   ```
+2. Download the required model by running:
+   ```bash
+   ~/.local/bin/ollama pull mistral:7b
+   ```
+*(Note: Because SteamOS blocks system services, you may need to manually start the engine by running `~/.local/bin/ollama serve &` in Konsole after a reboot before using VennLedger's AI features).*
+
 ---
 
 ## 📥 Download & Install
@@ -73,7 +86,8 @@ You don't need to install Python to run VennLedger. Standalone executables are a
 
 1. Go to the **[Releases](../../releases)** page.
 2. **Windows:** Download `VennLedger_Setup_v1.0.0.exe` and run the installer.
-3. **Linux / SteamOS:** Download `VennLedger_Linux_v1.0.0.zip`, extract the file, and ensure it has executable permissions (`chmod +x VennLedger-Linux`). 
+3. **Linux / SteamOS:** Download `VennLedger_Linux_v1.0.0.zip`, extract the archive, and launch `VennLedger-Linux`. 
+   *(Note: If the app does not launch after extracting, open a terminal in that folder and run `chmod +x VennLedger-Linux` to grant execution permissions).*
 
 *(Note: On the very first run, VennLedger will guide you through a First-Run Wizard to set up your Base Currency and initial account balances).*
 

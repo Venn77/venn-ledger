@@ -6,6 +6,18 @@ from config import USER_CONFIG_DIR
 from database.models import Expense, Gain, Transfer, Currency
 
 
+def open_config_folder():
+    """Cross-platform method to open the app's configuration directory in the native file explorer."""
+    if not os.path.exists(USER_CONFIG_DIR):
+        os.makedirs(USER_CONFIG_DIR, exist_ok=True)
+
+    if sys.platform == "win32":
+        os.startfile(USER_CONFIG_DIR)
+    elif sys.platform == "darwin":
+        subprocess.Popen(["open", USER_CONFIG_DIR])
+    else:
+        subprocess.Popen(["xdg-open", USER_CONFIG_DIR])
+
 def export_data_to_csv(db_session, filepath):
     """Gathers all transactions, sorts them by latest, and exports to a CSV file."""
     try:

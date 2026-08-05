@@ -7,7 +7,7 @@ from gui.master_data_grids import (
 from gui.dialogs import show_popup
 from customtkinter import filedialog
 import datetime, os, threading
-from utils.fs_utils import export_data_to_csv, create_full_backup_zip
+from utils.fs_utils import export_data_to_csv, create_full_backup_zip, open_config_folder
 from utils.cld_utils import upload_to_drive
 from utils.icon_manager import get_icon
 
@@ -53,7 +53,7 @@ class SettingsView(ctk.CTkFrame):
         ctk.CTkButton(self.btn_frame, text="Open Config Folder", anchor="center", width=150,
                       fg_color="#1f538d",
                       hover_color="#14375e",
-                      command=lambda: os.startfile(USER_CONFIG_DIR)).pack(side="left", padx=(10, 0))
+                      command=open_config_folder).pack(side="left", padx=(10, 0))
 
         self.tab_accounts = self.settings_tabview.add("Accounts & Payment Methods")
         self.tab_currencies = self.settings_tabview.add("Currencies & FX")

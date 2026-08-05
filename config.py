@@ -32,7 +32,16 @@ TOKEN_PATH = os.path.join(USER_CONFIG_DIR, "token.json")
 CONFIG_PATH = os.path.join(USER_CONFIG_DIR, "ui_prefs.json")
 ERROR_LOG_PATH = os.path.join(LOG_DIR, "error.log")
 
+IS_STEAMOS = False
 if sys.platform != "win32":
+    # Detect if running on Steam Deck / SteamOS
+    try:
+        with open("/etc/os-release") as f:
+            if "steamos" in f.read().lower():
+                IS_STEAMOS = True
+    except OSError:
+        pass
+
     UI_SCALE = 0.9
     ctk.set_widget_scaling(UI_SCALE)
     ctk.set_window_scaling(UI_SCALE)

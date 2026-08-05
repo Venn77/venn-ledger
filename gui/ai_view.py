@@ -1,5 +1,6 @@
 import customtkinter as ctk
 import threading, datetime, sys
+from config import IS_STEAMOS
 from database.models import (
     Category, Currency, Project
 )
@@ -198,7 +199,7 @@ class AIImportView(ctk.CTkFrame):
             "Housing Hotel 150 USD (FX 1.14 - including tax) credit"
         )
 
-        show_popup(self, title="Required File Format", message=msg, show_ok=True, width=450, height=550, message_wraplength=400)
+        show_popup(self, title="Required File Format", message=msg, show_ok=True, width=450, height=550, message_wraplength=400, is_copyable=True)
 
     def _show_parser_guide(self):
         """Displays a comprehensive guide on tailoring the LLM prompt."""
@@ -212,37 +213,56 @@ class AIImportView(ctk.CTkFrame):
             "For example: If your database uses 'Amex Card' instead of 'Credit Card', change it in the mapping table so the AI outputs the exact match!"
         )
 
-        show_popup(self, title="Customizing the AI", message=msg, show_ok=True, width=480, height=440, message_wraplength=430)
+        show_popup(self, title="Customizing the AI", message=msg, show_ok=True, width=480, height=440, message_wraplength=430, is_copyable=True)
 
     def _show_engine_guide(self):
         """Displays platform-specific instructions for installing Ollama."""
-        if sys.platform != "win32":
+        if sys.platform == "win32":
             msg = (
                 "Venn Ledger uses Ollama to process data locally and privately.\n\n"
-                "To set this up on Linux/Steam Deck, open your Terminal (Konsole) and run the following two commands:\n\n"
-                "1. curl -fsSL https://ollama.com/install.sh | sh\n"
-                "2. ollama run mistral:7b\n\n"
-                "Leave the service running in the background before parsing."
-            )
-            popup_height = 320
-        else:
-            msg = (
-                "Venn Ledger uses Ollama to process data locally and privately.\n\n"
-                "1. Download and install Ollama Desktop from ollama.com\n"
+                "1. Download and install Ollama Desktop from ollama.com\n\n"
                 "2. Open your Command Prompt and run:\n\n"
-                "   ollama run mistral:7b\n\n"
+                "   ollama pull mistral:7b\n\n"
                 "Ensure Ollama is running in your system tray before parsing."
             )
             popup_height = 300
+            popup_width = 480
+            wrap_len = 430
+
+        elif IS_STEAMOS:
+            msg = (
+                "Venn Ledger uses Ollama to process data locally and privately.\n\n"
+                "Because SteamOS is read-only, open Konsole and run:\n\n"
+                "1. curl -L https://ollama.com/download/ollama-linux-amd64 -o ~/.local/bin/ollama && chmod +x ~/.local/bin/ollama\n\n"
+                "2. ~/.local/bin/ollama pull mistral:7b\n\n"
+                "(Note: You may need to manually run '~/.local/bin/ollama serve &' after a system reboot to start the engine)."
+            )
+            popup_height = 380
+            popup_width = 580
+            wrap_len = 530
+
+        else:
+            # Standard Linux (Ubuntu, Mint, Fedora, Arch, etc.)
+            msg = (
+                "Venn Ledger uses Ollama to process data locally and privately.\n\n"
+                "To set this up, open your Terminal and run:\n\n"
+                "1. curl -fsSL https://ollama.com/install.sh | sh\n\n"
+                "2. ollama pull mistral:7b\n\n"
+                "Leave the service running in the background before parsing."
+            )
+            popup_height = 350
+            popup_width = 480
+            wrap_len = 430
 
         show_popup(
             self,
             title="AI Engine Setup",
             message=msg,
             show_ok=True,
-            width=480,
+            width=popup_width,
             height=popup_height,
-            message_wraplength=430
+            message_wraplength=wrap_len,
+            is_copyable=True
         )
 
     def _ai_browse_file(self):

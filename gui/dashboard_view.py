@@ -21,7 +21,7 @@ class DashboardView(ctk.CTkFrame):
         self.header = ctk.CTkLabel(self.header_frame, text="Financial Dashboard", font=("JetBrains Mono", 22, "bold"))
         self.header.pack(side="left")
 
-        self.range_var = ctk.StringVar(value="6 Months")
+        self.range_var = ctk.StringVar(self, value="6 Months")
         self.range_selector = ctk.CTkSegmentedButton(
             self.header_frame,
             values=["1 Month", "3 Months", "6 Months", "12 Months", "3 Years", "5 Years"],

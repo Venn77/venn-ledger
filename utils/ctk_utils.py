@@ -1,4 +1,6 @@
+import sys
 import customtkinter as ctk
+import tkinter as tk
 
 
 def create_ellipsis_label(container, text, width, font, color="white", height=24):
@@ -79,5 +81,77 @@ def calculate_dialog_geometry(widget, width, height):
         y = screen_h - height - 40
 
     return f"{width}x{height}+{x}+{y}"
+
+def apply_linux_emoji_vaccine(app_root):
+    """
+    An impenetrable global shield against libXft / colored emoji Segfaults on Linux.
+    Intercepts and sanitizes text at the lowest Tkinter level before it can crash X11.
+    """
+    if sys.platform == "win32":
+        return
+
+    def sanitize_string(text):
+        if not isinstance(text, str):
+            return text
+        return "".join(c if ord(c) <= 0xFFFF else " " for c in text)
+
+    original_set = tk.StringVar.set
+
+    def safe_set(self, value):
+        original_set(self, sanitize_string(value))
+
+    tk.StringVar.set = safe_set
+
+    original_entry_insert = tk.Entry.insert
+
+    def safe_entry_insert(self, index, string):
+        original_entry_insert(self, index, sanitize_string(string))
+
+    tk.Entry.insert = safe_entry_insert
+
+    original_text_insert = tk.Text.insert
+
+    def safe_text_insert(self, index, chars, *args):
+        original_text_insert(self, index, sanitize_string(chars), *args)
+
+    tk.Text.insert = safe_text_insert
+
+    def block_emoji_keys(event):
+        if event.char and len(event.char) > 0:
+            if ord(event.char[0]) > 0xFFFF:
+                try:
+                    event.widget.insert(tk.INSERT, " ")
+                except (tk.TclError, AttributeError):
+                    pass
+                return "break"
+        return None
+
+    app_root.bind_all("<KeyPress>", block_emoji_keys, add="+")
+
+    def safe_paste(event):
+        try:
+            widget = event.widget
+            clean_text = sanitize_string(widget.clipboard_get())
+
+            if isinstance(widget, tk.Entry):
+                try:
+                    widget.delete("sel.first", "sel.last")
+                except tk.TclError:
+                    pass
+                widget.insert(tk.INSERT, clean_text)
+                return "break"
+
+            elif isinstance(widget, tk.Text):
+                try:
+                    widget.delete("sel.first", "sel.last")
+                except tk.TclError:
+                    pass
+                widget.insert(tk.INSERT, clean_text)
+                return "break"
+        except (tk.TclError, AttributeError):
+            pass
+
+    app_root.bind_class("Entry", "<<Paste>>", safe_paste)
+    app_root.bind_class("Text", "<<Paste>>", safe_paste)
 
 

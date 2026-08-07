@@ -1,22 +1,54 @@
 import csv
 import zipfile
-import os, sys, subprocess, shutil
+import os, sys, subprocess
 from sqlalchemy import text
 from config import USER_CONFIG_DIR
 from database.models import Expense, Gain, Transfer, Currency
 
+
+def _open_cross_platform(target_path, linux_fallback_cmds):
+    """
+    Internal helper to securely launch files or folders across Windows, Mac, and Linux.
+    Safely scrubs PyInstaller environment variables on Linux to prevent subprocess crashes.
+    """
+    try:
+        if sys.platform == "win32":
+            os.startfile(target_path)
+        elif sys.platform == "darwin":
+            subprocess.Popen(['open', target_path])
+        else:
+            clean_env = os.environ.copy()
+            clean_env.pop("LD_LIBRARY_PATH", None)
+            if "LD_LIBRARY_PATH_ORIG" in clean_env:
+                clean_env["LD_LIBRARY_PATH"] = clean_env["LD_LIBRARY_PATH_ORIG"]
+
+            opened = False
+            for cmd in linux_fallback_cmds:
+                try:
+                    subprocess.Popen(
+                        [cmd, target_path],
+                        env=clean_env,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL
+                    )
+                    opened = True
+                    break
+                except (FileNotFoundError, OSError):
+                    continue
+
+            if not opened:
+                print(f"Error: Could not open path. No suitable application found.")
+
+    except OSError as e:
+        print(f"Failed to launch OS handler for {target_path}: {e}")
 
 def open_config_folder():
     """Cross-platform method to open the app's configuration directory in the native file explorer."""
     if not os.path.exists(USER_CONFIG_DIR):
         os.makedirs(USER_CONFIG_DIR, exist_ok=True)
 
-    if sys.platform == "win32":
-        os.startfile(USER_CONFIG_DIR)
-    elif sys.platform == "darwin":
-        subprocess.Popen(["open", USER_CONFIG_DIR])
-    else:
-        subprocess.Popen(["xdg-open", USER_CONFIG_DIR])
+    linux_file_managers = ["dolphin", "nautilus", "thunar", "pcmanfm", "xdg-open"]
+    _open_cross_platform(USER_CONFIG_DIR, linux_file_managers)
 
 def export_data_to_csv(db_session, filepath):
     """Gathers all transactions, sorts them by latest, and exports to a CSV file."""
@@ -161,38 +193,7 @@ def open_text_config(filename, default_content, allow_empty=False):
 
     ensure_file_has_content(file_path, default_content, allow_empty)
 
-    try:
-        if sys.platform == "win32":
-            os.startfile(file_path)
-        elif sys.platform == "darwin":
-            subprocess.Popen(['open', file_path])
-        else:
-            clean_env = os.environ.copy()
-
-            clean_env.pop("LD_LIBRARY_PATH", None)
-
-            if "LD_LIBRARY_PATH_ORIG" in clean_env:
-                clean_env["LD_LIBRARY_PATH"] = clean_env["LD_LIBRARY_PATH_ORIG"]
-
-            linux_editors = ["kwrite", "kate", "gedit", "mousepad", "xed", "pluma", "xdg-open"]
-
-            opened = False
-            for editor in linux_editors:
-                if shutil.which(editor):
-                    try:
-                        subprocess.Popen([editor, file_path],
-                                         env=clean_env,
-                                         stdout=subprocess.DEVNULL,
-                                         stderr=subprocess.DEVNULL)
-                        opened = True
-                        break
-                    except Exception as e:
-                        print(f"Tried {editor} but failed: {e}")
-
-            if not opened:
-                print("Error: Could not find a suitable text editor.")
-
-    except Exception as e:
-        print(f"Failed to open config file: {e}")
+    linux_editors = ["kwrite", "kate", "gedit", "mousepad", "xed", "pluma", "xdg-open"]
+    _open_cross_platform(file_path, linux_editors)
 
 

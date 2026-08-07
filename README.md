@@ -44,7 +44,9 @@ VennLedger is built on a robust, modern Python stack:
 
 ## 🛑 Prerequisites (Local AI Engine)
 
-Before using the AI Parser, you **must** have Ollama installed and the required AI model pulled to your local machine. The parsing features will fail gracefully if the Ollama daemon is not running.
+Before using the AI Parser, you **must** have Ollama installed and the required AI model pulled to your local machine.
+
+VennLedger will automatically spin up the AI engine in the background when the app starts, so you only need to perform this setup once!
 
 ### For Windows Users
 1. Download and install [Ollama Desktop](https://ollama.com/).
@@ -52,31 +54,40 @@ Before using the AI Parser, you **must** have Ollama installed and the required 
    ```cmd
    ollama pull mistral:7b
    ```
-3. Ensure the Ollama icon is running in your System Tray before launching VennLedger.
+3. You're done! You can now launch VennLedger.
 
 ### For Standard Linux Users (Ubuntu, Mint, Fedora, Arch)
 1. Open your **Terminal** and run the official install script:
    ```bash
-   curl -fsSL [https://ollama.com/install.sh](https://ollama.com/install.sh) | sh
+   curl -fsSL https://ollama.com/install.sh | sh
    ```
 2. Download the required model by running:
    ```bash
    ollama pull mistral:7b
    ```
-3. Leave the service running in the background.
+3. You're done! VennLedger will automatically manage the connection.
 
 ### For SteamOS / Steam Deck Users
-Because SteamOS has a read-only filesystem, the standard installer will fail. You must download the standalone binary instead:
+Because SteamOS has a read-only filesystem, the standard system service installer will fail.
 
-1. Open **Konsole** (in Desktop Mode) and run this single command to download the engine and set permissions:
+You must download the standalone binaries and run them manually just once to download the model:
+
+1. Open **Konsole** (in Desktop Mode) and extract the binaries:
    ```bash
-   curl -L [https://ollama.com/download/ollama-linux-amd64](https://ollama.com/download/ollama-linux-amd64) -o ~/.local/bin/ollama && chmod +x ~/.local/bin/ollama
+   mkdir -p ~/.local && curl -L https://ollama.com/download/ollama-linux-amd64.tar.zst | tar -x --zstd -C ~/.local
    ```
-2. Download the required model by running:
+2. Open a **new tab** in Konsole. 
+   In the first tab, start the engine temporarily so you can download the model:
+   ```bash
+   OLLAMA_IGPU_ENABLE=1 ~/.local/bin/ollama serve
+   ```
+   In the second tab, download the required model:
    ```bash
    ~/.local/bin/ollama pull mistral:7b
    ```
-*(Note: Because SteamOS blocks system services, you may need to manually start the engine by running `~/.local/bin/ollama serve &` in Konsole after a reboot before using VennLedger's AI features).*
+3. Once the download reaches 100%, you can close both terminal tabs. You're done!
+
+*(Note: VennLedger will now automatically detect the Steam Deck binaries and silently launch the AI daemon with AMD hardware acceleration in the background every time you open the app).*
 
 ---
 

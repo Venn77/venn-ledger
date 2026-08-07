@@ -58,7 +58,7 @@ class AIImportView(ctk.CTkFrame):
         self.lbl_container.pack(side="left", fill="x", expand=True, padx=(0, 10))
 
         self.ai_full_filepath = ""
-        self.ai_filepath_var = ctk.StringVar(value="No file selected...")
+        self.ai_filepath_var = ctk.StringVar(self, value="No file selected...")
         self.ai_file_lbl = ctk.CTkLabel(self.lbl_container, textvariable=self.ai_filepath_var, text_color="gray60",
                                         anchor="w")
         self.ai_file_lbl.pack(fill="both", expand=True, padx=10)
@@ -199,7 +199,7 @@ class AIImportView(ctk.CTkFrame):
             "Housing Hotel 150 USD (FX 1.14 - including tax) credit"
         )
 
-        show_popup(self, title="Required File Format", message=msg, show_ok=True, width=450, height=550, message_wraplength=400, is_copyable=True)
+        show_popup(self, title="Required File Format", message=msg, show_ok=True, width=450, height=580, message_wraplength=400, is_copyable=True)
 
     def _show_parser_guide(self):
         """Displays a comprehensive guide on tailoring the LLM prompt."""
@@ -223,7 +223,7 @@ class AIImportView(ctk.CTkFrame):
                 "1. Download and install Ollama Desktop from ollama.com\n\n"
                 "2. Open your Command Prompt and run:\n\n"
                 "   ollama pull mistral:7b\n\n"
-                "Ensure Ollama is running in your system tray before parsing."
+                "Once downloaded, Venn Ledger will automatically manage the engine in the background!"
             )
             popup_height = 300
             popup_width = 480
@@ -232,10 +232,11 @@ class AIImportView(ctk.CTkFrame):
         elif IS_STEAMOS:
             msg = (
                 "Venn Ledger uses Ollama to process data locally and privately.\n\n"
-                "Because SteamOS is read-only, open Konsole and run:\n\n"
-                "1. curl -L https://ollama.com/download/ollama-linux-amd64 -o ~/.local/bin/ollama && chmod +x ~/.local/bin/ollama\n\n"
-                "2. ~/.local/bin/ollama pull mistral:7b\n\n"
-                "(Note: You may need to manually run '~/.local/bin/ollama serve &' after a system reboot to start the engine)."
+                "Because SteamOS is read-only, open Konsole and run these steps just once:\n\n"
+                "1. mkdir -p ~/.local && curl -L https://ollama.com/download/ollama-linux-amd64.tar.zst | tar -x --zstd -C ~/.local\n\n"
+                "2. In Tab 1 run: OLLAMA_IGPU_ENABLE=1 ~/.local/bin/ollama serve\n\n"
+                "3. In Tab 2 run: ~/.local/bin/ollama pull mistral:7b\n\n"
+                "Once downloaded, Venn Ledger will automatically manage the engine!"
             )
             popup_height = 380
             popup_width = 580
@@ -248,7 +249,7 @@ class AIImportView(ctk.CTkFrame):
                 "To set this up, open your Terminal and run:\n\n"
                 "1. curl -fsSL https://ollama.com/install.sh | sh\n\n"
                 "2. ollama pull mistral:7b\n\n"
-                "Leave the service running in the background before parsing."
+                "Once downloaded, Venn Ledger will automatically manage the engine!"
             )
             popup_height = 350
             popup_width = 480
@@ -329,9 +330,10 @@ class AIImportView(ctk.CTkFrame):
         currency = self.ai_curr_combo.get()
         year = self.ai_year_combo.get()
         project = self.ai_proj_combo.get()
+        cats = self.db_session.query(Category).all()
 
         thread = threading.Thread(target=self._run_ai_parser_backend,
-                                  args=(self.ai_full_filepath, currency, year, project))
+                                  args=(self.ai_full_filepath, currency, year, project, cats))
         thread.daemon = True
         thread.start()
 
@@ -352,7 +354,7 @@ class AIImportView(ctk.CTkFrame):
         self.ai_status_lbl.configure(text="Cancelling... waiting for current line to finish.", text_color="orange")
         self.ai_progress_bar.configure(progress_color="orange")
 
-    def _run_ai_parser_backend(self, filepath, currency, year, project):
+    def _run_ai_parser_backend(self, filepath, currency, year, project, cats):
         """Runs in the background."""
         try:
             current_skip_terms = get_skip_terms()
@@ -366,22 +368,21 @@ class AIImportView(ctk.CTkFrame):
             for day in daily_chunks:
                 combined_str += f"{day['header']}\n{day['data']}\n"
 
-            # 3. Get categories
-            cats = self.db_session.query(Category).all()
-
-            # 4. Define the callback
+            # 3. Define the callback
             def progress_cb(c_line, t_lines, c_tx, t_tx):
                 self.after(0, self._update_ai_progress, c_line, t_lines, c_tx, t_tx)
 
-            # 5. Invoke LLM
+            # 4. Invoke LLM
             parsed_results = get_structured_data(combined_str, cats, system_prompt=current_system_prompt,
                                                  cancel_event=self.ai_cancel_event, progress_callback=progress_cb)
 
-            # 6. Pass results back to the main GUI thread
-            self.after(0, self._on_ai_parsing_complete, parsed_results, year, project)
+            # 5. Pass results back to the main GUI thread
+            self._thread_results = (parsed_results, year, project)
+            self.after(0, lambda: self._on_ai_parsing_complete())
 
         except Exception as e:
-            self.after(0, self._on_ai_parsing_failed, str(e))
+            self._thread_error = str(e)
+            self.after(0, lambda: self._on_ai_parsing_failed())
 
     def _toggle_ai_view(self):
         """Flips visibility between the file preview and the staging grid."""
@@ -452,8 +453,11 @@ class AIImportView(ctk.CTkFrame):
         else:
             self.ai_status_lbl.configure(text="Session cleared. Ready.", text_color="gray")
 
-    def _on_ai_parsing_failed(self, error_msg):
+    def _on_ai_parsing_failed(self, error_msg=None):
         """Runs on main thread: Handles crashes during parsing."""
+        if error_msg is None:
+            error_msg = getattr(self, "_thread_error", "Unknown error occurred.")
+
         self.ai_year_combo.configure(state="normal")
         self.ai_curr_combo.configure(state="normal")
         self.ai_proj_combo.configure(state="normal")
@@ -471,8 +475,10 @@ class AIImportView(ctk.CTkFrame):
 
         self.ai_progress_bar.pack_forget()
 
-    def _on_ai_parsing_complete(self, parsed_results, year, project):
+    def _on_ai_parsing_complete(self):
         """Runs on main thread: Receives data and build the staging grid."""
+        parsed_results, year, project = self._thread_results
+
         self.btn_cancel_ai.pack_forget()
         self.btn_clear_ai.pack(side="right")
 

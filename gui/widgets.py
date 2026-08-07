@@ -175,21 +175,22 @@ class AIStagingRow(ctk.CTkFrame):
         self.grid_columnconfigure(8, weight=2)
 
         # 0. Status Indicator
-        self.status_lbl = ctk.CTkLabel(self, text="⚫", width=30, font=("Segoe UI", 14))
-        self.status_lbl.grid(row=0, column=0, padx=5, pady=5)
-        self.status_tooltip = ToolTip(self.status_lbl, "Initializing...")
+        self.status_frame = ctk.CTkFrame(self, width=16, height=16, corner_radius=10, fg_color="#1B5E20", border_color="#81C784", border_width=2)
+        self.status_frame.grid(row=0, column=0, padx=10, pady=(10, 10))
+        self.status_frame.grid_propagate(False)
+        self.status_tooltip = ToolTip(self.status_frame, "Initializing...")
 
         # 1. Date
         ctk.CTkLabel(self, text=data['date'], width=45, font=("JetBrains Mono", 11, "bold")).grid(row=0, column=1,
                                                                                                   padx=5, sticky="w")
 
         # 2. Vendor
-        self.ven_var = ctk.StringVar(value=data['vendor'])
+        self.ven_var = ctk.StringVar(self, value=data['vendor'])
         self.ven_entry = ctk.CTkEntry(self, textvariable=self.ven_var, height=24)
         self.ven_entry.grid(row=0, column=2, padx=5, sticky="ew")
 
         # 3. Amount
-        self.amt_var = ctk.StringVar(value=str(data['amount']))
+        self.amt_var = ctk.StringVar(self, value=str(data['amount']))
         self.amt_entry = ctk.CTkEntry(self, textvariable=self.amt_var, width=70, height=24)
         self.amt_entry.grid(row=0, column=3, padx=5)
 
@@ -200,7 +201,7 @@ class AIStagingRow(ctk.CTkFrame):
         self.currency_combo.grid(row=0, column=4, padx=5)
 
         # 4. FX Rate
-        self.fx_var = ctk.StringVar()
+        self.fx_var = ctk.StringVar(self)
         self.fx_entry = ctk.CTkEntry(self, textvariable=self.fx_var, width=60, height=24, placeholder_text="FX")
         self.fx_entry.grid(row=0, column=5, padx=5)
         self.fx_tooltip = ToolTip(self.fx_entry, "")
@@ -229,7 +230,7 @@ class AIStagingRow(ctk.CTkFrame):
         self.pm_combo.grid(row=0, column=7, padx=5, sticky="ew")
 
         # 7. Description (Editable)
-        self.desc_var = ctk.StringVar(value=data['description'])
+        self.desc_var = ctk.StringVar(self, value=data['description'])
         self.desc_entry = ctk.CTkEntry(self, textvariable=self.desc_var, height=24)
         self.desc_entry.grid(row=0, column=8, padx=5, sticky="ew")
 
@@ -354,11 +355,11 @@ class AIStagingRow(ctk.CTkFrame):
         )
 
         if errors:
-            self.status_lbl.configure(text="🔴", text_color="#FF6B6B")
+            self.status_frame.configure(fg_color="#8C2D2D", border_color="#FF8A80") # Red
         elif warnings:
-            self.status_lbl.configure(text="🟡", text_color="#FFD60A")
+            self.status_frame.configure(fg_color="#8C710A", border_color="#FFF176") # Yellow
         else:
-            self.status_lbl.configure(text="🟢", text_color="#4CD964")
+            self.status_frame.configure(fg_color="#1B5E20", border_color="#81C784") # Green
 
         self.status_tooltip.text = self.data['tooltip']
         self.is_valid = self.data['is_valid']

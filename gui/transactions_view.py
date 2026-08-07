@@ -55,7 +55,7 @@ class TransactionsView(ctk.CTkFrame):
         self.clear_search_btn.pack(side="left", padx=(5, 0))
 
         # 4. Filter Bar
-        self.date_filter_var = ctk.StringVar(value="This Month")
+        self.date_filter_var = ctk.StringVar(self, value="This Month")
 
         self.filter_bar = ctk.CTkFrame(self, fg_color="transparent")
         self.filter_bar.pack(fill="x", pady=(0, 10))
@@ -104,8 +104,8 @@ class TransactionsView(ctk.CTkFrame):
         self.year_frame.pack(side="left", padx=(0, 5))
         self.month_frame.pack(side="left")
 
-        self.start_date_var = ctk.StringVar(value=(datetime.datetime.now() - datetime.timedelta(days=30)).strftime("%Y-%m-%d"))
-        self.end_date_var = ctk.StringVar(value=datetime.datetime.now().strftime("%Y-%m-%d"))
+        self.start_date_var = ctk.StringVar(self, value=(datetime.datetime.now() - datetime.timedelta(days=30)).strftime("%Y-%m-%d"))
+        self.end_date_var = ctk.StringVar(self, value=datetime.datetime.now().strftime("%Y-%m-%d"))
 
         self.custom_date_frame = ctk.CTkFrame(self.filter_bar, fg_color="transparent")
 
@@ -138,7 +138,7 @@ class TransactionsView(ctk.CTkFrame):
         self.project_filter_frame = ctk.CTkFrame(self.filter_bar, fg_color="transparent")
         self.project_filter_frame.pack(side="right", padx=(10, 0))
 
-        self.project_filter_var = ctk.StringVar(value="All Projects")
+        self.project_filter_var = ctk.StringVar(self, value="All Projects")
         projects = ["All Projects", "No Project"] + [p.name for p in
                                        self.db_session.query(Project)
                                        .order_by(collate(Project.name, 'NOCASE'))

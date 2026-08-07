@@ -46,28 +46,28 @@ class FirstRunWizard(ctk.CTkToplevel):
                                                                                                   sticky="e", padx=15,
                                                                                                   pady=10)
         codes = sorted([f"{c} - {d['name']}" for c, d in CURRENCY_SYMBOLS.items()]) + ["Custom..."]
-        self.code_var = ctk.StringVar(value="EUR - Eurozone Euro")
-        self.code_dropdown = ctk.CTkOptionMenu(form_frame, values=codes, variable=self.code_var, width=190,
-                                               command=self._on_code_change)
+        self.code_var = ctk.StringVar(self, value="EUR - Eurozone Euro")
+        self.code_dropdown = ctk.CTkComboBox(form_frame, values=codes, variable=self.code_var, width=190,
+                                               command=self._on_code_change, state="readonly")
         self.code_dropdown.grid(row=0, column=1, sticky="w", padx=10, pady=10)
 
-        self.custom_code_var = ctk.StringVar(value="")
+        self.custom_code_var = ctk.StringVar(self, value="")
         self.custom_code_entry = ctk.CTkEntry(form_frame, textvariable=self.custom_code_var, width=190,
                                               placeholder_text="Code (Max 10)")
 
         ctk.CTkLabel(form_frame, text="Symbol:", font=("JetBrains Mono", 12, "bold")).grid(row=2, column=0, sticky="e",
                                                                                            padx=15, pady=10)
-        self.symbol_var = ctk.StringVar(value="€")
+        self.symbol_var = ctk.StringVar(self, value="€")
         self.symbol_dropdown = ctk.CTkOptionMenu(form_frame, values=["€"], variable=self.symbol_var, state="disabled",
                                                  width=190, command=self._on_symbol_change)
         self.symbol_dropdown.grid(row=2, column=1, sticky="w", padx=10, pady=10)
 
-        self.custom_symbol_var = ctk.StringVar(value="")
+        self.custom_symbol_var = ctk.StringVar(self, value="")
         self.custom_symbol_entry = ctk.CTkEntry(form_frame, textvariable=self.custom_symbol_var, width=190,
                                                 placeholder_text="Symbol")
 
         self.precision_lbl = ctk.CTkLabel(form_frame, text="# of Decimals:", font=("JetBrains Mono", 12, "bold"))
-        self.precision_var = ctk.StringVar(value="2 (Standard Fiat)")
+        self.precision_var = ctk.StringVar(self, value="2 (Standard Fiat)")
         self.precision_dropdown = ctk.CTkOptionMenu(
             form_frame,
             values=["0 (Whole Numbers)", "2 (Standard Fiat)", "8 (Crypto/Tokens)"],
@@ -84,14 +84,14 @@ class FirstRunWizard(ctk.CTkToplevel):
                                                                                                         sticky="e",
                                                                                                         padx=15,
                                                                                                         pady=10)
-        self.check_var = ctk.StringVar(value="0.00")
+        self.check_var = ctk.StringVar(self, value="0.00")
         self.check_entry = ctk.CTkEntry(bal_frame, textvariable=self.check_var, width=145)
         self.check_entry.grid(row=0, column=1, sticky="w", padx=10, pady=10)
 
         ctk.CTkLabel(bal_frame, text="Cash Balance:", font=("JetBrains Mono", 12, "bold")).grid(row=1, column=0,
                                                                                                        sticky="e",
                                                                                                        padx=15, pady=10)
-        self.cash_var = ctk.StringVar(value="0.00")
+        self.cash_var = ctk.StringVar(self, value="0.00")
         self.cash_entry = ctk.CTkEntry(bal_frame, textvariable=self.cash_var, width=145)
         self.cash_entry.grid(row=1, column=1, sticky="w", padx=10, pady=10)
 

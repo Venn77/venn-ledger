@@ -121,8 +121,6 @@ class AIStagingGrid(ctk.CTkFrame):
                 row.destroy()
         self.rows.clear()
 
-        gc.collect()
-
         active_items = [res for res in self.parsed_results if not res.get('discarded')]
 
         total_pages = max(1, (len(active_items) + self.page_size - 1) // self.page_size)
@@ -147,7 +145,7 @@ class AIStagingGrid(ctk.CTkFrame):
 
         if hasattr(self.scroll, "_parent_canvas"):
             # noinspection PyProtectedMember
-            self.scroll._parent_canvas.yview_moveto(0)
+            self.after(50, lambda: self.scroll._parent_canvas.yview_moveto(0))
 
         self.update_pagination_state()
 
@@ -207,7 +205,6 @@ class AIStagingGrid(ctk.CTkFrame):
 
         self.parsed_results.clear()
         self.destroy()
-        gc.collect()
         if success_count == 1:
             msg_transaction = "transaction"
         else:

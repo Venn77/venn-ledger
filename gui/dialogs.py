@@ -217,7 +217,7 @@ class CurrencyDialog(ctk.CTkToplevel):
 
         if not is_edit:
             ctk.CTkLabel(self, text="# of Decimals:", font=("JetBrains Mono", 11, "bold")).pack()
-            self.precision_var = ctk.StringVar(value="2 (Standard Fiat)")
+            self.precision_var = ctk.StringVar(self, value="2 (Standard Fiat)")
             self.precision_dropdown = ctk.CTkOptionMenu(
                 self,
                 values=["0 (Whole Numbers)", "2 (Standard Fiat)", "8 (Crypto/Tokens)"],
@@ -227,7 +227,7 @@ class CurrencyDialog(ctk.CTkToplevel):
             self.precision_dropdown.pack(pady=(2, 10))
 
             ctk.CTkLabel(self, text="Conversion Math:", font=("JetBrains Mono", 11, "bold")).pack()
-            self.quote_var = ctk.StringVar(value="Divide (Foreign ÷ Rate = Base)")
+            self.quote_var = ctk.StringVar(self, value="Divide (Foreign ÷ Rate = Base)")
             self.quote_dropdown = ctk.CTkOptionMenu(
                 self,
                 values=["Divide (Foreign ÷ Rate = Base)", "Multiply (Foreign × Rate = Base)"],
@@ -347,7 +347,7 @@ class FXDialog(ctk.CTkToplevel):
         self.geometry(calculate_dialog_geometry(parent, width, height))
 
         ctk.CTkLabel(self, text="Foreign Currency:", font=("JetBrains Mono", 11, "bold")).pack(pady=(15, 0))
-        self.code_var = ctk.StringVar(value=list(currency_data.keys())[0])
+        self.code_var = ctk.StringVar(self, value=list(currency_data.keys())[0])
         self.code_dropdown = ctk.CTkOptionMenu(
             self,
             values=list(currency_data.keys()),

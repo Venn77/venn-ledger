@@ -51,8 +51,8 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         else:
             initial_date = f"{mem_date} {self.session_time}"
 
-        self.currency_var = ctk.StringVar(value=self.mem.get("currency", self.manager.base_currency))
-        self.date_var = ctk.StringVar(value=initial_date)
+        self.currency_var = ctk.StringVar(self, value=self.mem.get("currency", self.manager.base_currency))
+        self.date_var = ctk.StringVar(self, value=initial_date)
 
         init_dec = self.currency_map.get(self.currency_var.get(), 2)
         self.amount_placeholder = self.get_dynamic_placeholder("Amount", init_dec)

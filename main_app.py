@@ -1,4 +1,4 @@
-import json, os, sys, traceback
+import json, os, sys, traceback, faulthandler
 import customtkinter as ctk
 import matplotlib.pyplot as plt
 from tkinter import TclError
@@ -7,7 +7,8 @@ from config import CONFIG_PATH, APP_VERSION, IS_COMPILED, ERROR_LOG_PATH, UI_SCA
 from database.models import Session, Account, Transfer, Currency
 from core import manager as finance_manager
 from utils.icon_manager import get_icon, set_app_window_icon
-from utils.ctk_utils import calculate_dialog_geometry
+from utils.ctk_utils import calculate_dialog_geometry, apply_linux_emoji_vaccine
+from utils.ollama_manager import start_ollama_daemon
 from gui.transaction_forms import AddExpenseWindow, AddGainWindow, AddTransferWindow
 from gui.transactions_view import TransactionsView
 from gui.settings_view import SettingsView
@@ -17,6 +18,12 @@ from gui.wizard import FirstRunWizard
 
 
 if IS_COMPILED:
+    try:
+        fault_file = open(ERROR_LOG_PATH, "a")
+        faulthandler.enable(file=fault_file)
+    except OSError:
+        pass
+
     def global_exception_handler(exc_type, exc_value, exc_traceback):
         with open(ERROR_LOG_PATH, "a") as log_file:
             log_file.write("--- FATAL CRASH ---\n")
@@ -29,6 +36,8 @@ if IS_COMPILED:
 class FinanceApp(ctk.CTk):
     def __init__(self):
         super().__init__()
+        apply_linux_emoji_vaccine(self)
+        start_ollama_daemon()
         if IS_COMPILED:
             self.report_callback_exception = global_exception_handler
         self.title("Venn Ledger 2026")

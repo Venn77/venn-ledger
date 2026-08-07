@@ -596,3 +596,101 @@ class PMDialog(ctk.CTkToplevel):
                 self.destroy()
             else:
                 self.err_lbl.configure(text=msg)
+
+class SearchableListDialog(ctk.CTkToplevel):
+    """A reusable modal dialog for searching and selecting an item from a long list."""
+    def __init__(self, parent, title, items, show_search=True):
+        super().__init__(parent)
+        self.withdraw()
+        self.attributes("-alpha", 0.0)
+        self.title(title)
+        self.geometry("350x450")
+        self.attributes("-topmost", True)
+        self.resizable(False, False)
+
+        self.configure(fg_color=("gray90", "gray15"))
+
+        self.items = items
+        self.selected_item = None
+        set_app_window_icon(self)
+
+        # Search Bar
+        if show_search:
+            search_frame = ctk.CTkFrame(self, fg_color="transparent")
+            search_frame.pack(fill="x", padx=10, pady=(10, 0))
+
+            ctk.CTkLabel(search_frame, text="Search:", font=("JetBrains Mono", 12, "bold")).pack(side="left",
+                                                                                                 padx=(0, 10))
+
+            self.search_entry = ctk.CTkEntry(search_frame)
+            self.search_entry.pack(side="left", fill="x", expand=True)
+            self.search_entry.bind("<KeyRelease>", self._filter_list)
+
+            top_padding = 5
+        else:
+            self.search_entry = None
+            top_padding = 10
+
+        # Scrollable Frame
+        self.scroll_frame = ctk.CTkScrollableFrame(self, fg_color=("gray90", "gray15"))
+        self.scroll_frame.pack(fill="both", expand=True, padx=10, pady=(top_padding, 10))
+
+        self.buttons = []
+        self._populate_list(self.items)
+
+        self.update_idletasks()
+        x = parent.winfo_x() + (parent.winfo_width() // 2) - (350 // 2)
+        y = parent.winfo_y() + (parent.winfo_height() // 2) - (450 // 2)
+        self.geometry(f"+{x}+{y}")
+        self.deiconify()
+        self.after(100, self._reveal_window)
+
+        if self.search_entry:
+            self.after(100, self.search_entry.focus)
+
+        self.grab_set()
+        self.wait_window()
+
+    def _reveal_window(self):
+        """Restores opacity only after the OS has completely painted the dark canvas."""
+        self.attributes("-alpha", 1.0)
+
+    def _populate_list(self, items):
+        for btn in self.buttons:
+            btn.destroy()
+        self.buttons.clear()
+
+        for item in items:
+            btn = ctk.CTkButton(
+                self.scroll_frame,
+                text=item,
+                anchor="w",
+                fg_color="transparent",
+                text_color=("gray10", "gray90"),
+                hover_color=("gray70", "gray30"),
+                command=lambda val=item: self._select_item(val)
+            )
+            btn.pack(fill="x", pady=2)
+            self.buttons.append(btn)
+
+    def _filter_list(self, _event=None):
+        if not self.search_entry:
+            return
+
+        query = self.search_entry.get().lower()
+        if not query:
+            filtered = self.items
+        else:
+            filtered = [item for item in self.items if query in item.lower()]
+        self._populate_list(filtered)
+
+    def _select_item(self, value):
+        self.selected_item = value
+        self.grab_release()
+        self.destroy()
+
+    def get_result(self):
+        """Returns the selection after the window is destroyed."""
+        return self.selected_item
+
+

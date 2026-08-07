@@ -154,4 +154,19 @@ def apply_linux_emoji_vaccine(app_root):
     app_root.bind_class("Entry", "<<Paste>>", safe_paste)
     app_root.bind_class("Text", "<<Paste>>", safe_paste)
 
+def apply_linux_ui_vaccine():
+    """
+    Globally patches CustomTkinter rendering artifacts on Linux/SteamOS.
+    Sets corner radii to 0 to prevent the 'bleeding pixel' canvas bug
+    when using fractional scaling on external monitors.
+    """
+    if sys.platform not in ["win32", "darwin"]:
+        if "CTkButton" in ctk.ThemeManager.theme:
+            ctk.ThemeManager.theme["CTkButton"]["corner_radius"] = 0
+
+        if "CTkFrame" in ctk.ThemeManager.theme:
+            ctk.ThemeManager.theme["CTkFrame"]["corner_radius"] = 0
+        if "CTkEntry" in ctk.ThemeManager.theme:
+            ctk.ThemeManager.theme["CTkEntry"]["corner_radius"] = 0
+
 

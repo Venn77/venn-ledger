@@ -7,7 +7,7 @@ from config import CONFIG_PATH, APP_VERSION, IS_COMPILED, ERROR_LOG_PATH, UI_SCA
 from database.models import Session, Account, Transfer, Currency
 from core import manager as finance_manager
 from utils.icon_manager import get_icon, set_app_window_icon
-from utils.ctk_utils import calculate_dialog_geometry, apply_linux_emoji_vaccine
+from utils.ctk_utils import calculate_dialog_geometry, apply_linux_emoji_vaccine, apply_linux_ui_vaccine
 from utils.ollama_manager import start_ollama_daemon
 from gui.transaction_forms import AddExpenseWindow, AddGainWindow, AddTransferWindow
 from gui.transactions_view import TransactionsView
@@ -37,6 +37,7 @@ class FinanceApp(ctk.CTk):
     def __init__(self):
         super().__init__()
         apply_linux_emoji_vaccine(self)
+        apply_linux_ui_vaccine()
         start_ollama_daemon()
         if IS_COMPILED:
             self.report_callback_exception = global_exception_handler

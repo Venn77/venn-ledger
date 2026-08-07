@@ -75,6 +75,51 @@ class ToolTip:
             self.tip_window.destroy()
             self.tip_window = None
 
+
+class CompoundDropdown(ctk.CTkFrame):
+    """Custom fake Dropdown built with two buttons, designed to trigger calls to the SearchableListDialog modal."""
+    def __init__(self, master, variable, command=None, width=200, **kwargs):
+        super().__init__(master, fg_color="transparent", **kwargs)
+        self.command = command
+        self.variable = variable
+        self.is_disabled = False
+
+        display_width = width - 30
+
+        self.display_btn = ctk.CTkButton(
+            self, textvariable=self.variable, width=display_width, height=28,
+            anchor="w", fg_color=("gray80", "gray20"),
+            hover_color=("gray80", "gray20"),
+            border_width=1, border_color=("gray60", "gray50"),
+            text_color=("black", "white"), corner_radius=6,
+            cursor="hand2", command=self._on_click
+        )
+        self.display_btn.pack(side="left", padx=(0, 2))
+
+        self.btn = ctk.CTkButton(
+            self, text="▼", width=28, height=28,
+            fg_color=("gray80", "gray20"), hover_color=("gray70", "gray30"),
+            border_width=1, border_color=("gray60", "gray50"),
+            command=self._on_click
+        )
+        self.btn.pack(side="left")
+
+    def _on_click(self):
+        if not self.is_disabled and self.command:
+            self.command()
+
+    def set_disabled(self, disabled: bool):
+        """Grays out both sub-widgets when locked."""
+        self.is_disabled = disabled
+        if disabled:
+            self.display_btn.configure(state="disabled", cursor="arrow", fg_color=("gray90", "gray15"),
+                                       text_color=("gray50", "gray50"))
+            self.btn.configure(state="disabled", cursor="arrow", fg_color=("gray90", "gray15"))
+        else:
+            self.display_btn.configure(state="normal", cursor="hand2", fg_color=("gray80", "gray20"),
+                                       text_color=("black", "white"))
+            self.btn.configure(state="normal", cursor="hand2", fg_color=("gray80", "gray20"))
+
 class SearchableComboBox(ctk.CTkComboBox):
     def __init__(self, master, placeholder="", **kwargs):
         super().__init__(master, **kwargs)

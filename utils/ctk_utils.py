@@ -82,6 +82,44 @@ def calculate_dialog_geometry(widget, width, height):
 
     return f"{width}x{height}+{x}+{y}"
 
+def apply_placeholder(entry_widget, placeholder_text, normal_color="white", placeholder_color="gray"):
+    """Attaches robust placeholder behavior to a CTk widget."""
+    entry_widget._placeholder = placeholder_text
+    entry_widget._normal_color = normal_color
+    entry_widget._placeholder_color = placeholder_color
+
+    if not getattr(entry_widget, "_placeholder_bound", False):
+        def on_focus_in(_event):
+            # noinspection PyProtectedMember
+            if entry_widget.get() == entry_widget._placeholder:
+                entry_widget.delete(0, 'end')
+                # noinspection PyProtectedMember
+                entry_widget.configure(text_color=entry_widget._normal_color)
+
+        def on_focus_out(_event):
+            if entry_widget.get().strip() == "":
+                entry_widget.delete(0, 'end')
+                # noinspection PyProtectedMember
+                entry_widget.insert(0, entry_widget._placeholder)
+                # noinspection PyProtectedMember
+                entry_widget.configure(text_color=entry_widget._placeholder_color)
+
+        entry_widget.bind("<FocusIn>", on_focus_in, add="+")
+        entry_widget.bind("<FocusOut>", on_focus_out, add="+")
+        entry_widget._placeholder_bound = True
+
+    current_text = entry_widget.get().strip()
+    # noinspection PyProtectedMember
+    if not current_text or current_text == entry_widget._placeholder:
+        entry_widget.delete(0, 'end')
+        # noinspection PyProtectedMember
+        entry_widget.insert(0, entry_widget._placeholder)
+        # noinspection PyProtectedMember
+        entry_widget.configure(text_color=entry_widget._placeholder_color)
+    else:
+        # noinspection PyProtectedMember
+        entry_widget.configure(text_color=entry_widget._normal_color)
+
 def apply_linux_emoji_vaccine(app_root):
     """
     An impenetrable global shield against libXft / colored emoji Segfaults on Linux.
@@ -161,12 +199,38 @@ def apply_linux_ui_vaccine():
     when using fractional scaling on external monitors.
     """
     if sys.platform not in ["win32", "darwin"]:
-        if "CTkButton" in ctk.ThemeManager.theme:
-            ctk.ThemeManager.theme["CTkButton"]["corner_radius"] = 0
+        widgets_to_flatten = [
+            "CTkButton", "CTkFrame", "CTkEntry",
+            "CTkOptionMenu", "CTkComboBox", "CTkCheckBox",
+            "CTkProgressBar", "CTkSlider", "CTkTextbox"
+        ]
 
-        if "CTkFrame" in ctk.ThemeManager.theme:
-            ctk.ThemeManager.theme["CTkFrame"]["corner_radius"] = 0
-        if "CTkEntry" in ctk.ThemeManager.theme:
-            ctk.ThemeManager.theme["CTkEntry"]["corner_radius"] = 0
+        for widget in widgets_to_flatten:
+            if widget in ctk.ThemeManager.theme:
+                ctk.ThemeManager.theme[widget]["corner_radius"] = 0
+
+def patch_linux_scrolling(scrollable_frame):
+    """
+    Recursively fixes the Linux X11 scroll deadlock on any CTkScrollableFrame
+    by binding <Button-4> (up) and <Button-5> (down) to every child widget.
+    """
+    if sys.platform in ["win32", "darwin"]:
+        return
+
+    def _on_mousewheel(event):
+        canvas = getattr(scrollable_frame, '_parent_canvas', None)
+        if hasattr(canvas, 'yview_scroll'):
+            if event.num == 4:
+                canvas.yview_scroll(-1, "units")
+            elif event.num == 5:
+                canvas.yview_scroll(1, "units")
+
+    def _bind_recursive(widget):
+        widget.bind("<Button-4>", _on_mousewheel, add="+")
+        widget.bind("<Button-5>", _on_mousewheel, add="+")
+        for child in widget.winfo_children():
+            _bind_recursive(child)
+
+    _bind_recursive(scrollable_frame)
 
 

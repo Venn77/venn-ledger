@@ -2,6 +2,7 @@ import customtkinter as ctk
 from config import CURRENCY_SYMBOLS
 from core.manager import seed_fresh_database
 from utils.icon_manager import set_app_window_icon
+from utils.ctk_utils import apply_placeholder
 from gui.dialogs import SearchableListDialog
 from gui.widgets import CompoundDropdown
 
@@ -57,12 +58,7 @@ class FirstRunWizard(ctk.CTkToplevel):
         self.code_dropdown.grid(row=0, column=1, sticky="w", padx=10, pady=(15, 5))
 
         self.custom_code_entry = ctk.CTkEntry(form_frame,width=200)
-        self.custom_code_entry.insert(0, self.custom_code_placeholder)
-        self.custom_code_entry.configure(text_color="gray")
-        self.custom_code_entry.bind("<FocusIn>", lambda e: self._entry_focus_in(self.custom_code_entry,
-                                                                                self.custom_code_placeholder))
-        self.custom_code_entry.bind("<FocusOut>", lambda e: self._entry_focus_out(self.custom_code_entry,
-                                                                                  self.custom_code_placeholder))
+        apply_placeholder(self.custom_code_entry, self.custom_code_placeholder)
 
         self.is_custom_var = ctk.BooleanVar(self, value=False)
         self.chk_custom = ctk.CTkCheckBox(
@@ -82,12 +78,7 @@ class FirstRunWizard(ctk.CTkToplevel):
         self.symbol_dropdown.set_disabled(True)
 
         self.custom_symbol_entry = ctk.CTkEntry(form_frame, width=200)
-        self.custom_symbol_entry.insert(0, self.custom_symbol_placeholder)
-        self.custom_symbol_entry.configure(text_color="gray")
-        self.custom_symbol_entry.bind("<FocusIn>", lambda e: self._entry_focus_in(self.custom_symbol_entry,
-                                                                                  self.custom_symbol_placeholder))
-        self.custom_symbol_entry.bind("<FocusOut>", lambda e: self._entry_focus_out(self.custom_symbol_entry,
-                                                                                    self.custom_symbol_placeholder))
+        apply_placeholder(self.custom_symbol_entry, self.custom_symbol_placeholder)
 
         self.is_custom_sym_var = ctk.BooleanVar(self, value=False)
         self.chk_custom_symbol = ctk.CTkCheckBox(
@@ -127,21 +118,6 @@ class FirstRunWizard(ctk.CTkToplevel):
         self.btn_start.pack(pady=(5, 20))
 
         self._reformat_balances()
-
-    @staticmethod
-    def _entry_focus_in(widget, placeholder):
-        """Clears the placeholder and sets text color to white."""
-        if widget.get() == placeholder:
-            widget.delete(0, 'end')
-            widget.configure(text_color="white")
-
-    @staticmethod
-    def _entry_focus_out(widget, placeholder):
-        """Restores the placeholder if the entry is left blank."""
-        if widget.get().strip() == "":
-            widget.delete(0, 'end')
-            widget.insert(0, placeholder)
-            widget.configure(text_color="gray")
 
     def _open_currency_picker(self):
         codes = sorted([f"{c} - {d['name']}" for c, d in CURRENCY_SYMBOLS.items()])

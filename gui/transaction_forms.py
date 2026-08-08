@@ -10,6 +10,7 @@ from gui.widgets import SearchableComboBox, ToolTip
 from gui.dialogs import open_calendar, show_popup
 from utils.io_utils import format_input_float
 from utils.icon_manager import set_app_window_icon
+from utils.ctk_utils import apply_placeholder
 
 
 class BaseTransactionWindow(ctk.CTkToplevel):
@@ -17,7 +18,7 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         super().__init__(parent)
         self.title(title)
         self.db_session = db_session
-        self.base_w = int(450 / UI_SCALE)
+        self.base_w = int(470 / UI_SCALE)
         self.center_relative_to_parent(width=self.base_w, height=585)
         self.minsize(self.base_w, 585)
         self.maxsize(self.base_w, 585)
@@ -43,6 +44,7 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         self.desc_placeholder = "Description (Optional)"
         self.fx_placeholder = "Rate (e.g. 1.1500)"
         self.proj_placeholder = "Search or type Project..."
+        self.date_placeholder = "YYYY-MM-DD HH:MM:SS"
         self.session_time = datetime.datetime.now().strftime("%H:%M:%S")
 
         mem_date = self.mem.get("date", "")
@@ -127,7 +129,6 @@ class BaseTransactionWindow(ctk.CTkToplevel):
 
         self.update_fx_list()
         self.validate_form()
-
         self.setup_tab_order()
 
     # Layout Methods
@@ -136,25 +137,27 @@ class BaseTransactionWindow(ctk.CTkToplevel):
 
         # Amount (Row 1)
         self.lbl_amount.grid(row=1, column=0, padx=(20, 10), pady=8, sticky="w")
-        self.amount_entry.grid(row=1, column=1, padx=(0, 20), pady=8, sticky="ew")
-        self._apply_entry_state(self.amount_entry, self.mem.get("amount"), self.amount_placeholder)
+        if self.mem.get("amount") is not None and str(self.mem.get("amount")).strip() != "":
+            self.amount_entry.insert(0, str(self.mem.get("amount")))
+        apply_placeholder(self.amount_entry, self.amount_placeholder)
 
         self._reformat_input(self.amount_entry, self.currency_map.get(self.currency_var.get(), 2),
                              self.amount_placeholder)
+        self.amount_entry.grid(row=1, column=1, padx=(0, 20), pady=8, sticky="ew")
 
         # Currency (Row 2)
         self.lbl_currency.grid(row=2, column=0, padx=(20, 10), pady=8, sticky="w")
         self.currency_menu.grid(row=2, column=1, padx=(0, 20), pady=8, sticky="ew")
 
         # FX Rate (Row 3)
-        self.fx_entry.insert(0, self.fx_placeholder)
-        self.fx_entry.configure(text_color="gray")
+        apply_placeholder(self.fx_entry, self.fx_placeholder)
         self.fx_tooltip = ToolTip(self.fx_entry, "Latest known rate will appear here")
 
     def layout_shared_bottom(self):
         # Date (Row 7)
         self.lbl_date.grid(row=7, column=0, padx=(20, 10), pady=8, sticky="w")
         self.date_frame.grid(row=7, column=1, padx=(0, 20), pady=8, sticky="ew")
+        apply_placeholder(self.date_entry, self.date_placeholder)
         self.date_entry.pack(side="left", fill="x", expand=True, padx=(0, 5))
         self.today_btn.pack(side="left", padx=2)
         self.yesterday_btn.pack(side="left", padx=2)
@@ -166,8 +169,10 @@ class BaseTransactionWindow(ctk.CTkToplevel):
 
         # Description (Row 8)
         self.lbl_desc.grid(row=8, column=0, padx=(20, 10), pady=8, sticky="w")
+        if self.mem.get("desc"):
+            self.desc_entry.insert(0, str(self.mem.get("desc")))
+        apply_placeholder(self.desc_entry, self.desc_placeholder)
         self.desc_entry.grid(row=8, column=1, padx=(0, 20), pady=8, sticky="ew")
-        self._apply_entry_state(self.desc_entry, self.mem.get("desc"), self.desc_placeholder)
 
         # Project (Row 9)
         self.lbl_project.grid(row=9, column=0, padx=(20, 10), pady=8, sticky="w")
@@ -181,17 +186,10 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         self.save_btn.pack(padx=2, pady=2)
 
     def setup_bindings(self):
-        self.amount_entry.bind("<FocusIn>", lambda e: self._entry_focus_in(self.amount_entry, self.amount_placeholder))
-        self.amount_entry.bind("<FocusOut>", lambda e: self._entry_focus_out(self.amount_entry, self.amount_placeholder))
         self.amount_entry.bind("<KeyRelease>", self.schedule_validation)
 
-        self.fx_entry.bind("<FocusIn>", lambda e: self._entry_focus_in(self.fx_entry, self.fx_placeholder))
-        self.fx_entry.bind("<FocusOut>", lambda e: self._entry_focus_out(self.fx_entry, self.fx_placeholder))
         self.fx_entry.bind("<KeyRelease>", lambda e: self._clear_fx_tooltip())
         self.fx_entry.bind("<KeyRelease>", self.schedule_validation, add="+")
-
-        self.desc_entry.bind("<FocusIn>", lambda e: self._entry_focus_in(self.desc_entry, self.desc_placeholder))
-        self.desc_entry.bind("<FocusOut>", lambda e: self._entry_focus_out(self.desc_entry, self.desc_placeholder))
 
         self.save_btn.bind("<FocusIn>", self._save_btn_focus_in)
         self.save_btn.bind("<FocusOut>", self._save_btn_focus_out)
@@ -283,38 +281,6 @@ class BaseTransactionWindow(ctk.CTkToplevel):
             widget.delete(0, "end")
             widget.insert(0, formatted_val)
 
-    @staticmethod
-    def _apply_placeholder(widget, placeholder):
-        """Clears an entry, applies a placeholder, and styles it gray."""
-        widget.delete(0, 'end')
-        widget.insert(0, placeholder)
-        widget.configure(text_color="gray")
-
-    @staticmethod
-    def _apply_entry_state(widget, value, placeholder):
-        """Applies either injected data or a gray placeholder."""
-        widget.delete(0, 'end')
-        if value is not None and str(value).strip() != "":
-            widget.insert(0, str(value))
-            widget.configure(text_color="white")
-        else:
-            widget.insert(0, placeholder)
-            widget.configure(text_color="gray")
-
-    @staticmethod
-    def _entry_focus_in(widget, placeholder):
-        """Clears the placeholder and sets value color."""
-        if widget.get() == placeholder:
-            widget.delete(0, 'end')
-            widget.configure(text_color="white")
-
-    @staticmethod
-    def _entry_focus_out(widget, placeholder):
-        """Sets the placeholder and its color."""
-        if widget.get() == "":
-            widget.insert(0, placeholder)
-            widget.configure(text_color="gray")
-
     def _clear_fx_tooltip(self):
         """Clears the 'Historical' tooltip if the user starts typing a manual rate."""
         if self.fx_entry.get() != self.fx_placeholder:
@@ -322,6 +288,9 @@ class BaseTransactionWindow(ctk.CTkToplevel):
 
     def _handle_date_change(self, _var_name, _index, _mode):
         """Ensures correct execution sequence when the user changes the Date."""
+        if hasattr(self, 'date_placeholder') and self.date_var.get() != self.date_placeholder:
+            self.date_entry.configure(text_color="white")
+
         self.schedule_fx_update()
         if hasattr(self, 'error_label'):
             self.validate_form()
@@ -334,11 +303,11 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         new_pl = self.get_dynamic_placeholder("Amount", dec)
         if self.amount_entry.get() == self.amount_placeholder:
             self.amount_entry.delete(0, 'end')
-            self.amount_entry.insert(0, new_pl)
 
         self.amount_placeholder = new_pl
-        self._reformat_input(self.amount_entry, dec, self.amount_placeholder)
+        apply_placeholder(self.amount_entry, self.amount_placeholder)
 
+        self._reformat_input(self.amount_entry, dec, self.amount_placeholder)
         self.schedule_fx_update()
         self.on_currency_change(cur)
         if hasattr(self, 'error_label'):
@@ -412,11 +381,10 @@ class BaseTransactionWindow(ctk.CTkToplevel):
     def _apply_fx_update(self, new_rate_str, new_tooltip):
         """Executes the UI update for the FX entry field."""
         self.fx_entry.delete(0, 'end')
-        self.fx_entry.insert(0, new_rate_str)
-        if new_rate_str == self.fx_placeholder:
-            self.fx_entry.configure(text_color="gray", font=("JetBrains Mono", 13))
-        else:
-            self.fx_entry.configure(text_color="white", font=("JetBrains Mono", 13))
+        if new_rate_str != self.fx_placeholder:
+            self.fx_entry.insert(0, new_rate_str)
+
+        apply_placeholder(self.fx_entry, self.fx_placeholder)
         self.fx_tooltip.text = new_tooltip
         self.validate_form()
 
@@ -462,8 +430,11 @@ class BaseTransactionWindow(ctk.CTkToplevel):
 
     def clear_all(self):
         """Resets the form to default values."""
-        self._apply_placeholder(self.amount_entry, self.amount_placeholder)
-        self._apply_placeholder(self.desc_entry, self.desc_placeholder)
+        self.amount_entry.delete(0, 'end')
+        apply_placeholder(self.amount_entry, self.amount_placeholder)
+
+        self.desc_entry.delete(0, 'end')
+        apply_placeholder(self.desc_entry, self.desc_placeholder)
 
         self.currency_var.set(self.manager.base_currency)
         self.project_combo.reset()
@@ -909,8 +880,10 @@ class AddTransferWindow(BaseTransactionWindow):
         self.dest_menu.grid(row=4, column=1, padx=(0, 20), pady=8, sticky="ew")
 
         self.lbl_dest_amt.grid(row=5, column=0, padx=(20, 10), pady=8, sticky="w")
+        if self.mem.get("dest_amount") is not None and str(self.mem.get("dest_amount")).strip() != "":
+            self.dest_amount_entry.insert(0, str(self.mem.get("dest_amount")))
+        apply_placeholder(self.dest_amount_entry, self.dest_amount_placeholder)
         self.dest_amount_entry.grid(row=5, column=1, padx=(0, 20), pady=8, sticky="ew")
-        self._apply_entry_state(self.dest_amount_entry, self.mem.get("dest_amount"), self.dest_amount_placeholder)
 
         self.lbl_project.grid_forget()
         self.project_combo.grid_forget()
@@ -942,15 +915,15 @@ class AddTransferWindow(BaseTransactionWindow):
         new_orig_pl = self.get_dynamic_placeholder("Sent Amount", orig_dec)
         if self.amount_entry.get() == getattr(self, 'amount_placeholder', ''):
             self.amount_entry.delete(0, 'end')
-            self.amount_entry.insert(0, new_orig_pl)
         self.amount_placeholder = new_orig_pl
+        apply_placeholder(self.amount_entry, self.amount_placeholder)
         self._reformat_input(self.amount_entry, orig_dec, self.amount_placeholder)
 
         new_dest_pl = self.get_dynamic_placeholder("Received Amount", dest_dec)
         if self.dest_amount_entry.get() == getattr(self, 'dest_amount_placeholder', ''):
             self.dest_amount_entry.delete(0, 'end')
-            self.dest_amount_entry.insert(0, new_dest_pl)
         self.dest_amount_placeholder = new_dest_pl
+        apply_placeholder(self.dest_amount_entry, self.dest_amount_placeholder)
         self._reformat_input(self.dest_amount_entry, dest_dec, self.dest_amount_placeholder)
 
         to_options = [n for n in self.all_acc_names if n != origin_name]
@@ -981,12 +954,10 @@ class AddTransferWindow(BaseTransactionWindow):
             current_sent = self.amount_entry.get()
             self.dest_amount_entry.delete(0, 'end')
 
-            if current_sent == self.amount_placeholder or current_sent == "":
-                self.dest_amount_entry.insert(0, self.dest_amount_placeholder)
-                self.dest_amount_entry.configure(text_color="gray")
-            else:
+            if current_sent != self.amount_placeholder and current_sent != "":
                 self.dest_amount_entry.insert(0, current_sent)
-                self.dest_amount_entry.configure(text_color="white")
+
+            apply_placeholder(self.dest_amount_entry, self.dest_amount_placeholder)
             self.schedule_validation()
 
     def _on_dest_manual_edit(self, _event):
@@ -999,9 +970,6 @@ class AddTransferWindow(BaseTransactionWindow):
         super().setup_bindings()
 
         self.amount_entry.bind("<KeyRelease>", self._handle_mirroring, add="+")
-
-        self.dest_amount_entry.bind("<FocusIn>", lambda e: self._entry_focus_in(self.dest_amount_entry, self.dest_amount_placeholder))
-        self.dest_amount_entry.bind("<FocusOut>", lambda e: self._entry_focus_out(self.dest_amount_entry, self.dest_amount_placeholder))
         self.dest_amount_entry.bind("<KeyRelease>", self._on_dest_manual_edit)
 
     def swap_accounts(self):
@@ -1023,7 +991,8 @@ class AddTransferWindow(BaseTransactionWindow):
             self.origin_menu.set(self.all_acc_names[0])
             self.dest_menu.set(self.all_acc_names[0])
 
-        self._apply_placeholder(self.dest_amount_entry, self.dest_amount_placeholder)
+        self.dest_amount_entry.delete(0, 'end')
+        apply_placeholder(self.dest_amount_entry, self.dest_amount_placeholder)
 
         self.auto_mirror = True
         self._sync_account_data()

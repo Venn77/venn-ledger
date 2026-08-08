@@ -2,7 +2,7 @@ import customtkinter as ctk
 import tkinter as tk
 import datetime
 from utils.io_utils import extract_exchange_rate, validate_parsed_record
-from utils.ctk_utils import apply_dynamic_ellipsis
+from utils.ctk_utils import apply_dynamic_ellipsis, patch_linux_scrolling
 
 
 class ToolTip:
@@ -91,7 +91,7 @@ class CompoundDropdown(ctk.CTkFrame):
             anchor="w", fg_color=("gray80", "gray20"),
             hover_color=("gray80", "gray20"),
             border_width=1, border_color=("gray60", "gray50"),
-            text_color=("black", "white"), corner_radius=6,
+            text_color=("black", "white"),
             cursor="hand2", command=self._on_click
         )
         self.display_btn.pack(side="left", padx=(0, 2))
@@ -100,7 +100,7 @@ class CompoundDropdown(ctk.CTkFrame):
             self, text="▼", width=28, height=28,
             fg_color=("gray80", "gray20"), hover_color=("gray70", "gray30"),
             border_width=1, border_color=("gray60", "gray50"),
-            command=self._on_click
+            cursor="hand2", command=self._on_click
         )
         self.btn.pack(side="left")
 
@@ -125,17 +125,14 @@ class SearchableComboBox(ctk.CTkComboBox):
         super().__init__(master, **kwargs)
         self.placeholder = placeholder
         self.all_values = kwargs.get("values", [])
-        self.set(self.placeholder)
+
+        self.reset()
 
         # Bindings
         self._entry.bind("<FocusIn>", self._on_focus_in)
         self._entry.bind("<FocusOut>", self._on_focus_out)
         self._entry.bind("<KeyRelease>", self._on_key_release)
         self._entry.bind("<Down>", self._on_down_key)
-
-        # Initialize Color
-        # noinspection PyTypeChecker
-        self.after(300, self._check_and_set_color)
 
     def _dropdown_callback(self, value):
         """Overrides the internal CTk hook for dropdown selections."""
@@ -145,21 +142,21 @@ class SearchableComboBox(ctk.CTkComboBox):
     def _check_and_set_color(self, *_):
         """Sets placeholder color to gray."""
         if self.get() == self.placeholder:
-            self._entry.configure(foreground="gray")
+            self.configure(text_color="gray")
         else:
-            self._entry.configure(foreground="white")
+            self.configure(text_color="white")
 
     def _on_focus_in(self, _event):
         """Clears the placeholder and sets value color."""
         if self.get() == self.placeholder:
             self.set("")
-            self._entry.configure(foreground="white")
+            self.configure(text_color="white")
 
     def _on_focus_out(self, _event):
         """Sets the placeholder and its color."""
         if self.get() == "":
             self.set(self.placeholder)
-            self._entry.configure(foreground="gray")
+            self.configure(text_color="gray")
 
     def _on_key_release(self, event):
         """Filters the dropdown values based on user input."""
@@ -180,7 +177,7 @@ class SearchableComboBox(ctk.CTkComboBox):
         try:
             if self.get() == self.placeholder:
                 self.set("")
-                self._entry.configure(foreground="white")
+                self.configure(text_color="white")
 
             self._open_dropdown_menu()
         except Exception:
@@ -190,14 +187,14 @@ class SearchableComboBox(ctk.CTkComboBox):
         """Pre-fills data for Copy/Edit modes."""
         if value and str(value).strip() != "":
             self.set(str(value))
-            self._entry.configure(foreground="white")
+            self.configure(text_color="white")
         else:
             self.reset()
 
     def reset(self):
         """Resets the combobox to its placeholder state."""
         self.set(self.placeholder)
-        self._entry.configure(foreground="gray")
+        self.configure(text_color="gray")
 
 class AIStagingRow(ctk.CTkFrame):
     """Represents one parsed transaction in a single row, with real-time validation."""
@@ -298,6 +295,7 @@ class AIStagingRow(ctk.CTkFrame):
         self.amt_entry.bind("<KeyRelease>", lambda e: self.validate())
         self.desc_entry.bind("<KeyRelease>", lambda e: self.validate())
         self.fx_entry.bind("<KeyRelease>", self._on_fx_manual_edit)
+        patch_linux_scrolling(self)
 
         self.is_valid = False
         self.status_type = ""

@@ -200,7 +200,7 @@ def get_valid_year(prompt):
                         \nEx: 2025
                         \r**********************""")
 
-def validate_parsed_record(data, manager, year, pm_currency_map, cat_names, ven_names):
+def validate_parsed_record(data, manager, year, pm_currency_map, cat_names, ven_names, curr_names=None):
     """
     Checks DB integrity, updates status flags, and returns (errors, warnings).
     """
@@ -214,10 +214,15 @@ def validate_parsed_record(data, manager, year, pm_currency_map, cat_names, ven_
         amt = 0.0
 
     base_curr = getattr(manager, 'base_currency', 'EUR')
-
     curr = data.get('currency', base_curr)
+
+    if curr_names is not None and curr not in curr_names:
+        errors.append(f"Unregistered Currency '{curr}'.")
+
     valid_pms = [name for name, c_code in pm_currency_map.items() if c_code == curr]
-    if data.get('payment_method') not in valid_pms:
+    if not valid_pms:
+        errors.append(f"No Payment Methods registered for {curr}.")
+    elif data.get('payment_method') not in valid_pms:
         errors.append("Select a matching Payment Method.")
 
     if curr != base_curr:
@@ -264,10 +269,10 @@ def validate_parsed_record(data, manager, year, pm_currency_map, cat_names, ven_
     raw_line = f"\n\nRaw Line: {data.get('line', '')}"
     if errors:
         data['is_valid'], data['status_type'] = False, "red"
-        data['tooltip'] = " | ".join(errors) + raw_line
+        data['tooltip'] = "\n".join(errors) + raw_line
     elif warnings:
         data['is_valid'], data['status_type'] = True, "yellow"
-        data['tooltip'] = " | ".join(warnings) + raw_line
+        data['tooltip'] = "\n".join(warnings) + raw_line
     else:
         data['is_valid'], data['status_type'] = True, "green"
         data['tooltip'] = "Ready to import." + raw_line

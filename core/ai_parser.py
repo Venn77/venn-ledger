@@ -249,8 +249,8 @@ def get_structured_data(combined_text, categories, system_prompt, cancel_event=N
                 line_to_process = line[len(first_word):].strip()
                 # print(f"Fuzzy Match: '{first_word}' -> '{expected_cat}'. Processing: '{line_to_process}'")
             else:
-                print(f"Skipping: No category match for {line}")
-                continue
+                expected_cat = ""
+                line_to_process = line
 
         # 4. LLM loop
         try:

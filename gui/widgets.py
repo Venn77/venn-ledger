@@ -343,32 +343,40 @@ class AIStagingRow(ctk.CTkFrame):
         ctk.CTkLabel(self, text=data['date'], width=45, font=("JetBrains Mono", 11, "bold")).grid(row=0, column=1,
                                                                                                   padx=5, sticky="w")
 
-        # 2. Vendor
-        self.ven_var = ctk.StringVar(self, value=data['vendor'])
-        self.ven_entry = ctk.CTkEntry(self, textvariable=self.ven_var, height=24)
-        self.ven_entry.grid(row=0, column=2, padx=5, sticky="ew")
+        # 2. Vendor (Combo)
+        self.ven_combo = SearchableComboBox(self, placeholder="Vendor...", values=self.ven_names, height=24,
+                                            command=lambda _: self.validate())
+        self.ven_combo.inject_value(data['vendor'])
+        self.ven_combo.grid(row=0, column=2, padx=5, sticky="ew")
+
+        # noinspection PyProtectedMember
+        self.ven_combo._entry.bind("<KeyRelease>", lambda e: self.validate(), add="+")
 
         # 3. Amount
         self.amt_var = ctk.StringVar(self, value=str(data['amount']))
-        self.amt_entry = ctk.CTkEntry(self, textvariable=self.amt_var, width=70, height=24)
+        self.amt_entry = ctk.CTkEntry(self, textvariable=self.amt_var, width=80, height=24)
         self.amt_entry.grid(row=0, column=3, padx=5)
 
         # 4. Currency
-        self.currency_combo = ctk.CTkComboBox(self, values=self.curr_names, width=70, height=24, state="readonly",
+        parsed_curr = data['currency']
+        combo_currencies = self.curr_names.copy()
+        if parsed_curr not in combo_currencies:
+            combo_currencies.append(parsed_curr)
+        self.currency_combo = ctk.CTkComboBox(self, values=combo_currencies, width=80, height=24, state="readonly",
                                           command=self._on_currency_change)
-        self.currency_combo.set(data['currency'] if data['currency'] in self.curr_names else self.app.manager.base_currency)
+        self.currency_combo.set(parsed_curr)
         self.currency_combo.grid(row=0, column=4, padx=5)
 
-        # 4. FX Rate
+        # 5. FX Rate
         self.fx_var = ctk.StringVar(self)
-        self.fx_entry = ctk.CTkEntry(self, textvariable=self.fx_var, width=60, height=24, placeholder_text="FX")
+        self.fx_entry = ctk.CTkEntry(self, textvariable=self.fx_var, width=80, height=24, placeholder_text="FX")
         self.fx_entry.grid(row=0, column=5, padx=5)
         self.fx_tooltip = ToolTip(self.fx_entry, "")
 
         self._calculate_fx(self.currency_combo.get(), initial_load=True)
 
-        # 5. Category (Combo)
-        self.cat_combo = SearchableComboBox(self, placeholder="Category...", values=self.cat_names, width=110, height=24,
+        # 6. Category (Combo)
+        self.cat_combo = SearchableComboBox(self, placeholder="Category...", values=self.cat_names, width=120, height=24,
                                          command=lambda _: self.validate())
         self.cat_combo.inject_value(data['category'])
         self.cat_combo.grid(row=0, column=6, padx=5, sticky="ew")
@@ -377,23 +385,29 @@ class AIStagingRow(ctk.CTkFrame):
         # noinspection PyProtectedMember
         self.cat_combo._entry.bind("<KeyRelease>", lambda e: self.validate(), add="+")
 
-        # 6. Payment Method (Combo)
+        # 7. Payment Method (Combo)
         valid_pms = [name for name, c_code in self.pm_dict.items() if c_code == self.currency_combo.get()]
-        self.pm_combo = ctk.CTkComboBox(self, values=valid_pms if valid_pms else ["None"], width=130, height=24,
+
+        self.pm_combo = ctk.CTkComboBox(self, values=valid_pms if valid_pms else ["None"], width=140, height=24,
                                         state="readonly", command=lambda _: self.validate())
 
-        if data['payment_method'] in valid_pms:
-            self.pm_combo.set(data['payment_method'])
+        if valid_pms:
+            if data['payment_method'] in valid_pms:
+                self.pm_combo.set(data['payment_method'])
+            else:
+                self.pm_combo.set("--- Select ---")
         else:
-            self.pm_combo.set("--- Select ---")
+            self.pm_combo.set("None")
+            self.pm_combo.configure(state="disabled")
+
         self.pm_combo.grid(row=0, column=7, padx=5, sticky="ew")
 
-        # 7. Description (Editable)
+        # 8. Description (Editable)
         self.desc_var = ctk.StringVar(self, value=data['description'])
         self.desc_entry = ctk.CTkEntry(self, textvariable=self.desc_var, height=24)
         self.desc_entry.grid(row=0, column=8, padx=5, sticky="ew")
 
-        # 8. Discard Button
+        # 9. Discard Button
         self.btn_discard = ctk.CTkButton(self, text="✕", width=30, height=24, fg_color="transparent",
                                          text_color="gray50", hover_color="#b13e3e", command=self.discard_row)
         self.btn_discard.grid(row=0, column=9, padx=(5, 10))
@@ -408,7 +422,6 @@ class AIStagingRow(ctk.CTkFrame):
         # Binds
         self.btn_discard.bind("<Enter>", on_x_hover, add="+")
         self.btn_discard.bind("<Leave>", on_x_leave, add="+")
-        self.ven_entry.bind("<KeyRelease>", lambda e: self.validate())
         self.amt_entry.bind("<KeyRelease>", lambda e: self.validate())
         self.desc_entry.bind("<KeyRelease>", lambda e: self.validate())
         self.fx_entry.bind("<KeyRelease>", self._on_fx_manual_edit)
@@ -470,10 +483,15 @@ class AIStagingRow(ctk.CTkFrame):
         self.data['currency'] = new_curr
 
         valid_pms = [name for name, c_code in self.pm_dict.items() if c_code == new_curr]
-        self.pm_combo.configure(values=valid_pms if valid_pms else ["None"])
 
-        if self.pm_combo.get() not in valid_pms:
-            self.pm_combo.set("--- Select ---")
+        self.pm_combo.configure(state="readonly", values=valid_pms if valid_pms else ["None"])
+
+        if valid_pms:
+            if self.pm_combo.get() not in valid_pms:
+                self.pm_combo.set("--- Select ---")
+        else:
+            self.pm_combo.set("None")
+            self.pm_combo.configure(state="disabled")
 
         self._calculate_fx(new_curr, initial_load=False)
         self.validate()
@@ -493,11 +511,15 @@ class AIStagingRow(ctk.CTkFrame):
         """Syncs UI to memory, calls validator, and applies visuals."""
         self.data['description'] = self.desc_var.get().strip()
         self.data['amount'] = self.amt_var.get().strip()
-        self.data['vendor'] = self.ven_var.get().strip()
         self.data['payment_method'] = self.pm_combo.get()
 
         if self.currency_combo.get() != self.app.manager.base_currency:
             self.data['fx_rate'] = self.fx_var.get().strip()
+
+        ven_val = self.ven_combo.get().strip()
+        if hasattr(self.ven_combo, 'placeholder') and ven_val == self.ven_combo.placeholder:
+            ven_val = ""
+        self.data['vendor'] = ven_val
 
         cat_val = self.cat_combo.get().strip()
         if hasattr(self.cat_combo, 'placeholder') and cat_val == self.cat_combo.placeholder:
@@ -510,7 +532,8 @@ class AIStagingRow(ctk.CTkFrame):
             year=self.year,
             pm_currency_map=self.pm_dict,
             cat_names=self.cat_names,
-            ven_names=self.ven_names
+            ven_names=self.ven_names,
+            curr_names=self.curr_names
         )
 
         if errors:
@@ -520,8 +543,13 @@ class AIStagingRow(ctk.CTkFrame):
         else:
             self.status_frame.configure(fg_color="#1B5E20", border_color="#81C784") # Green
 
-        self.status_tooltip.text = self.data['tooltip']
-        self.is_valid = self.data['is_valid']
+        self.status_tooltip.text = self.data.get('tooltip', "")
+        self.is_valid = self.data.get('is_valid', False)
+
+        if self.currency_combo.get() not in self.curr_names:
+            self.fx_var.set("")
+            self.fx_entry.configure(state="disabled", fg_color="gray15", text_color="gray50")
+            self._set_fx_tooltip("Invalid Currency: Cannot apply FX rate.")
 
         if hasattr(self.grid_ref, 'check_master_validation'):
             self.grid_ref.check_master_validation()

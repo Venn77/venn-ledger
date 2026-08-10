@@ -7,7 +7,16 @@ from core import manager as finance_manager
 from pathlib import Path
 
 
-def validate_and_save_batch(results, default_currency, year, project, categories, payment_methods, vendors, base_currency):
+def validate_and_save_batch(
+    results: list[dict],
+    default_currency: str,
+    year: int,
+    project: str,
+    categories: list[str],
+    payment_methods: list[str],
+    vendors: list[str],
+    base_currency: str
+):
     """
     Validates currency, exchange rate, category, vendor and payment method.
     Saves to db after user confirmation.
@@ -92,24 +101,34 @@ def validate_and_save_batch(results, default_currency, year, project, categories
             fx_rate = None
 
         # 3. Test category
-        cat_name = item['category']
+        cat_name = item.get('category', '').strip()
         if cat_name not in categories:
-            match = get_best_match(cat_name, categories)
+            match = get_best_match(cat_name, categories) if cat_name else None
             if match:
                 choice = input(f"   ? Category '{cat_name}' not found. Use '{match}'? (y/n): ").lower()
                 if choice == 'y':
                     cat_name = match
-            else:
-                print(f"   ! '{cat_name}' is not in DB.")
-                sorted_categories = sorted(categories)
-                for i, name in enumerate(sorted_categories):
-                    print(f" [{i}] {name}")
-                index = input(f"   Choose number to use (or 's' to use '{cat_name}'): ")
-                if index.isdigit() and int(index) < len(sorted_categories):
-                    cat_name = sorted_categories[int(index)]
-                else:
-                    # TransactionManager class should be creating the category when it takes a non-existing choice.
-                    print(f"   ! Category '{cat_name}' is new. It will be created.")
+                    if cat_name not in categories:
+                        if cat_name:
+                            print(f"   ! '{cat_name}' is not in DB.")
+                        else:
+                            print("   ! No category was extracted by the LLM.")
+
+                        sorted_categories = sorted(categories)
+                        for i, name in enumerate(sorted_categories):
+                            print(f" [{i}] {name}")
+
+                        prompt_text = (f"   Choose number to use (or 's' to use '{cat_name}'): "
+                                       if cat_name else "   Choose number to use (or 's' to skip item): ")
+
+                        index = input(prompt_text)
+                        if index.isdigit() and int(index) < len(sorted_categories):
+                            cat_name = sorted_categories[int(index)]
+                        elif not cat_name or (index.lower() == 's' and not cat_name):
+                            print("   ! ERROR: Cannot proceed without a category. Skipping item.")
+                            continue
+                        else:
+                            print(f"   ! Category '{cat_name}' is new. It will be created.")
 
         # 4. Test vendor
         vendor_name = item['vendor']

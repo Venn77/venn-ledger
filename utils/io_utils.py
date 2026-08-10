@@ -1,5 +1,6 @@
 from database.models import Currency, Project, Account, Stream, Payer
 from decimal import Decimal, ROUND_HALF_UP
+from typing import Optional
 import datetime, difflib, re
 
 
@@ -34,6 +35,33 @@ def extract_exchange_rate(description):
         except ValueError:
             return None
     return None
+
+def extract_valid_time(datetime_str: str) -> Optional[str]:
+    """
+    Safely extracts the HH:MM:SS portion from a datetime string.
+    Returns the time string if valid, otherwise returns None.
+    """
+    if not datetime_str or " " not in datetime_str.strip():
+        return None
+
+    candidate_time = datetime_str.strip().split(" ")[-1]
+
+    try:
+        datetime.datetime.strptime(candidate_time, "%H:%M:%S")
+        return candidate_time
+    except ValueError:
+        return None
+
+def get_relative_datetime_str(current_datetime_str: str, fallback_time: str, days_ago: int) -> str:
+    """
+    Calculates a relative date (e.g. 0 for today, 1 for yesterday)
+    while safely preserving the time portion from the existing string.
+    """
+    valid_time = extract_valid_time(current_datetime_str)
+    active_time = valid_time if valid_time else fallback_time
+
+    target_date = datetime.datetime.now() - datetime.timedelta(days=days_ago)
+    return f"{target_date.strftime('%Y-%m-%d')} {active_time}"
 
 def format_input_float(raw_val, decimals=2):
     """Formats a raw value into a string with exact decimal precision WITHOUT commas."""

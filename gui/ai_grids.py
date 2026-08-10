@@ -1,10 +1,11 @@
 import customtkinter as ctk
-import datetime, gc
+import datetime
 from sqlalchemy import collate
 from database.models import (
     Category, Vendor, Currency, PaymentMethod
 )
 from utils.io_utils import validate_parsed_record
+from utils.ctk_utils import patch_linux_scrolling
 from gui.widgets import AIStagingRow
 
 
@@ -148,6 +149,8 @@ class AIStagingGrid(ctk.CTkFrame):
             self.after(50, lambda: self.scroll._parent_canvas.yview_moveto(0))
 
         self.update_pagination_state()
+
+        patch_linux_scrolling(self.scroll)
 
     def check_master_validation(self):
         """Enables the Import button ONLY if every active item in memory is valid."""

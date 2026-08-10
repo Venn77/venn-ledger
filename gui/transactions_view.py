@@ -1,5 +1,7 @@
 import customtkinter as ctk
 import datetime
+
+from config import UI_SCALE
 from database.models import (
     Account, Expense, Gain, Category,
     PaymentMethod, Vendor, Project,
@@ -27,8 +29,12 @@ class TransactionsView(ctk.CTkFrame):
         self.show_gains_var = ctk.BooleanVar(value=True)
         self.show_transfers_var = ctk.BooleanVar(value=True)
 
-        # 3. Main Content Area (Transactions)
+        # Variables for Date Filtering
+        self.active_date_filter = "This Month"
+        self.active_custom_start = ""
+        self.active_custom_end = ""
 
+        # 3. Main Content Area (Transactions)
         self.top_bar = ctk.CTkFrame(self, fg_color="transparent")
         self.top_bar.pack(fill="x", pady=(0, 20))
 
@@ -74,32 +80,39 @@ class TransactionsView(ctk.CTkFrame):
 
         self.time_nav_frame = ctk.CTkFrame(self.filter_bar, fg_color="transparent")
 
-        self.year_frame = ctk.CTkFrame(self.time_nav_frame, fg_color="gray20", height=28, corner_radius=8)
-        self.year_frame.pack_propagate(False)
-        self.year_frame.configure(width=128)
-        self.btn_prev_year = ctk.CTkButton(self.year_frame, text="‹", width=30, height=28,
-                                           hover_color="#14375e", command=self.go_prev_year)
-        self.btn_prev_year.pack(side="left", padx=2)
-        self.year_display_lbl = ctk.CTkLabel(self.year_frame, text="", font=("JetBrains Mono", 12, "bold"), width=60,
-                                             height=28, fg_color="#1f538d"
-                                             )
-        self.year_display_lbl.pack(side="left")
-        self.btn_next_year = ctk.CTkButton(self.year_frame, text="›", width=30, height=28,
-                                           hover_color="#14375e", command=self.go_next_year)
-        self.btn_next_year.pack(side="left", padx=2)
+        overlap = 1 if UI_SCALE == 0.9 else 0
 
-        self.month_frame = ctk.CTkFrame(self.time_nav_frame, fg_color="gray20", height=28, corner_radius=8)
+        self.year_frame = ctk.CTkFrame(self.time_nav_frame, fg_color="gray13", height=28, corner_radius=0)
+        self.year_frame.configure(width=140)
+        self.year_frame.pack_propagate(False)
+
+        self.year_display_lbl = ctk.CTkLabel(self.year_frame, text="", font=("JetBrains Mono", 12, "bold"),
+                                             fg_color="#1f538d", corner_radius=0, width=80 + (overlap * 2), height=28)
+        self.year_display_lbl.place(x=30 - overlap, y=0)
+
+        self.btn_prev_year = ctk.CTkButton(self.year_frame, text="‹", width=30, height=28, corner_radius=0,
+                                           hover_color="#14375e", command=self.go_prev_year)
+        self.btn_prev_year.place(x=0, y=0)
+
+        self.btn_next_year = ctk.CTkButton(self.year_frame, text="›", width=30, height=28, corner_radius=0,
+                                           hover_color="#14375e", command=self.go_next_year)
+        self.btn_next_year.place(x=110, y=0)
+
+        self.month_frame = ctk.CTkFrame(self.time_nav_frame, fg_color="gray13", height=28, corner_radius=0)
+        self.month_frame.configure(width=140)
         self.month_frame.pack_propagate(False)
-        self.month_frame.configure(width=148)
-        self.btn_prev_month = ctk.CTkButton(self.month_frame, text="‹", width=30, height=28,
+
+        self.month_display_lbl = ctk.CTkLabel(self.month_frame, text="", font=("JetBrains Mono", 12, "bold"),
+                                              fg_color="#1f538d", corner_radius=0, width=80 + (overlap * 2), height=28)
+        self.month_display_lbl.place(x=30 - overlap, y=0)
+
+        self.btn_prev_month = ctk.CTkButton(self.month_frame, text="‹", width=30, height=28, corner_radius=0,
                                             hover_color="#14375e", command=self.go_prev_month)
-        self.btn_prev_month.pack(side="left", padx=2)
-        self.month_display_lbl = ctk.CTkLabel(self.month_frame, text="", font=("JetBrains Mono", 12, "bold"), width=80,
-                                              height=28, fg_color="#1f538d")
-        self.month_display_lbl.pack(side="left")
-        self.btn_next_month = ctk.CTkButton(self.month_frame, text="›", width=30, height=28,
+        self.btn_prev_month.place(x=0, y=0)
+
+        self.btn_next_month = ctk.CTkButton(self.month_frame, text="›", width=30, height=28, corner_radius=0,
                                             hover_color="#14375e", command=self.go_next_month)
-        self.btn_next_month.pack(side="left", padx=2)
+        self.btn_next_month.place(x=110, y=0)
 
         self.year_frame.pack(side="left", padx=(0, 5))
         self.month_frame.pack(side="left")
@@ -129,7 +142,7 @@ class TransactionsView(ctk.CTkFrame):
         )
         self.end_cal_btn.pack(side="left", padx=(2, 5))
 
-        self.apply_date_btn = ctk.CTkButton(self.custom_date_frame, text="Apply", width=50, command=self.load_transactions)
+        self.apply_date_btn = ctk.CTkButton(self.custom_date_frame, text="Apply", width=50, command=self.apply_custom_dates)
         self.apply_date_btn.pack(side="left", padx=2)
 
         self.type_filter_frame = ctk.CTkFrame(self.filter_bar, fg_color="transparent")
@@ -214,18 +227,27 @@ class TransactionsView(ctk.CTkFrame):
                                        font=("JetBrains Mono", 11), width=60, command=self._schedule_type_filter)
         self.chk_transfers.pack(side="left", padx=5)
 
+    def apply_custom_dates(self):
+        """Locks in the typed dates so filters don't trigger prematurely."""
+        self.active_date_filter = "Custom..."
+        self.active_custom_start = self.start_date_var.get()
+        self.active_custom_end = self.end_date_var.get()
+        self.current_page = 0
+        self.load_transactions()
+        self.reset_scroll_to_top()
+
     def load_transactions(self):
         """Fetches a page of transactions and renders them as rows."""
         self.update_idletasks()
 
         query = self.get_unified_transaction_query(self.db_session)
 
-        selection = self.date_filter_var.get()
+        selection = getattr(self, 'active_date_filter', "This Month")
 
         if selection == "Custom...":
             try:
-                start = datetime.datetime.strptime(self.start_date_var.get(), "%Y-%m-%d").replace(hour=0, minute=0)
-                end = datetime.datetime.strptime(self.end_date_var.get(), "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+                start = datetime.datetime.strptime(self.active_custom_start, "%Y-%m-%d").replace(hour=0, minute=0)
+                end = datetime.datetime.strptime(self.active_custom_end, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
                 query = query.filter(column("ts").between(start, end))
             except ValueError:
                 pass
@@ -677,6 +699,7 @@ class TransactionsView(ctk.CTkFrame):
                 self.month_frame.pack(side="left")
             self.time_nav_frame.pack(side="left", padx=20, anchor="n")
             self.update_time_display()
+            self.active_date_filter = selection
             self.current_page = 0
             self.load_transactions()
             self.reset_scroll_to_top()
@@ -686,6 +709,7 @@ class TransactionsView(ctk.CTkFrame):
                 self.custom_date_frame.pack(side="left", padx=5)
             else:
                 self.custom_date_frame.pack_forget()
+                self.active_date_filter = selection
                 self.current_page = 0
                 self.load_transactions()
                 self.reset_scroll_to_top()

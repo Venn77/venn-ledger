@@ -10,7 +10,7 @@ from gui.dialogs import (
 )
 from gui.widgets import ToolTip
 from utils.icon_manager import set_app_window_icon
-from utils.ctk_utils import calculate_dialog_geometry, create_ellipsis_label
+from utils.ctk_utils import calculate_dialog_geometry, create_ellipsis_label, patch_linux_scrolling
 
 
 class PaginationMixin:
@@ -202,6 +202,7 @@ class SimpleMasterDataGrid(ctk.CTkFrame, PaginationMixin):
         self.loading_frame.pack_forget()
         self.scroll.pack(fill="both", expand=True)
         self.render_pagination_controls()
+        patch_linux_scrolling(self.scroll)
 
     def toggle_status(self, item_id):
         try:
@@ -339,6 +340,8 @@ class CurrencyGrid(ctk.CTkFrame, PaginationMixin):
                                                                                                          padx=10)
 
         self.render_pagination_controls()
+
+        patch_linux_scrolling(self.scroll)
 
     def toggle(self, code):
         try:
@@ -480,6 +483,8 @@ class ExchangeRateGrid(ctk.CTkFrame, PaginationMixin):
             self.scroll.pack(fill="both", expand=True)
             self.render_pagination_controls()
 
+        patch_linux_scrolling(self.scroll)
+
     def delete(self, rate_id):
         rate = self.db_session.get(ExchangeRate, rate_id)
         context_text = f"[{rate.timestamp.strftime('%Y-%m-%d')}] {rate.currency_code} | {rate.fx_multiplier}" if rate else ""
@@ -616,6 +621,8 @@ class AccountGrid(ctk.CTkFrame, PaginationMixin):
                                                                                                          padx=10)
 
         self.render_pagination_controls()
+
+        patch_linux_scrolling(self.scroll)
 
     def toggle(self, acc):
         if acc.active_bool and acc.balance != 0:
@@ -769,6 +776,8 @@ class PMGrid(ctk.CTkFrame, PaginationMixin):
                                                                                                          padx=10)
 
         self.render_pagination_controls()
+
+        patch_linux_scrolling(self.scroll)
 
     def toggle(self, item_id):
         try:

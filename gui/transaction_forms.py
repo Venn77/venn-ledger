@@ -5,10 +5,9 @@ from database.models import (
     Currency, Project, Category, Vendor,
     PaymentMethod, Account, Stream, Payer
 )
-from config import UI_SCALE
 from gui.widgets import SearchableComboBox, ToolTip
 from gui.dialogs import open_calendar, show_popup
-from utils.io_utils import format_input_float
+from utils.io_utils import format_input_float, get_relative_datetime_str
 from utils.icon_manager import set_app_window_icon
 from utils.ctk_utils import apply_placeholder
 
@@ -18,7 +17,7 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         super().__init__(parent)
         self.title(title)
         self.db_session = db_session
-        self.base_w = int(470 / UI_SCALE)
+        self.base_w = 474
         self.center_relative_to_parent(width=self.base_w, height=585)
         self.minsize(self.base_w, 585)
         self.maxsize(self.base_w, 585)
@@ -83,8 +82,8 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         self.lbl_date = ctk.CTkLabel(self, text="Date & Time", font=("JetBrains Mono", 13, "bold"), anchor="w")
         self.date_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.date_entry = ctk.CTkEntry(self.date_frame, textvariable=self.date_var, width=150)
-        self.today_btn = ctk.CTkButton(self.date_frame, text="T", width=30, command=lambda: self.set_relative_date(0))
-        self.yesterday_btn = ctk.CTkButton(self.date_frame, text="Y", width=30, command=lambda: self.set_relative_date(1))
+        self.today_btn = ctk.CTkButton(self.date_frame, text="T", width=30, command=lambda: self.date_var.set(get_relative_datetime_str(self.date_var.get(), self.session_time, 0)))
+        self.yesterday_btn = ctk.CTkButton(self.date_frame, text="Y", width=30, command=lambda: self.date_var.set(get_relative_datetime_str(self.date_var.get(), self.session_time, 1)))
         self.date_btn = ctk.CTkButton(self.date_frame, text="", image=parent.calendar_icon, width=40, command=lambda: open_calendar(self, self.date_var, include_time=True))
 
         self.lbl_desc = ctk.CTkLabel(self, text="Description", font=("JetBrains Mono", 13, "bold"), anchor="w")
@@ -317,23 +316,6 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         self.focus_force()
         self.lift()
         self.amount_entry.focus()
-
-    def get_current_time_part(self):
-        """Extracts the HH:MM:SS part from the current entry, falling back to session_time."""
-        # noinspection PyBroadException
-        try:
-            return self.date_var.get().split(" ")[1] if " " in self.date_var.get() else self.session_time
-        except:
-            return self.session_time
-
-    def set_relative_date(self, days_ago):
-        """
-        Sets the date_var to Today (0) or Yesterday (1).
-        Keeps the time.
-        """
-        active_time = self.get_current_time_part()
-        target_date = datetime.datetime.now() - datetime.timedelta(days=days_ago)
-        self.date_var.set(f"{target_date.strftime('%Y-%m-%d')} {active_time}")
 
     def schedule_fx_update(self):
         """Debounces the FX lookup."""

@@ -37,3 +37,4 @@ jobs:
             dist/VennLedger-Linux
             LICENSE
             README_LINUX.txt
+          retention-days: 1

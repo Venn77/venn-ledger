@@ -1,7 +1,8 @@
 import customtkinter as ctk
 from tkcalendar import Calendar
 from utils.icon_manager import set_app_window_icon
-from utils.ctk_utils import calculate_dialog_geometry
+from utils.ctk_utils import calculate_dialog_geometry, patch_linux_scrolling
+from utils.io_utils import extract_valid_time
 import datetime
 
 
@@ -13,16 +14,11 @@ def open_calendar(parent, target_var, include_time=False):
         parent.cal_window.focus_force()
         return
     parent.cal_window = ctk.CTkToplevel(parent)
+    parent.cal_window.withdraw()
+    parent.cal_window.attributes("-alpha", 0.0)
     set_app_window_icon(parent.cal_window)
     parent.cal_window.title("Select Date")
     parent.cal_window.attributes("-topmost", True)
-
-    parent.cal_window.geometry(calculate_dialog_geometry(parent, 300, 300))
-
-    # noinspection PyTypeChecker
-    parent.cal_window.after(10, lambda: ctk.set_appearance_mode("dark"))
-    # noinspection PyTypeChecker
-    parent.cal_window.after(90, lambda: force_focus(parent.cal_window))
 
     try:
         raw_val = target_var.get().strip()
@@ -45,10 +41,10 @@ def open_calendar(parent, target_var, include_time=False):
         selected_date = cal.selection_get()
         if include_time:
             current_val = target_var.get().strip()
-            if " " in current_val:
-                active_time = current_val.split(" ")[1]
-            else:
-                active_time = getattr(parent, 'session_time', datetime.datetime.now().strftime("%H:%M:%S"))
+
+            valid_time = extract_valid_time(current_val)
+
+            active_time = valid_time if valid_time else getattr(parent, 'session_time', datetime.datetime.now().strftime("%H:%M:%S"))
 
             target_var.set(f"{selected_date} {active_time}")
         else:
@@ -57,6 +53,15 @@ def open_calendar(parent, target_var, include_time=False):
         parent.cal_window.destroy()
 
     ctk.CTkButton(parent.cal_window, text="Confirm", command=set_date).pack(pady=10)
+
+    parent.cal_window.update_idletasks()
+
+    parent.cal_window.geometry(calculate_dialog_geometry(parent, 300, 300))
+
+    parent.cal_window.deiconify()
+    parent.cal_window.after(10, lambda: ctk.set_appearance_mode("dark"))
+    parent.cal_window.after(50, lambda: parent.cal_window.attributes("-alpha", 1.0))
+    parent.cal_window.after(90, lambda: force_focus(parent.cal_window))
 
 def show_popup(parent, title, message, is_error=False, show_ok=True, show_cancel=False, ok_command=None, cancel_command=None, width=400, height=180, message_wraplength=350, is_copyable=False):
     """
@@ -637,6 +642,7 @@ class SearchableListDialog(ctk.CTkToplevel):
 
         self.buttons = []
         self._populate_list(self.items)
+        patch_linux_scrolling(self.scroll_frame)
 
         self.update_idletasks()
         x = parent.winfo_x() + (parent.winfo_width() // 2) - (350 // 2)

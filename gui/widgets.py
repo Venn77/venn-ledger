@@ -2,7 +2,7 @@ import customtkinter as ctk
 import tkinter as tk
 import datetime
 from utils.io_utils import extract_exchange_rate, validate_parsed_record
-from utils.ctk_utils import apply_dynamic_ellipsis, patch_linux_scrolling
+from utils.ctk_utils import apply_dynamic_ellipsis
 
 
 class ToolTip:
@@ -74,7 +74,6 @@ class ToolTip:
         if self.tip_window:
             self.tip_window.destroy()
             self.tip_window = None
-
 
 class CompoundDropdown(ctk.CTkFrame):
     """Custom fake Dropdown built with two buttons, designed to trigger calls to the SearchableListDialog modal."""
@@ -295,7 +294,6 @@ class AIStagingRow(ctk.CTkFrame):
         self.amt_entry.bind("<KeyRelease>", lambda e: self.validate())
         self.desc_entry.bind("<KeyRelease>", lambda e: self.validate())
         self.fx_entry.bind("<KeyRelease>", self._on_fx_manual_edit)
-        patch_linux_scrolling(self)
 
         self.is_valid = False
         self.status_type = ""

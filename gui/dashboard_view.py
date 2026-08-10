@@ -6,6 +6,7 @@ import matplotlib.ticker as ticker
 import datetime
 import mplcursors
 from database.models import Expense, Gain
+from utils.ctk_utils import patch_linux_scrolling
 
 
 class DashboardView(ctk.CTkFrame):
@@ -71,6 +72,8 @@ class DashboardView(ctk.CTkFrame):
         br_frame = ctk.CTkFrame(bottom_frame, fg_color=self.bg_color, corner_radius=8)
         br_frame.grid(row=0, column=1, sticky="nsew", padx=(10, 5))
         self._draw_networth(br_frame, nw_labels, net_worths)
+
+        patch_linux_scrolling(self.scroll)
 
     def _get_historical_data(self, range_str):
         today = datetime.date.today()

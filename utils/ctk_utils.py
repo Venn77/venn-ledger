@@ -1,6 +1,7 @@
 import sys
 import customtkinter as ctk
 import tkinter as tk
+from typing import Optional
 
 
 def create_ellipsis_label(container, text, width, font, color="white", height=24):
@@ -209,7 +210,7 @@ def apply_linux_ui_vaccine():
             if widget in ctk.ThemeManager.theme:
                 ctk.ThemeManager.theme[widget]["corner_radius"] = 0
 
-def patch_linux_scrolling(scrollable_frame):
+def patch_linux_scrolling(widget_container):
     """
     Recursively fixes the Linux X11 scroll deadlock on any CTkScrollableFrame
     by binding <Button-4> (up) and <Button-5> (down) to every child widget.
@@ -217,20 +218,38 @@ def patch_linux_scrolling(scrollable_frame):
     if sys.platform in ["win32", "darwin"]:
         return
 
+    def _find_canvas(w) -> Optional[tk.Canvas]:
+        curr = w
+        while curr:
+            if hasattr(curr, '_parent_canvas'):
+                # noinspection PyProtectedMember
+                return curr._parent_canvas
+            curr = getattr(curr, 'master', None)
+        return None
+
+    target_canvas = _find_canvas(widget_container)
+
+    if target_canvas is None or not hasattr(target_canvas, 'yview_scroll'):
+        return
+
+    canvas: tk.Canvas = target_canvas
+
     def _on_mousewheel(event):
-        canvas = getattr(scrollable_frame, '_parent_canvas', None)
-        if hasattr(canvas, 'yview_scroll'):
-            if event.num == 4:
+        current_yview = canvas.yview()
+        if event.num == 4:
+            if current_yview[0] > 0.0:
                 canvas.yview_scroll(-1, "units")
-            elif event.num == 5:
+
+        elif event.num == 5:
+            if current_yview[1] < 1.0:
                 canvas.yview_scroll(1, "units")
 
-    def _bind_recursive(widget):
-        widget.bind("<Button-4>", _on_mousewheel, add="+")
-        widget.bind("<Button-5>", _on_mousewheel, add="+")
-        for child in widget.winfo_children():
+    def _bind_recursive(w):
+        w.bind("<Button-4>", _on_mousewheel, add="+")
+        w.bind("<Button-5>", _on_mousewheel, add="+")
+        for child in w.winfo_children():
             _bind_recursive(child)
 
-    _bind_recursive(scrollable_frame)
+    _bind_recursive(widget_container)
 
 

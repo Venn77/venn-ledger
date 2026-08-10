@@ -1,7 +1,5 @@
 import customtkinter as ctk
 import datetime
-
-from config import UI_SCALE
 from database.models import (
     Account, Expense, Gain, Category,
     PaymentMethod, Vendor, Project,
@@ -12,7 +10,7 @@ from sqlalchemy import (
     union_all, asc, case, collate
 )
 from sqlalchemy.orm import aliased
-from gui.widgets import ToolTip
+from gui.widgets import ToolTip, MonthYearSelector
 from gui.transaction_grids import TransactionGrid
 from gui.dialogs import open_calendar
 
@@ -78,44 +76,11 @@ class TransactionsView(ctk.CTkFrame):
         )
         self.date_menu.pack(side="left")
 
-        self.time_nav_frame = ctk.CTkFrame(self.filter_bar, fg_color="transparent")
-
-        overlap = 1 if UI_SCALE == 0.9 else 0
-
-        self.year_frame = ctk.CTkFrame(self.time_nav_frame, fg_color="gray13", height=28, corner_radius=0)
-        self.year_frame.configure(width=140)
-        self.year_frame.pack_propagate(False)
-
-        self.year_display_lbl = ctk.CTkLabel(self.year_frame, text="", font=("JetBrains Mono", 12, "bold"),
-                                             fg_color="#1f538d", corner_radius=0, width=80 + (overlap * 2), height=28)
-        self.year_display_lbl.place(x=30 - overlap, y=0)
-
-        self.btn_prev_year = ctk.CTkButton(self.year_frame, text="‹", width=30, height=28, corner_radius=0,
-                                           hover_color="#14375e", command=self.go_prev_year)
-        self.btn_prev_year.place(x=0, y=0)
-
-        self.btn_next_year = ctk.CTkButton(self.year_frame, text="›", width=30, height=28, corner_radius=0,
-                                           hover_color="#14375e", command=self.go_next_year)
-        self.btn_next_year.place(x=110, y=0)
-
-        self.month_frame = ctk.CTkFrame(self.time_nav_frame, fg_color="gray13", height=28, corner_radius=0)
-        self.month_frame.configure(width=140)
-        self.month_frame.pack_propagate(False)
-
-        self.month_display_lbl = ctk.CTkLabel(self.month_frame, text="", font=("JetBrains Mono", 12, "bold"),
-                                              fg_color="#1f538d", corner_radius=0, width=80 + (overlap * 2), height=28)
-        self.month_display_lbl.place(x=30 - overlap, y=0)
-
-        self.btn_prev_month = ctk.CTkButton(self.month_frame, text="‹", width=30, height=28, corner_radius=0,
-                                            hover_color="#14375e", command=self.go_prev_month)
-        self.btn_prev_month.place(x=0, y=0)
-
-        self.btn_next_month = ctk.CTkButton(self.month_frame, text="›", width=30, height=28, corner_radius=0,
-                                            hover_color="#14375e", command=self.go_next_month)
-        self.btn_next_month.place(x=110, y=0)
-
-        self.year_frame.pack(side="left", padx=(0, 5))
-        self.month_frame.pack(side="left")
+        self.time_nav = MonthYearSelector(
+            self.filter_bar,
+            initial_date=self.current_view_date,
+            command=self._on_time_nav_change
+        )
 
         self.start_date_var = ctk.StringVar(self, value=(datetime.datetime.now() - datetime.timedelta(days=30)).strftime("%Y-%m-%d"))
         self.end_date_var = ctk.StringVar(self, value=datetime.datetime.now().strftime("%Y-%m-%d"))
@@ -572,32 +537,6 @@ class TransactionsView(ctk.CTkFrame):
             self.jump_entry.delete(0, "end")
             self.jump_entry.insert(0, str(self.current_page + 1))
 
-    def update_time_display(self):
-        self.year_display_lbl.configure(text=self.current_view_date.strftime("%Y"))
-        self.month_display_lbl.configure(text=self.current_view_date.strftime("%B"))
-
-    def go_prev_year(self):
-        self.current_view_date = self.current_view_date.replace(year=self.current_view_date.year - 1)
-        self.update_time_display()
-        self._schedule_nav_load()
-
-    def go_next_year(self):
-        self.current_view_date = self.current_view_date.replace(year=self.current_view_date.year + 1)
-        self.update_time_display()
-        self._schedule_nav_load()
-
-    def go_prev_month(self):
-        last_month = self.current_view_date - datetime.timedelta(days=1)
-        self.current_view_date = last_month.replace(day=1)
-        self.update_time_display()
-        self._schedule_nav_load()
-
-    def go_next_month(self):
-        next_month = self.current_view_date + datetime.timedelta(days=32)
-        self.current_view_date = next_month.replace(day=1)
-        self.update_time_display()
-        self._schedule_nav_load()
-
     def reset_scroll_to_top(self):
         """Forces the canvas back to coordinate 0."""
         self.update_idletasks()
@@ -689,22 +628,27 @@ class TransactionsView(ctk.CTkFrame):
         self.load_transactions()
         self.reset_scroll_to_top()
 
+    def _on_time_nav_change(self, new_date):
+        """Called automatically by the MonthYearSelector when the user changes the date."""
+        self.current_view_date = new_date
+        self._schedule_nav_load()
+
     def on_date_filter_change(self, selection):
         if selection in ["This Month", "This Year"]:
             self.current_view_date = datetime.datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+            self.time_nav.set_date(self.current_view_date)
             self.custom_date_frame.pack_forget()
-            if selection == "This Year":
-                self.month_frame.pack_forget()
-            else:
-                self.month_frame.pack(side="left")
-            self.time_nav_frame.pack(side="left", padx=20, anchor="n")
-            self.update_time_display()
+
+            self.time_nav.set_mode(show_month=(selection == "This Month"))
+            self.time_nav.pack(side="left", padx=20, anchor="n")
+
             self.active_date_filter = selection
             self.current_page = 0
             self.load_transactions()
             self.reset_scroll_to_top()
         else:
-            self.time_nav_frame.pack_forget()
+            self.time_nav.pack_forget()
             if selection == "Custom...":
                 self.custom_date_frame.pack(side="left", padx=5)
             else:
@@ -760,3 +704,5 @@ class TransactionsView(ctk.CTkFrame):
             self.project_filter_var.set("All Projects")
 
         self.load_transactions()
+
+

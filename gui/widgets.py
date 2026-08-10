@@ -3,6 +3,8 @@ import tkinter as tk
 import datetime
 from utils.io_utils import extract_exchange_rate, validate_parsed_record
 from utils.ctk_utils import apply_dynamic_ellipsis
+from gui.dialogs import SearchableListDialog
+from config import UI_SCALE
 
 
 class ToolTip:
@@ -74,6 +76,122 @@ class ToolTip:
         if self.tip_window:
             self.tip_window.destroy()
             self.tip_window = None
+
+class MonthYearSelector(ctk.CTkFrame):
+    """A reusable, self-contained date navigator with dialog selection."""
+    def __init__(self, parent, initial_date=None, command=None, show_month=True):
+        super().__init__(parent, fg_color="transparent")
+
+        self.current_date = initial_date or datetime.datetime.now().replace(day=1, hour=0, minute=0, second=0,
+                                                                            microsecond=0)
+        self.command = command
+        self.show_month = show_month
+
+        overlap = 1 if UI_SCALE == 0.9 else 0
+
+        self.year_frame = ctk.CTkFrame(self, fg_color="gray13", height=28, corner_radius=0)
+        self.year_frame.configure(width=140)
+        self.year_frame.pack_propagate(False)
+
+        self.btn_year_lbl = ctk.CTkButton(
+            self.year_frame, text="", font=("JetBrains Mono", 12, "bold"),
+            fg_color="#1f538d", hover_color="#14375e", corner_radius=0,
+            width=80 + (overlap * 2), height=28, command=self._select_year
+        )
+        self.btn_year_lbl.place(x=30 - overlap, y=0)
+
+        self.btn_prev_year = ctk.CTkButton(self.year_frame, text="‹", width=30, height=28, corner_radius=0,
+                                           hover_color="#14375e", command=self.go_prev_year)
+        self.btn_prev_year.place(x=0, y=0)
+
+        self.btn_next_year = ctk.CTkButton(self.year_frame, text="›", width=30, height=28, corner_radius=0,
+                                           hover_color="#14375e", command=self.go_next_year)
+        self.btn_next_year.place(x=110, y=0)
+
+        self.month_frame = ctk.CTkFrame(self, fg_color="gray13", height=28, corner_radius=0)
+        self.month_frame.configure(width=140)
+        self.month_frame.pack_propagate(False)
+
+        self.btn_month_lbl = ctk.CTkButton(
+            self.month_frame, text="", font=("JetBrains Mono", 12, "bold"),
+            fg_color="#1f538d", hover_color="#14375e", corner_radius=0,
+            width=80 + (overlap * 2), height=28, command=self._select_month
+        )
+        self.btn_month_lbl.place(x=30 - overlap, y=0)
+
+        self.btn_prev_month = ctk.CTkButton(self.month_frame, text="‹", width=30, height=28, corner_radius=0,
+                                            hover_color="#14375e", command=self.go_prev_month)
+        self.btn_prev_month.place(x=0, y=0)
+
+        self.btn_next_month = ctk.CTkButton(self.month_frame, text="›", width=30, height=28, corner_radius=0,
+                                            hover_color="#14375e", command=self.go_next_month)
+        self.btn_next_month.place(x=110, y=0)
+
+        self.year_frame.pack(side="left", padx=(0, 5))
+        if self.show_month:
+            self.month_frame.pack(side="left")
+
+        self.update_display()
+
+    def set_mode(self, show_month):
+        """Toggles between showing just the Year, or both Year & Month."""
+        self.show_month = show_month
+        if self.show_month:
+            self.month_frame.pack(side="left")
+        else:
+            self.month_frame.pack_forget()
+
+    def set_date(self, new_date):
+        """Allows parent to force an external date reset."""
+        self.current_date = new_date.replace(day=1)
+        self.update_display()
+
+    def update_display(self):
+        self.btn_year_lbl.configure(text=self.current_date.strftime("%Y"))
+        self.btn_month_lbl.configure(text=self.current_date.strftime("%B"))
+
+    def _notify_parent(self):
+        """Updates internal UI and triggers the callback to fetch data."""
+        self.update_display()
+        if self.command:
+            self.command(self.current_date)
+
+    def go_prev_year(self):
+        self.current_date = self.current_date.replace(year=self.current_date.year - 1)
+        self._notify_parent()
+
+    def go_next_year(self):
+        self.current_date = self.current_date.replace(year=self.current_date.year + 1)
+        self._notify_parent()
+
+    def go_prev_month(self):
+        last_month = self.current_date - datetime.timedelta(days=1)
+        self.current_date = last_month.replace(day=1)
+        self._notify_parent()
+
+    def go_next_month(self):
+        next_month = self.current_date + datetime.timedelta(days=32)
+        self.current_date = next_month.replace(day=1)
+        self._notify_parent()
+
+    def _select_year(self):
+        current_yr = self.current_date.year
+        # Generate -10 to +10 years
+        years = [str(y) for y in range(current_yr - 10, current_yr + 11)]
+        dialog = SearchableListDialog(self.btn_year_lbl, "Select Year", years, show_search=False)
+        res = dialog.get_result()
+        if res:
+            self.current_date = self.current_date.replace(year=int(res))
+            self._notify_parent()
+
+    def _select_month(self):
+        months = [datetime.date(2000, m, 1).strftime('%B') for m in range(1, 13)]
+        dialog = SearchableListDialog(self.btn_month_lbl, "Select Month", months, show_search=False)
+        res = dialog.get_result()
+        if res:
+            m_idx = months.index(res) + 1
+            self.current_date = self.current_date.replace(month=m_idx)
+            self._notify_parent()
 
 class CompoundDropdown(ctk.CTkFrame):
     """Custom fake Dropdown built with two buttons, designed to trigger calls to the SearchableListDialog modal."""

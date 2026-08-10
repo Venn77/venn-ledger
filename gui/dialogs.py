@@ -645,9 +645,7 @@ class SearchableListDialog(ctk.CTkToplevel):
         patch_linux_scrolling(self.scroll_frame)
 
         self.update_idletasks()
-        x = parent.winfo_x() + (parent.winfo_width() // 2) - (350 // 2)
-        y = parent.winfo_y() + (parent.winfo_height() // 2) - (450 // 2)
-        self.geometry(f"+{x}+{y}")
+        self.geometry(calculate_dialog_geometry(parent, 350, 450))
         self.deiconify()
         self.after(100, self._reveal_window)
 

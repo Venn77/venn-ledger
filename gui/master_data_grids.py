@@ -105,22 +105,21 @@ class PaginationMixin:
             # noinspection PyProtectedMember
             self.scroll._parent_canvas.yview_moveto(0)
 
-
-class SimpleMasterDataGrid(ctk.CTkFrame, PaginationMixin):
-    """Renders a dynamic grid for simple CRUD operations on db."""
-    def __init__(self, parent, db_session, model, title, has_desc=False):
+class AsyncPaginatedGrid(ctk.CTkFrame, PaginationMixin):
+    """Base class handles async batching, pagination, and loading screens."""
+    def __init__(self, parent, db_session, title, btn_text, btn_command, page_size=100):
         super().__init__(parent, fg_color="transparent")
         self.db_session = db_session
-        self.model = model
-        self.title = title
-        self.has_desc = has_desc
         self.current_results = None
         self.page_items = None
+        self._render_job = None
 
-        header_frame = ctk.CTkFrame(self, fg_color="transparent")
-        header_frame.pack(fill="x", pady=(0, 10))
-        ctk.CTkLabel(header_frame, text=title, font=("JetBrains Mono", 16, "bold")).pack(side="left")
-        ctk.CTkButton(header_frame, text="+ Add New", width=130, command=self.add_new).pack(side="right")
+        header = ctk.CTkFrame(self, fg_color="transparent")
+        header.pack(fill="x", pady=(0, 10))
+        ctk.CTkLabel(header, text=title, font=("JetBrains Mono", 16, "bold")).pack(side="left")
+
+        self.btn_add = ctk.CTkButton(header, text=btn_text, width=130, command=btn_command)
+        self.btn_add.pack(side="right")
 
         self.loading_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.loading_lbl = ctk.CTkLabel(self.loading_frame, text="Loading...", font=("JetBrains Mono", 16, "bold"),
@@ -130,11 +129,10 @@ class SimpleMasterDataGrid(ctk.CTkFrame, PaginationMixin):
         self.scroll = ctk.CTkScrollableFrame(self)
         self.scroll.pack(fill="both", expand=True)
 
-        self.init_pagination(page_size=100)
-        self.load_data()
+        self.init_pagination(page_size=page_size)
 
-    def load_data(self):
-        if hasattr(self, '_render_job') and self._render_job:
+    def load_data(self, _event=None):
+        if self._render_job:
             self.after_cancel(self._render_job)
 
         self.scroll.pack_forget()
@@ -145,8 +143,9 @@ class SimpleMasterDataGrid(ctk.CTkFrame, PaginationMixin):
         for widget in self.scroll.winfo_children():
             widget.destroy()
 
-        query = self.db_session.query(self.model).order_by(collate(self.model.name, 'NOCASE'))
+        query = self.get_query()
         self.current_results = self.paginate_query(query)
+        # noinspection PyTypeChecker
         self.page_items = len(self.current_results)
 
         if self.page_items > 0:
@@ -156,42 +155,10 @@ class SimpleMasterDataGrid(ctk.CTkFrame, PaginationMixin):
 
     def _render_batch(self, start_idx, batch_size):
         end_idx = min(start_idx + batch_size, self.page_items)
-
         self.loading_lbl.configure(text=f"Loading... {end_idx} / {self.page_items}")
 
         for idx in range(start_idx, end_idx):
-            item = self.current_results[idx]
-            row = ctk.CTkFrame(self.scroll, fg_color="gray20", corner_radius=6)
-            row.pack(fill="x", pady=2, padx=2)
-
-            name_frame, name_lbl = create_ellipsis_label(row, item.name, 150, ("JetBrains Mono", 12, "bold"))
-            ToolTip(name_lbl, item.name)
-            name_frame.pack(side="left", padx=10, pady=8)
-
-            if self.has_desc and hasattr(item, 'description'):
-                desc = item.description or ""
-                desc_frame, desc_lbl = create_ellipsis_label(row, desc, 150, ("JetBrains Mono", 11), "gray60")
-                ToolTip(desc_lbl, desc)
-                desc_frame.pack(side="left", padx=10)
-
-            # Action Buttons
-            btn_frame = ctk.CTkFrame(row, fg_color="transparent")
-            btn_frame.pack(side="right", padx=10)
-
-            toggle_text = "Deactivate" if item.active_bool else "Activate"
-            toggle_color = "#b13e3e" if item.active_bool else "#1f538d"
-
-            ctk.CTkButton(btn_frame, text=toggle_text, width=80, height=24, fg_color=toggle_color,
-                          command=lambda i=item.id: self.toggle_status(i)).pack(side="right", padx=2)
-
-            ctk.CTkButton(btn_frame, text="Edit", width=60, height=24, fg_color="gray30", hover_color="gray40",
-                          command=lambda i=item: self.edit_item(i)).pack(side="right", padx=2)
-
-            # Status Label
-            status_text = "Active" if item.active_bool else "Inactive"
-            status_color = "#4CD964" if item.active_bool else "gray50"
-            ctk.CTkLabel(row, text=status_text, text_color=status_color, width=60, font=("JetBrains Mono", 11)).pack(
-                side="right", padx=10)
+            self.render_row(self.current_results[idx], self.scroll)
 
         if end_idx < self.page_items:
             self._render_job = self.after(10, self._render_batch, end_idx, batch_size)
@@ -203,6 +170,53 @@ class SimpleMasterDataGrid(ctk.CTkFrame, PaginationMixin):
         self.scroll.pack(fill="both", expand=True)
         self.render_pagination_controls()
         patch_linux_scrolling(self.scroll)
+        self.after_load_hook()
+
+    def get_query(self):
+        raise NotImplementedError
+
+    def render_row(self, item, parent_frame):
+        raise NotImplementedError
+
+    def after_load_hook(self):
+        pass
+
+class SimpleMasterDataGrid(AsyncPaginatedGrid):
+    def __init__(self, parent, db_session, model, title, has_desc=False):
+        self.model = model
+        self.has_desc = has_desc
+        super().__init__(parent, db_session, title, "+ Add New", self.add_new)
+        self.load_data()
+
+    def get_query(self):
+        return self.db_session.query(self.model).order_by(collate(self.model.name, 'NOCASE'))
+
+    def render_row(self, item, parent_frame):
+        row = ctk.CTkFrame(parent_frame, fg_color="gray20", corner_radius=6)
+        row.pack(fill="x", pady=2, padx=2)
+
+        name_frame, name_lbl = create_ellipsis_label(row, item.name, 150, ("JetBrains Mono", 12, "bold"))
+        ToolTip(name_lbl, item.name)
+        name_frame.pack(side="left", padx=10, pady=8)
+
+        if self.has_desc and hasattr(item, 'description'):
+            desc = item.description or ""
+            desc_frame, desc_lbl = create_ellipsis_label(row, desc, 150, ("JetBrains Mono", 11), "gray60")
+            ToolTip(desc_lbl, desc)
+            desc_frame.pack(side="left", padx=10)
+
+        btn_frame = ctk.CTkFrame(row, fg_color="transparent")
+        btn_frame.pack(side="right", padx=10)
+
+        toggle_text, toggle_color = ("Deactivate", "#b13e3e") if item.active_bool else ("Activate", "#1f538d")
+        ctk.CTkButton(btn_frame, text=toggle_text, width=80, height=24, fg_color=toggle_color,
+                      command=lambda i=item.id: self.toggle_status(i)).pack(side="right", padx=2)
+        ctk.CTkButton(btn_frame, text="Edit", width=60, height=24, fg_color="gray30", hover_color="gray40",
+                      command=lambda i=item: self.edit_item(i)).pack(side="right", padx=2)
+
+        status, status_color = ("Active", "#4CD964") if item.active_bool else ("Inactive", "gray50")
+        ctk.CTkLabel(row, text=status, text_color=status_color, width=60, font=("JetBrains Mono", 11)).pack(
+            side="right", padx=10)
 
     def toggle_status(self, item_id):
         try:
@@ -282,66 +296,47 @@ class SimpleMasterDataGrid(ctk.CTkFrame, PaginationMixin):
         SimpleDataDialog(self, f"Edit {self.model.__name__}", initial_name=item.name, initial_desc=initial_desc,
                          has_desc=self.has_desc, on_submit=_update)
 
-class CurrencyGrid(ctk.CTkFrame, PaginationMixin):
-    """Renders a dynamic grid for CRUD operations on currencies table."""
+class CurrencyGrid(AsyncPaginatedGrid):
     def __init__(self, parent, db_session):
-        super().__init__(parent, fg_color="transparent")
-        self.db_session = db_session
-
-        header = ctk.CTkFrame(self, fg_color="transparent")
-        header.pack(fill="x", pady=(0, 10))
-        ctk.CTkLabel(header, text="Currencies", font=("JetBrains Mono", 16, "bold")).pack(side="left")
-        ctk.CTkButton(header, text="+ Add Currency", width=130, command=self.add_new).pack(side="right")
-
-        self.scroll = ctk.CTkScrollableFrame(self)
-        self.scroll.pack(fill="both", expand=True)
-
-        self.init_pagination(page_size=100)
+        super().__init__(parent, db_session, "Currencies", "+ Add Currency", self.add_new)
         self.load_data()
 
-    def load_data(self):
-        for widget in self.scroll.winfo_children(): widget.destroy()
-        if hasattr(self, 'nav_bar'): self.nav_bar.pack_forget()
+    def get_query(self):
+        return self.db_session.query(Currency).order_by(collate(Currency.code, 'NOCASE'))
 
-        query = self.db_session.query(Currency).order_by(collate(Currency.code, 'NOCASE'))
-        items = self.paginate_query(query)
+    def render_row(self, item, parent_frame):
+        row = ctk.CTkFrame(parent_frame, fg_color="gray20", corner_radius=6)
+        row.pack(fill="x", pady=2, padx=2)
 
-        for item in items:
-            row = ctk.CTkFrame(self.scroll, fg_color="gray20", corner_radius=6)
-            row.pack(fill="x", pady=2, padx=2)
+        ctk.CTkLabel(row, text=item.code, width=40, font=("JetBrains Mono", 12, "bold"), text_color="#5AC8FA").pack(
+            side="left", padx=(10, 5), pady=8)
+        name_frame, name_lbl = create_ellipsis_label(row, item.name, 150, ("JetBrains Mono", 11))
+        ToolTip(name_lbl, item.name)
+        name_frame.pack(side="left", padx=5)
 
-            ctk.CTkLabel(row, text=item.code, width=40, font=("JetBrains Mono", 12, "bold"), text_color="#5AC8FA").pack(
-                side="left", padx=(10, 5), pady=8)
-            name_frame, name_lbl = create_ellipsis_label(row, item.name, 150, ("JetBrains Mono", 11))
-            ToolTip(name_lbl, item.name)
-            name_frame.pack(side="left", padx=5)
+        if item.is_base:
+            ctk.CTkLabel(row, text="[BASE]", text_color="#4CD964", font=("JetBrains Mono", 10, "bold"), width=50).pack(
+                side="left", padx=5)
+        else:
+            math_symbol = "[ × ]" if item.quotation_method == "multiply" else "[ ÷ ]"
+            ctk.CTkLabel(row, text=math_symbol, text_color="gray50", font=("JetBrains Mono", 12, "bold"),
+                         width=50).pack(
+                side="left", padx=5)
 
-            if item.is_base:
-                ctk.CTkLabel(row, text="[BASE]", text_color="#4CD964", font=("JetBrains Mono", 10, "bold"), width=50).pack(
-                    side="left", padx=5)
-            else:
-                math_symbol = "[ × ]" if item.quotation_method == "multiply" else "[ ÷ ]"
-                ctk.CTkLabel(row, text=math_symbol, text_color="gray50", font=("JetBrains Mono", 12, "bold"), width=50).pack(
-                    side="left", padx=5)
+        btn_frame = ctk.CTkFrame(row, fg_color="transparent")
+        btn_frame.pack(side="right", padx=10)
 
-            btn_frame = ctk.CTkFrame(row, fg_color="transparent")
-            btn_frame.pack(side="right", padx=10)
+        toggle_text, toggle_color = ("Deactivate", "#b13e3e") if item.active_bool else ("Activate", "#1f538d")
+        state = "disabled" if item.is_base == True else "normal"
+        ctk.CTkButton(btn_frame, text=toggle_text, width=80, height=24, fg_color=toggle_color, state=state,
+                      command=lambda i=item.code: self.toggle(i)).pack(side="right", padx=2)
+        ctk.CTkButton(btn_frame, text="Edit", width=60, height=24, fg_color="gray30", hover_color="gray40",
+                      command=lambda i=item: self.edit(i)).pack(side="right", padx=2)
 
-            toggle_text, toggle_color = ("Deactivate", "#b13e3e") if item.active_bool else ("Activate", "#1f538d")
-            state = "disabled" if item.is_base == True else "normal"
-            ctk.CTkButton(btn_frame, text=toggle_text, width=80, height=24, fg_color=toggle_color, state=state,
-                          command=lambda i=item.code: self.toggle(i)).pack(side="right", padx=2)
-            ctk.CTkButton(btn_frame, text="Edit", width=60, height=24, fg_color="gray30", hover_color="gray40",
-                          command=lambda i=item: self.edit(i)).pack(side="right", padx=2)
-
-            status = "Active" if item.active_bool else "Inactive"
-            color = "#4CD964" if item.active_bool else "gray50"
-            ctk.CTkLabel(row, text=status, text_color=color, width=60, font=("JetBrains Mono", 11)).pack(side="right",
-                                                                                                         padx=10)
-
-        self.render_pagination_controls()
-
-        patch_linux_scrolling(self.scroll)
+        status = "Active" if item.active_bool else "Inactive"
+        color = "#4CD964" if item.active_bool else "gray50"
+        ctk.CTkLabel(row, text=status, text_color=color, width=60, font=("JetBrains Mono", 11)).pack(side="right",
+                                                                                                     padx=10)
 
     def toggle(self, code):
         try:
@@ -360,10 +355,12 @@ class CurrencyGrid(ctk.CTkFrame, PaginationMixin):
     def add_new(self):
         base_curr = self.db_session.query(Currency).filter_by(is_base=True).first()
         base_code = base_curr.code if base_curr else "BASE"
+
         def _save(code, name, q_method, decimals):
             try:
                 if self.db_session.get(Currency, code): return False, "Currency Code already exists."
-                self.db_session.add(Currency(code=code[:10], name=name, is_base=False, quotation_method=q_method, decimals=decimals))
+                self.db_session.add(
+                    Currency(code=code[:10], name=name, is_base=False, quotation_method=q_method, decimals=decimals))
                 self.db_session.commit()
                 self.load_data()
                 self.winfo_toplevel().event_generate("<<SettingsUpdate>>")
@@ -391,86 +388,36 @@ class CurrencyGrid(ctk.CTkFrame, PaginationMixin):
         CurrencyDialog(self, "Edit Currency Name", initial_code=item.code, initial_name=item.name, is_edit=True,
                        on_submit=_update)
 
-class ExchangeRateGrid(ctk.CTkFrame, PaginationMixin):
-    """Renders a dynamic grid for CRUD operations on exchange_rates table."""
+class ExchangeRateGrid(AsyncPaginatedGrid):
     def __init__(self, parent, db_session):
-        super().__init__(parent, fg_color="transparent")
-        self.db_session = db_session
-        self.current_results = None
-        self.page_items = None
-
-        header = ctk.CTkFrame(self, fg_color="transparent")
-        header.pack(fill="x", pady=(0, 10))
-        ctk.CTkLabel(header, text="Exchange Rates", font=("JetBrains Mono", 16, "bold")).pack(side="left")
-        self.btn_add = ctk.CTkButton(header, text="+ Log New Rate", width=130, command=self.add_new)
-        self.btn_add.pack(side="right")
+        super().__init__(parent, db_session, "Exchange Rates", "+ Log New Rate", self.add_new)
 
         self.lbl_warning = ctk.CTkLabel(self, text="⚠ Add a foreign currency in 'Currencies' to log rates.",
                                         text_color="orange", font=("JetBrains Mono", 11))
-
-        self.loading_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.loading_lbl = ctk.CTkLabel(self.loading_frame, text="Loading...", font=("JetBrains Mono", 16, "bold"),
-                                        text_color="#5AC8FA")
-        self.loading_lbl.pack(pady=50)
-
-        self.scroll = ctk.CTkScrollableFrame(self)
-        self.scroll.pack(fill="both", expand=True)
-
-        self.init_pagination(page_size=100)
         self.load_data()
 
-    def load_data(self):
-        if hasattr(self, '_render_job') and self._render_job:
-            self.after_cancel(self._render_job)
+    def get_query(self):
+        return (self.db_session.query(ExchangeRate)
+                .join(Currency)
+                .filter(Currency.is_base == False)
+                .order_by(ExchangeRate.timestamp.desc()))
 
-        self.scroll.pack_forget()
-        if hasattr(self, 'nav_bar'): self.nav_bar.pack_forget()
-        self.loading_frame.pack(fill="both", expand=True)
-        self.loading_lbl.configure(text="Fetching data...")
+    def render_row(self, item, parent_frame):
+        row = ctk.CTkFrame(parent_frame, fg_color="gray20", corner_radius=6)
+        row.pack(fill="x", pady=2, padx=2)
 
-        for widget in self.scroll.winfo_children(): widget.destroy()
+        ctk.CTkLabel(row, text=item.currency_code, width=40, font=("JetBrains Mono", 12, "bold"),
+                     text_color="#5AC8FA").pack(side="left", padx=(10, 5), pady=8)
+        ctk.CTkLabel(row, text=f"Rate: {item.fx_multiplier:,.4f}", width=120, anchor="w",
+                     font=("JetBrains Mono", 11, "bold")).pack(side="left", padx=5)
+        ctk.CTkLabel(row, text=item.timestamp.strftime("%Y-%m-%d %H:%M"), text_color="gray50",
+                     font=("JetBrains Mono", 10)).pack(side="left", padx=10)
 
-        query = (self.db_session.query(ExchangeRate)
-                 .join(Currency)
-                 .filter(Currency.is_base == False)
-                 .order_by(ExchangeRate.timestamp.desc()))
+        ctk.CTkButton(row, text="✕", width=30, height=24, fg_color="transparent", text_color="gray50",
+                      hover_color="#8b2525",
+                      command=lambda i=item.id: self.delete(i)).pack(side="right", padx=10)
 
-        self.current_results = self.paginate_query(query)
-        self.page_items = len(self.current_results)
-
-        if self.page_items > 0:
-            self._render_batch(start_idx=0, batch_size=25)
-        else:
-            self._finish_loading()
-
-    def _render_batch(self, start_idx, batch_size):
-        end_idx = min(start_idx + batch_size, self.page_items)
-
-        self.loading_lbl.configure(text=f"Loading... {end_idx} / {self.page_items}")
-
-        for idx in range(start_idx, end_idx):
-            r = self.current_results[idx]
-            row = ctk.CTkFrame(self.scroll, fg_color="gray20", corner_radius=6)
-            row.pack(fill="x", pady=2, padx=2)
-
-            ctk.CTkLabel(row, text=r.currency_code, width=40, font=("JetBrains Mono", 12, "bold"),
-                         text_color="#5AC8FA").pack(side="left", padx=(10, 5), pady=8)
-            ctk.CTkLabel(row, text=f"Rate: {r.fx_multiplier:,.4f}", width=120, anchor="w",
-                         font=("JetBrains Mono", 11, "bold")).pack(side="left", padx=5)
-            ctk.CTkLabel(row, text=r.timestamp.strftime("%Y-%m-%d %H:%M"), text_color="gray50",
-                         font=("JetBrains Mono", 10)).pack(side="left", padx=10)
-
-            ctk.CTkButton(row, text="✕", width=30, height=24, fg_color="transparent", text_color="gray50",
-                          hover_color="#8b2525",
-                          command=lambda i=r.id: self.delete(i)).pack(side="right", padx=10)
-
-        if end_idx < self.page_items:
-            self._render_job = self.after(10, self._render_batch, end_idx, batch_size)
-        else:
-            self._finish_loading()
-
-    def _finish_loading(self):
-        self.loading_frame.pack_forget()
+    def after_load_hook(self):
         act_currencies = [c for c in self.db_session.query(Currency).filter_by(active_bool=True).all() if not c.is_base]
         if not act_currencies:
             self.btn_add.configure(state="disabled")
@@ -480,10 +427,6 @@ class ExchangeRateGrid(ctk.CTkFrame, PaginationMixin):
         else:
             self.btn_add.configure(state="normal")
             self.lbl_warning.pack_forget()
-            self.scroll.pack(fill="both", expand=True)
-            self.render_pagination_controls()
-
-        patch_linux_scrolling(self.scroll)
 
     def delete(self, rate_id):
         rate = self.db_session.get(ExchangeRate, rate_id)
@@ -540,7 +483,8 @@ class ExchangeRateGrid(ctk.CTkFrame, PaginationMixin):
         if not base_curr:
             return
 
-        foreign_currs = self.db_session.query(Currency).filter_by(active_bool=True, is_base=False).order_by(collate(Currency.code, 'NOCASE')).all()
+        foreign_currs = self.db_session.query(Currency).filter_by(active_bool=True, is_base=False).order_by(
+            collate(Currency.code, 'NOCASE')).all()
         if not foreign_currs:
             return
 
@@ -573,56 +517,39 @@ class ExchangeRateGrid(ctk.CTkFrame, PaginationMixin):
             on_submit=_save
         )
 
-class AccountGrid(ctk.CTkFrame, PaginationMixin):
+class AccountGrid(AsyncPaginatedGrid):
     def __init__(self, parent, db_session):
-        super().__init__(parent, fg_color="transparent")
-        self.db_session = db_session
-        header = ctk.CTkFrame(self, fg_color="transparent")
-        header.pack(fill="x", pady=(0, 10))
-        ctk.CTkLabel(header, text="Accounts", font=("JetBrains Mono", 16, "bold")).pack(side="left")
-        ctk.CTkButton(header, text="+ Add Account", width=130, command=self.add_new).pack(side="right")
-
-        self.scroll = ctk.CTkScrollableFrame(self)
-        self.scroll.pack(fill="both", expand=True)
-
-        self.init_pagination(page_size=100)
+        super().__init__(parent, db_session, "Accounts", "+ Add Account", self.add_new)
         self.load_data()
 
-    def load_data(self):
-        for widget in self.scroll.winfo_children(): widget.destroy()
-        if hasattr(self, 'nav_bar'): self.nav_bar.pack_forget()
+    def get_query(self):
+        return self.db_session.query(Account).order_by(collate(Account.name, 'NOCASE'))
 
-        query = self.db_session.query(Account).order_by(collate(Account.name, 'NOCASE'))
-        items = self.paginate_query(query)
+    def render_row(self, item, parent_frame):
+        row = ctk.CTkFrame(parent_frame, fg_color="gray20", corner_radius=6)
+        row.pack(fill="x", pady=2, padx=2)
 
-        for item in items:
-            row = ctk.CTkFrame(self.scroll, fg_color="gray20", corner_radius=6)
-            row.pack(fill="x", pady=2, padx=2)
+        name_frame, name_lbl = create_ellipsis_label(row, item.name, 120, ("JetBrains Mono", 12, "bold"))
+        ToolTip(name_lbl, item.name)
+        name_frame.pack(side="left", padx=10, pady=8)
+        balance_text = f"{item.balance:,.{item.currency.decimals}f} {item.currency_code}"
+        balance_frame, balance_lbl = create_ellipsis_label(row, balance_text, 100, ("JetBrains Mono", 11, "bold"),
+                                                           "#5AC8FA")
+        ToolTip(balance_lbl, balance_text)
+        balance_frame.pack(side="left", padx=5)
 
-            name_frame, name_lbl = create_ellipsis_label(row, item.name, 120, ("JetBrains Mono", 12, "bold"))
-            ToolTip(name_lbl, item.name)
-            name_frame.pack(side="left", padx=10, pady=8)
-            balance_text = f"{item.balance:,.{item.currency.decimals}f} {item.currency_code}"
-            balance_frame, balance_lbl = create_ellipsis_label(row, balance_text, 100, ("JetBrains Mono", 11, "bold"), "#5AC8FA")
-            ToolTip(balance_lbl, balance_text)
-            balance_frame.pack(side="left", padx=5)
+        btn_frame = ctk.CTkFrame(row, fg_color="transparent")
+        btn_frame.pack(side="right", padx=10)
+        t_text, t_color = ("Deactivate", "#b13e3e") if item.active_bool else ("Activate", "#1f538d")
 
-            btn_frame = ctk.CTkFrame(row, fg_color="transparent")
-            btn_frame.pack(side="right", padx=10)
-            t_text, t_color = ("Deactivate", "#b13e3e") if item.active_bool else ("Activate", "#1f538d")
+        ctk.CTkButton(btn_frame, text=t_text, width=80, height=24, fg_color=t_color,
+                      command=lambda i=item: self.toggle(i)).pack(side="right", padx=2)
+        ctk.CTkButton(btn_frame, text="Edit", width=60, height=24, fg_color="gray30", hover_color="gray40",
+                      command=lambda i=item: self.edit(i)).pack(side="right", padx=2)
 
-            ctk.CTkButton(btn_frame, text=t_text, width=80, height=24, fg_color=t_color,
-                          command=lambda i=item: self.toggle(i)).pack(side="right", padx=2)
-            ctk.CTkButton(btn_frame, text="Edit", width=60, height=24, fg_color="gray30", hover_color="gray40",
-                          command=lambda i=item: self.edit(i)).pack(side="right", padx=2)
-
-            status, color = ("Active", "#4CD964") if item.active_bool else ("Inactive", "gray50")
-            ctk.CTkLabel(row, text=status, text_color=color, width=60, font=("JetBrains Mono", 11)).pack(side="right",
-                                                                                                         padx=10)
-
-        self.render_pagination_controls()
-
-        patch_linux_scrolling(self.scroll)
+        status, color = ("Active", "#4CD964") if item.active_bool else ("Inactive", "gray50")
+        ctk.CTkLabel(row, text=status, text_color=color, width=60, font=("JetBrains Mono", 11)).pack(side="right",
+                                                                                                     padx=10)
 
     def toggle(self, acc):
         if acc.active_bool and acc.balance != 0:
@@ -672,7 +599,8 @@ class AccountGrid(ctk.CTkFrame, PaginationMixin):
             show_popup(self, "Database Error", f"Failed to toggle account:\n{e}", is_error=True)
 
     def add_new(self):
-        currencies = self.db_session.query(Currency).filter_by(active_bool=True).order_by(collate(Currency.code, 'NOCASE')).all()
+        currencies = self.db_session.query(Currency).filter_by(active_bool=True).order_by(
+            collate(Currency.code, 'NOCASE')).all()
         if not currencies: return
 
         curr_data = {c.code: c.decimals for c in currencies}
@@ -685,7 +613,8 @@ class AccountGrid(ctk.CTkFrame, PaginationMixin):
                     if not has_rate:
                         return False, f"You must log an Exchange Rate for {curr_code} first."
                 if self.db_session.query(Account).filter_by(name=name).first(): return False, "Name already exists."
-                self.db_session.add(Account(name=name, description=descr, currency_code=curr_code, balance=bal, initial_balance=bal))
+                self.db_session.add(
+                    Account(name=name, description=descr, currency_code=curr_code, balance=bal, initial_balance=bal))
                 self.db_session.commit()
                 self.load_data()
                 self.winfo_toplevel().event_generate("<<SidebarUpdate>>")
@@ -720,64 +649,47 @@ class AccountGrid(ctk.CTkFrame, PaginationMixin):
 
         curr_data = {acc.currency_code: acc.currency.decimals}
 
-        AccountDialog(self, currency_data=curr_data, initial_name=acc.name, initial_desc=acc.description, initial_curr=acc.currency_code,
+        AccountDialog(self, currency_data=curr_data, initial_name=acc.name, initial_desc=acc.description,
+                      initial_curr=acc.currency_code,
                       initial_bal=str(acc.initial_balance), is_edit=True, on_submit=_update)
 
-class PMGrid(ctk.CTkFrame, PaginationMixin):
+class PMGrid(AsyncPaginatedGrid):
     def __init__(self, parent, db_session):
-        super().__init__(parent, fg_color="transparent")
-        self.db_session = db_session
-        header = ctk.CTkFrame(self, fg_color="transparent")
-        header.pack(fill="x", pady=(0, 10))
-        ctk.CTkLabel(header, text="Payment Methods", font=("JetBrains Mono", 16, "bold")).pack(side="left")
-        ctk.CTkButton(header, text="+ Add Method", width=130, command=self.add_new).pack(side="right")
-
-        self.scroll = ctk.CTkScrollableFrame(self)
-        self.scroll.pack(fill="both", expand=True)
-
-        self.init_pagination(page_size=100)
+        super().__init__(parent, db_session, "Payment Methods", "+ Add Method", self.add_new)
         self.load_data()
 
-    def load_data(self, _event=None):
-        for widget in self.scroll.winfo_children(): widget.destroy()
-        if hasattr(self, 'nav_bar'): self.nav_bar.pack_forget()
+    def get_query(self):
+        return self.db_session.query(PaymentMethod).join(Account).order_by(collate(Account.name, 'NOCASE'),
+                                                                           collate(PaymentMethod.name, 'NOCASE'))
 
-        query = self.db_session.query(PaymentMethod).join(Account).order_by(collate(Account.name, 'NOCASE'),
-                                                                            collate(PaymentMethod.name, 'NOCASE'))
-        items = self.paginate_query(query)
+    def render_row(self, item, parent_frame):
+        row = ctk.CTkFrame(parent_frame, fg_color="gray20", corner_radius=6)
+        row.pack(fill="x", pady=2, padx=2)
 
-        for item in items:
-            row = ctk.CTkFrame(self.scroll, fg_color="gray20", corner_radius=6)
-            row.pack(fill="x", pady=2, padx=2)
+        name_frame, name_lbl = create_ellipsis_label(row, item.name, 120, ("JetBrains Mono", 12, "bold"))
+        ToolTip(name_lbl, item.name)
+        name_frame.pack(side="left", padx=10, pady=8)
 
-            name_frame, name_lbl = create_ellipsis_label(row, item.name, 120, ("JetBrains Mono", 12, "bold"))
-            ToolTip(name_lbl, item.name)
-            name_frame.pack(side="left", padx=10, pady=8)
+        acc_color = "gray60" if not item.account.active_bool else "#5AC8FA"
+        acc_text = f"→ {item.account.name}"
+        acc_frame, acc_lbl = create_ellipsis_label(row, acc_text, 140, ("JetBrains Mono", 11), acc_color)
+        ToolTip(acc_lbl, acc_text)
+        acc_frame.pack(side="left", padx=5)
 
-            acc_color = "gray60" if not item.account.active_bool else "#5AC8FA"
-            acc_text = f"→ {item.account.name}"
-            acc_frame, acc_lbl = create_ellipsis_label(row, acc_text, 140, ("JetBrains Mono", 11), acc_color)
-            ToolTip(acc_lbl, acc_text)
-            acc_frame.pack(side="left", padx=5)
+        btn_frame = ctk.CTkFrame(row, fg_color="transparent")
+        btn_frame.pack(side="right", padx=10)
 
-            btn_frame = ctk.CTkFrame(row, fg_color="transparent")
-            btn_frame.pack(side="right", padx=10)
+        t_text, t_color = ("Deactivate", "#b13e3e") if item.active_bool else ("Activate", "#1f538d")
 
-            t_text, t_color = ("Deactivate", "#b13e3e") if item.active_bool else ("Activate", "#1f538d")
+        state = "disabled" if not item.active_bool and not item.account.active_bool else "normal"
+        ctk.CTkButton(btn_frame, text=t_text, width=80, height=24, fg_color=t_color, state=state,
+                      command=lambda i=item.id: self.toggle(i)).pack(side="right", padx=2)
+        ctk.CTkButton(btn_frame, text="Edit", width=60, height=24, fg_color="gray30", hover_color="gray40",
+                      command=lambda i=item: self.edit(i)).pack(side="right", padx=2)
 
-            state = "disabled" if not item.active_bool and not item.account.active_bool else "normal"
-            ctk.CTkButton(btn_frame, text=t_text, width=80, height=24, fg_color=t_color, state=state,
-                          command=lambda i=item.id: self.toggle(i)).pack(side="right", padx=2)
-            ctk.CTkButton(btn_frame, text="Edit", width=60, height=24, fg_color="gray30", hover_color="gray40",
-                          command=lambda i=item: self.edit(i)).pack(side="right", padx=2)
-
-            status, color = ("Active", "#4CD964") if item.active_bool else ("Inactive", "gray50")
-            ctk.CTkLabel(row, text=status, text_color=color, width=60, font=("JetBrains Mono", 11)).pack(side="right",
-                                                                                                         padx=10)
-
-        self.render_pagination_controls()
-
-        patch_linux_scrolling(self.scroll)
+        status, color = ("Active", "#4CD964") if item.active_bool else ("Inactive", "gray50")
+        ctk.CTkLabel(row, text=status, text_color=color, width=60, font=("JetBrains Mono", 11)).pack(side="right",
+                                                                                                     padx=10)
 
     def toggle(self, item_id):
         try:
@@ -790,7 +702,8 @@ class PMGrid(ctk.CTkFrame, PaginationMixin):
             show_popup(self, "Database Error", f"Failed to toggle Payment Method:\n{e}", is_error=True)
 
     def add_new(self):
-        act_accounts = [a.name for a in self.db_session.query(Account).filter_by(active_bool=True).order_by(collate(Account.name, 'NOCASE')).all()]
+        act_accounts = [a.name for a in self.db_session.query(Account).filter_by(active_bool=True).order_by(
+            collate(Account.name, 'NOCASE')).all()]
         if not act_accounts: return
 
         def _save(name, acc_name):
@@ -811,7 +724,8 @@ class PMGrid(ctk.CTkFrame, PaginationMixin):
         PMDialog(self, act_accounts, on_submit=_save)
 
     def edit(self, item):
-        act_accounts = [a.name for a in self.db_session.query(Account).filter_by(active_bool=True).order_by(collate(Account.name, 'NOCASE')).all()]
+        act_accounts = [a.name for a in self.db_session.query(Account).filter_by(active_bool=True).order_by(
+            collate(Account.name, 'NOCASE')).all()]
         if item.account.name not in act_accounts: act_accounts.append(item.account.name)
 
         def _update(name, acc_name):

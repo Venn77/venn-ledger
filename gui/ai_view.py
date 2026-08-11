@@ -117,7 +117,7 @@ class AIImportView(ctk.CTkFrame):
         self.ai_year_combo = ctk.CTkComboBox(row2, values=years, width=80)
         self.ai_year_combo.set(current_year)
         self.ai_year_combo.pack(side="left", padx=(10, 25))
-        ToolTip(self.ai_year_combo, "Select from dropdown or manually type a year.")
+        ToolTip(self.ai_year_combo, "Select from dropdown or manually type any year.")
 
         ctk.CTkLabel(row2, text="Default Currency:", font=("JetBrains Mono", 11, "bold")).pack(side="left")
         self.ai_curr_combo = ctk.CTkComboBox(row2, values=active_currencies, state="readonly", width=120)

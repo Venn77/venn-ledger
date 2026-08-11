@@ -604,7 +604,7 @@ class PMDialog(ctk.CTkToplevel):
 
 class SearchableListDialog(ctk.CTkToplevel):
     """A reusable modal dialog for searching and selecting an item from a long list."""
-    def __init__(self, parent, title, items, show_search=True):
+    def __init__(self, parent, title, items, show_search=True, allow_custom=False, initial_search=""):
         super().__init__(parent)
         self.withdraw()
         self.attributes("-alpha", 0.0)
@@ -617,7 +617,10 @@ class SearchableListDialog(ctk.CTkToplevel):
 
         self.items = items
         self.selected_item = None
+        self.search_timer = None
         set_app_window_icon(self)
+
+        self.bind("<Escape>", lambda e: self._on_escape())
 
         # Search Bar
         if show_search:
@@ -630,6 +633,12 @@ class SearchableListDialog(ctk.CTkToplevel):
             self.search_entry = ctk.CTkEntry(search_frame)
             self.search_entry.pack(side="left", fill="x", expand=True)
             self.search_entry.bind("<KeyRelease>", self._filter_list)
+
+            if allow_custom:
+                self.btn_custom = ctk.CTkButton(search_frame, text="Add", width=50,
+                                                command=self._use_custom, fg_color="#1f538d", hover_color="#14375e")
+                self.btn_custom.pack(side="left", padx=(5, 0))
+                self.search_entry.bind("<Return>", self._use_custom)
 
             top_padding = 5
         else:
@@ -644,6 +653,10 @@ class SearchableListDialog(ctk.CTkToplevel):
         self._populate_list(self.items)
         patch_linux_scrolling(self.scroll_frame)
 
+        if self.search_entry and initial_search:
+            self.search_entry.insert(0, initial_search)
+            self._filter_list()
+
         self.update_idletasks()
         self.geometry(calculate_dialog_geometry(parent, 350, 450))
         self.deiconify()
@@ -654,6 +667,18 @@ class SearchableListDialog(ctk.CTkToplevel):
 
         self.grab_set()
         self.wait_window()
+
+    def _use_custom(self, _event=None):
+        """Passes the raw typed text back to the parent."""
+        val = self.search_entry.get().strip()
+        if val:
+            self._select_item(val)
+
+    def _on_escape(self):
+        """Cleanly closes the dialog without a selection."""
+        self.selected_item = None
+        self.grab_release()
+        self.destroy()
 
     def _reveal_window(self):
         """Restores opacity only after the OS has completely painted the dark canvas."""
@@ -678,6 +703,13 @@ class SearchableListDialog(ctk.CTkToplevel):
             self.buttons.append(btn)
 
     def _filter_list(self, _event=None):
+        """Debounces the search input to prevent UI lag on large lists."""
+        if self.search_timer:
+            self.after_cancel(self.search_timer)
+        self.search_timer = self.after(300, self._execute_filter)
+
+    def _execute_filter(self):
+        self.search_timer = None
         if not self.search_entry:
             return
 

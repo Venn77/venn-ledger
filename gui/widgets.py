@@ -178,11 +178,14 @@ class MonthYearSelector(ctk.CTkFrame):
         current_yr = self.current_date.year
         # Generate -10 to +10 years
         years = [str(y) for y in range(current_yr - 10, current_yr + 11)]
-        dialog = SearchableListDialog(self.btn_year_lbl, "Select Year", years, show_search=False)
-        res = dialog.get_result()
-        if res:
-            self.current_date = self.current_date.replace(year=int(res))
-            self._notify_parent()
+        dialog = SearchableListDialog(self.btn_year_lbl, "Select Year", years, show_search=True, allow_custom=True)
+        try:
+            res = dialog.get_result()
+            if res:
+                self.current_date = self.current_date.replace(year=int(res))
+                self._notify_parent()
+        except ValueError:
+            pass
 
     def _select_month(self):
         months = [datetime.date(2000, m, 1).strftime('%B') for m in range(1, 13)]
@@ -251,6 +254,42 @@ class SearchableComboBox(ctk.CTkComboBox):
         self._entry.bind("<KeyRelease>", self._on_key_release)
         self._entry.bind("<Down>", self._on_down_key)
 
+    def _clicked(self, event=None):
+        """
+        Overrides the CTk chevron click.
+        Shows full list, but spawns dialog if > 20 items.
+        """
+        if self._state == "disabled":
+            return
+
+        if self.get() == self.placeholder:
+            self.set("")
+            self.configure(text_color="white")
+
+        if len(self.all_values) > 20:
+            self._spawn_dialog(self.all_values, prefill_text="")
+        else:
+            self.configure(values=self.all_values)
+            super()._clicked(event)
+
+    def _spawn_dialog(self, items_to_show, prefill_text=""):
+        """Spawns the modal dialog with controlled initial search text."""
+        dialog = SearchableListDialog(
+            self.winfo_toplevel(),
+            "Select Option",
+            items_to_show,
+            show_search=True,
+            allow_custom=True,
+            initial_search=prefill_text
+        )
+
+        res = dialog.get_result()
+        if res:
+            self.set(res)
+            self.configure(text_color="white")
+            if hasattr(self, "_command") and self._command:
+                self._command(res)
+
     def _dropdown_callback(self, value):
         """Overrides the internal CTk hook for dropdown selections."""
         super()._dropdown_callback(value)
@@ -289,16 +328,26 @@ class SearchableComboBox(ctk.CTkComboBox):
         self.configure(values=filtered)
 
     def _on_down_key(self, _event):
-        """Manually opens the filtered list when the user hits the Down arrow."""
-        # noinspection PyBroadException
-        try:
-            if self.get() == self.placeholder:
-                self.set("")
-                self.configure(text_color="white")
+        """Forces filtering on the typed string, then opens menu or dialog."""
+        if self._state == "disabled":
+            return
 
-            self._open_dropdown_menu()
-        except Exception:
-            pass
+        if self.get() == self.placeholder:
+            self.set("")
+            self.configure(text_color="white")
+
+        typed = self.get().lower()
+        if typed == "":
+            filtered = self.all_values
+        else:
+            filtered = [v for v in self.all_values if typed in v.lower()]
+
+        if len(filtered) > 20:
+            self._spawn_dialog(filtered, prefill_text=self.get().strip())
+        else:
+            self.configure(values=filtered)
+            if hasattr(self, "_open_dropdown_menu"):
+                self._open_dropdown_menu()
 
     def inject_value(self, value):
         """Pre-fills data for Copy/Edit modes."""
@@ -751,3 +800,41 @@ class TransactionRow(ctk.CTkFrame):
             self.on_leave_action()
 
         self.main_app.delete_transaction_prompt(self.data.id, self.data.type, context_str, on_cancel)
+
+# Monkey Patch: turns regular dropdowns into smart ones!
+def _enable_smart_dropdown(cls):
+    """Dynamically upgrades any CTk dropdown class to use SearchableListDialog when its contents exceed 20 items."""
+    original_clicked = cls._clicked
+
+    def _smart_clicked(self: ctk.CTkComboBox | ctk.CTkOptionMenu, event=None):
+        if self._state == "disabled":
+            return
+
+        values = self._values or []
+        if len(values) > 20:
+            from gui.dialogs import SearchableListDialog
+
+            dialog = SearchableListDialog(
+                self,
+                "Select Option",
+                values,
+                show_search=True,
+                allow_custom=False,
+                initial_search=""
+            )
+
+            res = dialog.get_result()
+            if res:
+                self.set(res)
+                if self._command:
+                    self._command(res)
+        else:
+            bound_method = original_clicked.__get__(self, cls)
+            bound_method(event)
+
+    cls._clicked = _smart_clicked
+
+_enable_smart_dropdown(ctk.CTkComboBox)
+_enable_smart_dropdown(ctk.CTkOptionMenu)
+
+

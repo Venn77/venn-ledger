@@ -62,7 +62,6 @@ def apply_dynamic_ellipsis(container_frame, label_widget, full_text):
 
     container_frame.bind("<Configure>", _resize_text, add="+")
 
-
 def calculate_dialog_geometry(widget, width, height):
     """
     Calculates X anchored to the reference widget, and Y anchored to the mouse pointer.

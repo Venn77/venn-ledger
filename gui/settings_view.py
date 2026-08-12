@@ -74,10 +74,18 @@ class SettingsView(ctk.CTkFrame):
         = self.vendor_grid = self.payer_grid\
         = self.proj_grid = self.curr_grid\
         = self.fx_grid = self.loading_popup\
-        = self._backup_cancelled = None
+        = None
+        self._backup_cancelled = False
         self.app.bind("<<SettingsUpdate>>", lambda e: self.refresh_view(), add="+")
-        # noinspection PyTypeChecker
-        self.after(50, self.on_tab_change)
+        self._tab_timer = None
+        self._tab_timer = self.after(50, self.on_tab_change)
+
+    def destroy(self):
+        """Safely cleans up pending timers before destruction."""
+        if self._tab_timer is not None:
+            self.after_cancel(self._tab_timer)
+            self._tab_timer = None
+        super().destroy()
 
     def on_tab_change(self):
         """Fires whenever a tab is clicked. Lazy-loads the content."""
@@ -219,9 +227,9 @@ class SettingsView(ctk.CTkFrame):
         success, message = create_full_backup_zip(self.app.db_session, DB_PATH, temp_filepath)
 
         if not success:
-            if hasattr(self, 'loading_popup') and self.loading_popup.winfo_exists():
+            if self.loading_popup is not None and self.loading_popup.winfo_exists():
                 self.loading_popup.destroy()
-                delattr(self, 'loading_popup')
+                self.loading_popup = None
                 self.update()
 
             show_popup(self, "Error", f"Failed to prepare backup:\n{message}", is_error=True)
@@ -236,16 +244,17 @@ class SettingsView(ctk.CTkFrame):
         if os.path.exists(temp_filepath):
             os.remove(temp_filepath)
 
-        self.after(0, self._cloud_backup_finish, cloud_success, cloud_msg)
+        if self.winfo_exists():
+            self.after(0, self._cloud_backup_finish, cloud_success, cloud_msg)
 
     def _cloud_backup_finish(self, success, message):
         """Reports back results to the main thread."""
-        if getattr(self, '_backup_cancelled', False):
+        if self._backup_cancelled:
             return
 
-        if hasattr(self, 'loading_popup') and self.loading_popup.winfo_exists():
+        if self.loading_popup is not None and self.loading_popup.winfo_exists():
             self.loading_popup.destroy()
-            delattr(self, 'loading_popup')
+            self.loading_popup = None
             self.update()
 
         if success:
@@ -265,6 +274,6 @@ class SettingsView(ctk.CTkFrame):
         ]
 
         for grid in grids:
-            if grid is not None and hasattr(grid, "load_data"):
+            if grid is not None:
                 grid.load_data()
 

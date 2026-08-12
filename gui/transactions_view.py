@@ -479,7 +479,7 @@ class TransactionsView(ctk.CTkFrame):
 
     def _schedule_page_render(self):
         """Debounces pagination to prevent DB/Render lag on rapid clicks."""
-        if self.page_timer:
+        if self.page_timer is not None:
             self.after_cancel(self.page_timer)
         # noinspection PyTypeChecker
         self.page_timer = self.after(300, self._execute_page_render)
@@ -593,7 +593,7 @@ class TransactionsView(ctk.CTkFrame):
         if val == self.search_placeholder:
             return
 
-        if hasattr(self, 'search_timer') and self.search_timer:
+        if self.search_timer is not None:
             self.after_cancel(self.search_timer)
         # noinspection PyTypeChecker
         self.search_timer = self.after(500, self.execute_search)
@@ -621,7 +621,7 @@ class TransactionsView(ctk.CTkFrame):
         self.current_search_text = ""
         self.current_page = 0
 
-        if hasattr(self, 'search_timer') and self.search_timer:
+        if self.search_timer is not None:
             self.after_cancel(self.search_timer)
             self.search_timer = None
 
@@ -660,7 +660,7 @@ class TransactionsView(ctk.CTkFrame):
 
     def _schedule_nav_load(self):
         """Debounces DB calls to allow rapid clicking."""
-        if self.nav_timer:
+        if self.nav_timer is not None:
             self.after_cancel(self.nav_timer)
         # noinspection PyTypeChecker
         self.nav_timer = self.after(300, self._execute_nav_load)
@@ -673,7 +673,7 @@ class TransactionsView(ctk.CTkFrame):
 
     def _schedule_type_filter(self):
         """Debounces DB calls to allow rapid clicking."""
-        if self.type_timer:
+        if self.type_timer is not None:
             self.after_cancel(self.type_timer)
         # noinspection PyTypeChecker
         self.type_timer = self.after(600, self._execute_type_filter)

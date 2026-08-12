@@ -105,6 +105,16 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         self.save_btn_ring = ctk.CTkFrame(self.btn_frame, fg_color="transparent", corner_radius=6)
         self.save_btn = ctk.CTkButton(self.save_btn_ring, text="Save", command=self.submit_data, fg_color="green", border_width=0)
 
+    def destroy(self):
+        """Safely cleans up pending timers before destroying the window."""
+        if self._val_timer is not None:
+            self.after_cancel(self._val_timer)
+            self._val_timer = None
+        if self._fx_timer is not None:
+            self.after_cancel(self._fx_timer)
+            self._fx_timer = None
+        super().destroy()
+
     def center_relative_to_parent(self, width, height):
         """Calculates coordinates to center this window over its parent."""
         self.master.update_idletasks()
@@ -287,12 +297,11 @@ class BaseTransactionWindow(ctk.CTkToplevel):
 
     def _handle_date_change(self, _var_name, _index, _mode):
         """Ensures correct execution sequence when the user changes the Date."""
-        if hasattr(self, 'date_placeholder') and self.date_var.get() != self.date_placeholder:
+        if self.date_var.get() != self.date_placeholder:
             self.date_entry.configure(text_color="white")
 
         self.schedule_fx_update()
-        if hasattr(self, 'error_label'):
-            self.validate_form()
+        self.validate_form()
 
     def _handle_currency_change(self, _var_name, _index, _mode):
         """Re-runs validation, pulls FX updates, and rescales entry placeholders."""
@@ -309,8 +318,7 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         self._reformat_input(self.amount_entry, dec, self.amount_placeholder)
         self.schedule_fx_update()
         self.on_currency_change(cur)
-        if hasattr(self, 'error_label'):
-            self.validate_form()
+        self.validate_form()
 
     def force_focus(self):
         self.focus_force()
@@ -319,7 +327,7 @@ class BaseTransactionWindow(ctk.CTkToplevel):
 
     def schedule_fx_update(self):
         """Debounces the FX lookup."""
-        if hasattr(self, '_fx_timer') and self._fx_timer:
+        if self._fx_timer is not None:
             self.after_cancel(self._fx_timer)
         self._fx_timer = self.after(500, self.update_fx_list)
 
@@ -428,9 +436,8 @@ class BaseTransactionWindow(ctk.CTkToplevel):
 
     def schedule_validation(self, *_):
         """Debounces the validation until user is done typing."""
-        if self._val_timer:
+        if self._val_timer is not None:
             self.after_cancel(self._val_timer)
-        # noinspection PyTypeChecker
         self._val_timer = self.after(500, self.validate_form)
 
     def validate_form(self, *_):
@@ -458,12 +465,11 @@ class BaseTransactionWindow(ctk.CTkToplevel):
                 self.error_label.configure(text="⚠ Select a valid Currency")
             return
 
-        if hasattr(self, 'project_combo'):
-            proj_val = self.project_combo.get().strip()
-            if proj_val.lower() in ["all projects", "no project"]:
-                self.save_btn.configure(state="disabled", fg_color="gray30", text_color="white")
-                self.error_label.configure(text=f"⚠ '{proj_val}' is a reserved system name")
-                return
+        proj_val = self.project_combo.get().strip()
+        if proj_val.lower() in ["all projects", "no project"]:
+            self.save_btn.configure(state="disabled", fg_color="gray30", text_color="white")
+            self.error_label.configure(text=f"⚠ '{proj_val}' is a reserved system name")
+            return
 
         spec_ok, spec_err = self.validate_specific_fields()
         if not spec_ok:

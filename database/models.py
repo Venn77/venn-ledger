@@ -21,7 +21,7 @@ def set_sqlite_pragma(dbapi_connection, _connection_record):
 def calculate_conversion(item, is_base_currency=False, quotation_method="divide", decimals=2):
     """Returns converted amount with two decimals."""
     precision_string = "0." + ("0" * decimals) if decimals > 0 else "0"
-    if is_base_currency or not getattr(item, 'fx_rate', None):
+    if is_base_currency or not item.fx_rate:
         val = Decimal(str(item.amount)).quantize(Decimal(precision_string), rounding=ROUND_HALF_UP)
         item.converted_amount = float(val)
         item.fx_rate = None
@@ -185,8 +185,9 @@ class Expense(Base):
     project = relationship("Project", back_populates="expenses")
 
     def __repr__(self):
+        conv = f"{self.converted_amount}" if self.converted_amount is not None else "None"
         return (f"<Expense(amount={self.amount} {self.currency_code}, "
-                f"BASE={self.converted_amount:.{self.currency.decimals}f}, vendor='{self.vendor_id}', category='{self.category_id}')>")
+                f"BASE={conv}, vendor_id='{self.vendor_id}', category_id='{self.category_id}')>")
 
 class Gain(Base):
     __tablename__ = 'gains'
@@ -212,8 +213,9 @@ class Gain(Base):
     project = relationship("Project", back_populates="gains")
 
     def __repr__(self):
+        conv = f"{self.converted_amount}" if self.converted_amount is not None else "None"
         return (f"<Gain(amount={self.amount} {self.currency_code}, "
-                f"BASE={self.converted_amount:.{self.currency.decimals}f}, payer='{self.payer_id}', stream='{self.stream_id}')>")
+                f"BASE={conv}, payer_id='{self.payer_id}', stream_id='{self.stream_id}')>")
 
 class Transfer(Base):
     __tablename__ = 'transfers'

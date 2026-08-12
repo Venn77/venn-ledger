@@ -60,6 +60,13 @@ class AIStagingGrid(ctk.CTkFrame):
 
         self.render_page()
 
+    def destroy(self):
+        """Safely cleans up pending renders before destroying the grid."""
+        if self.render_timer is not None:
+            self.after_cancel(self.render_timer)
+            self.render_timer = None
+        super().destroy()
+
     def _pre_validate_all(self):
         """Runs headless validation on all items before the UI renders them."""
         pm_map = {p.name: p.account.currency_code for p in self.active_pms}
@@ -71,9 +78,8 @@ class AIStagingGrid(ctk.CTkFrame):
 
     def _schedule_render(self):
         """Debouncer: Cancels the previous timer and sets a new one to draw the page."""
-        if self.render_timer:
+        if self.render_timer is not None:
             self.after_cancel(self.render_timer)
-        # noinspection PyTypeChecker
         self.render_timer = self.after(300, self.render_page)
 
     def update_pagination_state(self):
@@ -188,7 +194,11 @@ class AIStagingGrid(ctk.CTkFrame):
             day, month = map(int, res['date'].split('/'))
             dt = datetime.datetime(int(self.year), month, day, 12, 0, 0, 0)
 
-            fx_rate = res.get('fx_rate', None)
+            raw_fx = res.get('fx_rate')
+            try:
+                fx_rate = float(raw_fx) if raw_fx else None
+            except ValueError:
+                fx_rate = None
 
             try:
                 self.app.manager.add_expense(

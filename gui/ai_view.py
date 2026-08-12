@@ -179,6 +179,14 @@ class AIImportView(ctk.CTkFrame):
 
         self.ai_cancel_event = threading.Event()
 
+        self._thread_results = None
+        self._thread_error = None
+
+    def destroy(self):
+        """Ensures the background AI thread gracefully aborts if the view is destroyed."""
+        self.ai_cancel_event.set()
+        super().destroy()
+
     def _show_format_guide(self):
         """Displays a guide for the required text file format."""
         msg = (
@@ -430,13 +438,9 @@ class AIImportView(ctk.CTkFrame):
             self.btn_clear_ai.configure(state="normal")
             self.preview_container.pack(fill="both", expand=True)
 
-            if hasattr(self, 'staging_title'):
-                self.staging_title.configure(text="File Preview")
-
+            self.staging_title.configure(text="File Preview")
             self.btn_import_all.pack_forget()
-
-            if hasattr(self, 'btn_toggle_view'):
-                self.btn_toggle_view.pack_forget()
+            self.btn_toggle_view.pack_forget()
 
         self.ai_progress_bar.pack_forget()
 
@@ -456,7 +460,7 @@ class AIImportView(ctk.CTkFrame):
     def _on_ai_parsing_failed(self, error_msg=None):
         """Runs on main thread: Handles crashes during parsing."""
         if error_msg is None:
-            error_msg = getattr(self, "_thread_error", "Unknown error occurred.")
+            error_msg = self._thread_error or "Unknown error occurred."
 
         self.ai_year_combo.configure(state="normal")
         self.ai_curr_combo.configure(state="normal")

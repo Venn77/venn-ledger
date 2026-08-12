@@ -42,8 +42,18 @@ class DashboardView(ctk.CTkFrame):
         plt.rcParams['font.sans-serif'] = ['JetBrains Mono', 'Segoe UI']
 
         self.bg_color = '#2b2b2b'
-        # noinspection PyTypeChecker
-        self.after(50, self.build_dashboard)
+        self._build_timer = None
+        self._build_timer = self.after(50, self.build_dashboard)
+
+    def destroy(self):
+        """Safely cleans up pending renders and Matplotlib figures before destruction."""
+        if self._build_timer is not None:
+            self.after_cancel(self._build_timer)
+            self._build_timer = None
+
+        plt.close('all')
+
+        super().destroy()
 
     def _on_range_change(self, _selected_value):
         for widget in self.scroll.winfo_children():
@@ -52,6 +62,8 @@ class DashboardView(ctk.CTkFrame):
         self.build_dashboard()
 
     def build_dashboard(self):
+        self._build_timer = None
+
         range_str = self.range_var.get()
 
         cf_labels, incomes, expenses, nw_labels, net_worths, start_date = self._get_historical_data(range_str)

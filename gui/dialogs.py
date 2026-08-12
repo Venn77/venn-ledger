@@ -8,10 +8,11 @@ import datetime
 
 def open_calendar(parent, target_var, include_time=False):
     """Pops up a calendar window to select a date."""
-    if hasattr(parent, 'cal_window') and parent.cal_window is not None and parent.cal_window.winfo_exists():
-        parent.cal_window.deiconify()
-        parent.cal_window.lift()
-        parent.cal_window.focus_force()
+    cal_win = getattr(parent, 'cal_window', None)
+    if isinstance(cal_win, ctk.CTkToplevel) and cal_win.winfo_exists():
+        cal_win.deiconify()
+        cal_win.lift()
+        cal_win.focus_force()
         return
     parent.cal_window = ctk.CTkToplevel(parent)
     parent.cal_window.withdraw()
@@ -34,8 +35,13 @@ def open_calendar(parent, target_var, include_time=False):
     cal.pack(pady=20, padx=10)
 
     def force_focus(window):
-        window.focus_force()
-        window.lift()
+        if window.winfo_exists():
+            window.focus_force()
+            window.lift()
+
+    def set_alpha(window):
+        if window.winfo_exists():
+            window.attributes("-alpha", 1.0)
 
     def set_date():
         selected_date = cal.selection_get()
@@ -53,14 +59,11 @@ def open_calendar(parent, target_var, include_time=False):
         parent.cal_window.destroy()
 
     ctk.CTkButton(parent.cal_window, text="Confirm", command=set_date).pack(pady=10)
-
     parent.cal_window.update_idletasks()
-
     parent.cal_window.geometry(calculate_dialog_geometry(parent, 300, 300))
-
     parent.cal_window.deiconify()
     parent.cal_window.after(10, lambda: ctk.set_appearance_mode("dark"))
-    parent.cal_window.after(50, lambda: parent.cal_window.attributes("-alpha", 1.0))
+    parent.cal_window.after(50, lambda: set_alpha(parent.cal_window))
     parent.cal_window.after(90, lambda: force_focus(parent.cal_window))
 
 def show_popup(parent, title, message, is_error=False, show_ok=True, show_cancel=False, ok_command=None, cancel_command=None, width=400, height=180, message_wraplength=350, is_copyable=False):
@@ -267,7 +270,7 @@ class CurrencyDialog(ctk.CTkToplevel):
 
     def _schedule_example_update(self, _event=None):
         """Debounces the text entry so the example can be updated."""
-        if self._example_timer:
+        if self._example_timer is not None:
             self.after_cancel(self._example_timer)
         self._example_timer = self.after(300, self._render_example_text)
 
@@ -331,6 +334,13 @@ class CurrencyDialog(ctk.CTkToplevel):
                 self.destroy()
             else:
                 self.err_lbl.configure(text=msg)
+
+    def destroy(self):
+        """Safely cleans up pending timers before destroying the widget."""
+        if getattr(self, '_example_timer', None) is not None:
+            self.after_cancel(self._example_timer)
+            self._example_timer = None
+        super().destroy()
 
 class FXDialog(ctk.CTkToplevel):
     """Custom popup for adding a new Exchange Rate."""
@@ -663,16 +673,18 @@ class SearchableListDialog(ctk.CTkToplevel):
         self.after(100, self._reveal_window)
 
         if self.search_entry:
-            self.after(100, self.search_entry.focus)
+            entry_widget = self.search_entry
+            self.after(100, lambda: entry_widget.focus() if self.winfo_exists() else None)
 
         self.grab_set()
         self.wait_window()
 
     def _use_custom(self, _event=None):
         """Passes the raw typed text back to the parent."""
-        val = self.search_entry.get().strip()
-        if val:
-            self._select_item(val)
+        if self.search_entry is not None:
+            val = self.search_entry.get().strip()
+            if val:
+                self._select_item(val)
 
     def _on_escape(self):
         """Cleanly closes the dialog without a selection."""
@@ -682,7 +694,8 @@ class SearchableListDialog(ctk.CTkToplevel):
 
     def _reveal_window(self):
         """Restores opacity only after the OS has completely painted the dark canvas."""
-        self.attributes("-alpha", 1.0)
+        if self.winfo_exists():
+            self.attributes("-alpha", 1.0)
 
     def _populate_list(self, items):
         for btn in self.buttons:
@@ -704,7 +717,7 @@ class SearchableListDialog(ctk.CTkToplevel):
 
     def _filter_list(self, _event=None):
         """Debounces the search input to prevent UI lag on large lists."""
-        if self.search_timer:
+        if self.search_timer is not None:
             self.after_cancel(self.search_timer)
         self.search_timer = self.after(300, self._execute_filter)
 
@@ -728,5 +741,12 @@ class SearchableListDialog(ctk.CTkToplevel):
     def get_result(self):
         """Returns the selection after the window is destroyed."""
         return self.selected_item
+
+    def destroy(self):
+        """Safely cleans up pending timers before destroying the widget."""
+        if self.search_timer is not None:
+            self.after_cancel(self.search_timer)
+            self.search_timer = None
+        super().destroy()
 
 

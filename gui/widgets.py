@@ -20,7 +20,7 @@ class ToolTip:
         self.widget.bind("<ButtonPress>", self.hide_tip, add="+")
 
     def _schedule(self, _event=None):
-        if self.id:
+        if self.id is not None:
             self.widget.after_cancel(self.id)
             self.id = None
         self.id = self.widget.after(self.delay, self.show_tip)
@@ -70,7 +70,7 @@ class ToolTip:
         self.tip_window.wm_geometry(f"+{pos_x}+{pos_y}")
 
     def hide_tip(self, _event=None):
-        if self.id:
+        if self.id is not None:
             self.widget.after_cancel(self.id)
             self.id = None
         if self.tip_window:
@@ -82,7 +82,7 @@ class MonthYearSelector(ctk.CTkFrame):
     def __init__(self, parent, initial_date=None, command=None, show_month=True):
         super().__init__(parent, fg_color="transparent")
 
-        self.current_date = initial_date or datetime.datetime.now().replace(day=1, hour=0, minute=0, second=0,
+        self.current_date: datetime.datetime = initial_date or datetime.datetime.now().replace(day=1, hour=0, minute=0, second=0,
                                                                             microsecond=0)
         self.command = command
         self.show_month = show_month
@@ -566,12 +566,12 @@ class AIStagingRow(ctk.CTkFrame):
             self.data['fx_rate'] = self.fx_var.get().strip()
 
         ven_val = self.ven_combo.get().strip()
-        if hasattr(self.ven_combo, 'placeholder') and ven_val == self.ven_combo.placeholder:
+        if ven_val == self.ven_combo.placeholder:
             ven_val = ""
         self.data['vendor'] = ven_val
 
         cat_val = self.cat_combo.get().strip()
-        if hasattr(self.cat_combo, 'placeholder') and cat_val == self.cat_combo.placeholder:
+        if cat_val == self.cat_combo.placeholder:
             cat_val = ""
         self.data['category'] = cat_val
 
@@ -609,6 +609,7 @@ class TransactionRow(ctk.CTkFrame):
         self.main_app = main_app
         self.data = data
         self.dec_map = dec_map
+        self._hover_timer = None
         self.pack(fill="x", pady=2, padx=5)
 
         colors = {
@@ -684,8 +685,7 @@ class TransactionRow(ctk.CTkFrame):
             if not self.winfo_exists(): return
 
             if self.is_locked:
-                # noinspection PyTypeChecker
-                self.after(100, check_hover)
+                self._hover_timer = self.after(100, check_hover)
                 return
 
             x, y = self.winfo_pointerxy()
@@ -700,10 +700,10 @@ class TransactionRow(ctk.CTkFrame):
                 curr = getattr(curr, 'master', None)
 
             if is_inside:
-                # noinspection PyTypeChecker
-                self.after(100, check_hover)
+                self._hover_timer = self.after(100, check_hover)
             else:
                 self._is_hovered = False
+                self._hover_timer = None
                 self.configure(fg_color="gray15")
                 self.btn_copy.pack_forget()
                 self.btn_edit.pack_forget()
@@ -717,8 +717,10 @@ class TransactionRow(ctk.CTkFrame):
                     r.btn_copy.pack(side="left", padx=2)
                     r.btn_edit.pack(side="left", padx=2)
                     r.btn_del.pack(side="left", padx=2)
-                # noinspection PyTypeChecker
-                r.after(50, check_hover)
+
+                if r._hover_timer is not None:
+                    r.after_cancel(r._hover_timer)
+                r._hover_timer = r.after(50, check_hover)
 
         self.on_enter_action = on_enter
         self.on_leave_action = lambda: setattr(self, 'is_locked', False)
@@ -800,6 +802,13 @@ class TransactionRow(ctk.CTkFrame):
             self.on_leave_action()
 
         self.main_app.delete_transaction_prompt(self.data.id, self.data.type, context_str, on_cancel)
+
+    def destroy(self):
+        """Safely cleans up pending hover timers before destroying the widget."""
+        if self._hover_timer is not None:
+            self.after_cancel(self._hover_timer)
+            self._hover_timer = None
+        super().destroy()
 
 # Monkey Patch: turns regular dropdowns into smart ones!
 def _enable_smart_dropdown(cls):

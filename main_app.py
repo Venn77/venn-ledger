@@ -71,6 +71,7 @@ class FinanceApp(ctk.CTk):
         self.selected_account_id = None
         self.filter_account_id = None
         self.current_net_worth = 0.0
+        self._odometer_timer = None
 
         if not base_exists:
             self.withdraw()
@@ -307,6 +308,10 @@ class FinanceApp(ctk.CTk):
 
     def update_net_worth(self):
         """Calculates Net Worth and triggers the rolling number animation."""
+        if self._odometer_timer is not None:
+            self.after_cancel(self._odometer_timer)
+            self._odometer_timer = None
+
         new_nw = self.manager.get_net_worth()
 
         if abs(new_nw - self.current_net_worth) < 0.01:
@@ -333,13 +338,14 @@ class FinanceApp(ctk.CTk):
                 text=f"{self.manager.base_currency_symbol} {current_val:,.{self.manager.base_currency_decimals}f}",
                 text_color=flash_color
             )
-            self.after(15, self._animate_odometer, start_val, end_val, flash_color, settle_color, steps,
+            self._odometer_timer = self.after(15, self._animate_odometer, start_val, end_val, flash_color, settle_color, steps,
                        current_step + 1)
         else:
             self.lbl_nw_val.configure(
                 text=f"{self.manager.base_currency_symbol} {end_val:,.{self.manager.base_currency_decimals}f}",
                 text_color=settle_color
             )
+            self._odometer_timer = None
 
     def toggle_reorder_mode(self):
         self.reorder_mode = not self.reorder_mode
@@ -407,7 +413,7 @@ class FinanceApp(ctk.CTk):
     def _open_or_focus_transaction_window(self, window_type, window_class, transaction_data=None):
         """Ensures only one instance of a specific transaction window is open at a time."""
         attr_name = f"active_{window_type}_window"
-        current_window = getattr(self, attr_name, None)
+        current_window = getattr(self, attr_name)
 
         if isinstance(current_window, ctk.CTkToplevel) and current_window.winfo_exists():
             current_window.deiconify()
@@ -476,15 +482,15 @@ class FinanceApp(ctk.CTk):
         """Generates a popup to confirm deletion before modifying the DB."""
         active_window = None
         if transaction_type == "expense":
-            active_window = getattr(self, "active_expense_window", None)
+            active_window = self.active_expense_window
         elif transaction_type == "gain":
-            active_window = getattr(self, "active_gain_window", None)
+            active_window = self.active_gain_window
         elif "transfer" in transaction_type:
-            active_window = getattr(self, "active_transfer_window", None)
+            active_window = self.active_transfer_window
 
-        if isinstance(active_window, ctk.CTkToplevel) and active_window.winfo_exists():
-            is_edit = getattr(active_window, "is_edit_mode", False)
-            tx_data = getattr(active_window, "transaction_data", {})
+        if isinstance(active_window, (AddExpenseWindow, AddGainWindow, AddTransferWindow)) and active_window.winfo_exists():
+            is_edit = active_window.is_edit_mode
+            tx_data = active_window.transaction_data
 
             if is_edit and tx_data and tx_data.get("id") == transaction_id:
                 if on_cancel: on_cancel()
@@ -557,6 +563,10 @@ class FinanceApp(ctk.CTk):
 
     def on_closing(self):
         """Ensures the DB session is safely closed before quitting."""
+        if self._odometer_timer is not None:
+            self.after_cancel(self._odometer_timer)
+            self._odometer_timer = None
+
         try:
             self.db_session.close()
             # print("Database session closed successfully.")

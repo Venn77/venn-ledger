@@ -43,7 +43,7 @@ def set_app_window_icon(window):
 
     if sys.platform == "win32":
         if os.path.exists(ico_path):
-            window.after(200, lambda: window.iconbitmap(ico_path))
+            window.after(200, lambda: window.iconbitmap(ico_path) if window.winfo_exists() else None)
 
     elif sys.platform.startswith("linux"):
         if os.path.exists(png_path):

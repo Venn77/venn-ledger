@@ -77,7 +77,7 @@ class PaginationMixin:
 
     def _schedule_page_render(self):
         """Debounces rapid page clicks."""
-        if hasattr(self, '_page_timer') and self._page_timer:
+        if self._page_timer is not None:
             self.after_cancel(self._page_timer)
         self._page_timer = self.after(300, self._execute_page_render)
 
@@ -132,11 +132,12 @@ class AsyncPaginatedGrid(ctk.CTkFrame, PaginationMixin):
         self.init_pagination(page_size=page_size)
 
     def load_data(self, _event=None):
-        if self._render_job:
+        if self._render_job is not None:
             self.after_cancel(self._render_job)
 
         self.scroll.pack_forget()
-        if hasattr(self, 'nav_bar'): self.nav_bar.pack_forget()
+        if self.nav_bar is not None:
+            self.nav_bar.pack_forget()
         self.loading_frame.pack(fill="both", expand=True)
         self.loading_lbl.configure(text="Fetching data...")
 
@@ -171,6 +172,18 @@ class AsyncPaginatedGrid(ctk.CTkFrame, PaginationMixin):
         self.render_pagination_controls()
         patch_linux_scrolling(self.scroll)
         self.after_load_hook()
+
+    def destroy(self):
+        """Safely cleans up pending renders and pagination timers before destruction."""
+        if getattr(self, '_render_job', None) is not None:
+            self.after_cancel(self._render_job)
+            self._render_job = None
+
+        if getattr(self, '_page_timer', None) is not None:
+            self.after_cancel(self._page_timer)
+            self._page_timer = None
+
+        super().destroy()
 
     def get_query(self):
         raise NotImplementedError
@@ -422,7 +435,8 @@ class ExchangeRateGrid(AsyncPaginatedGrid):
         if not act_currencies:
             self.btn_add.configure(state="disabled")
             self.scroll.pack_forget()
-            if hasattr(self, 'nav_bar'): self.nav_bar.pack_forget()
+            if self.nav_bar is not None:
+                self.nav_bar.pack_forget()
             self.lbl_warning.pack(pady=5)
         else:
             self.btn_add.configure(state="normal")

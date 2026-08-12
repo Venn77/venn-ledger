@@ -1,3 +1,7 @@
+from typing import TypeVar, Type
+
+T = TypeVar("T")
+
 from database.models import (
     calculate_conversion,
     Category, Vendor, Account, PaymentMethod,
@@ -58,7 +62,7 @@ class TransactionManager:
             raise ValueError(f"No exchange rate found for {currency_code}.")
         return rate_entry.fx_multiplier
 
-    def _get_or_create_dimension(self, model, name):
+    def _get_or_create_dimension(self, model: Type[T], name: str) -> T:
         """
         Handles the 'Master Data' lookup.
         If the item exists but is inactive, it reactivates it.
@@ -108,9 +112,9 @@ class TransactionManager:
         else:
             new_expense = Expense()
 
-        cat_id = category.id if category and hasattr(category, 'id') else None
-        ven_id = vendor.id if vendor and hasattr(vendor, 'id') else None
-        proj_id = project.id if project and hasattr(project, 'id') else None
+        cat_id = category.id if category is not None else None
+        ven_id = vendor.id if vendor is not None else None
+        proj_id = project.id if project is not None else None
 
         # 5. Update Fields
         new_expense.amount = amount
@@ -172,9 +176,9 @@ class TransactionManager:
         else:
             new_gain = Gain()
 
-        str_id = stream.id if stream and hasattr(stream, 'id') else None
-        pay_id = payer.id if payer and hasattr(payer, 'id') else None
-        proj_id = project.id if project and hasattr(project, 'id') else None
+        str_id = stream.id if stream is not None else None
+        pay_id = payer.id if payer is not None else None
+        proj_id = project.id if project is not None else None
 
         # 5. Update Fields
         new_gain.amount = amount

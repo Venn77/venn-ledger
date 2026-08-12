@@ -35,7 +35,11 @@ class FirstRunWizard(ctk.CTkToplevel):
 
         self._build_ui()
 
-        self.after(150,lambda: self.deiconify())
+        def _safe_show():
+            if self.winfo_exists():
+                self.deiconify()
+
+        self.after(150, _safe_show)
         self.wait_visibility()
         self.grab_set()
 

@@ -22,23 +22,21 @@ def start_ollama_daemon():
     if _ollama_process is not None or is_ollama_running():
         return
 
+    env = os.environ.copy()
+    env["OLLAMA_IGPU_ENABLE"] = "1"
+
     try:
         if sys.platform == "win32":
             _ollama_process = subprocess.Popen(
                 ["ollama", "serve"],
+                env=env,
                 creationflags=subprocess.CREATE_NO_WINDOW,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL
             )
         else:
-            env = os.environ.copy()
             deck_binary = os.path.expanduser("~/.local/bin/ollama")
-
-            if os.path.exists(deck_binary):
-                env["OLLAMA_IGPU_ENABLE"] = "1"
-                cmd = [deck_binary, "serve"]
-            else:
-                cmd = ["ollama", "serve"]
+            cmd = [deck_binary, "serve"] if os.path.exists(deck_binary) else ["ollama", "serve"]
 
             _ollama_process = subprocess.Popen(
                 cmd,

@@ -87,7 +87,7 @@ You must download the standalone binaries and run them manually just once to dow
    ```
 3. Once the download reaches 100%, you can close both terminal tabs. You're done!
 
-*(Note: VennLedger will now automatically detect the Steam Deck binaries and silently launch the AI daemon with AMD hardware acceleration in the background every time you open the app).*
+*(Note: VennLedger automatically manages the background AI daemon. It universally applies AMD APU hardware acceleration flags across Windows, Linux, and SteamOS to ensure optimal performance on any device).*
 
 ---
 

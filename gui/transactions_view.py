@@ -287,9 +287,6 @@ class TransactionsView(ctk.CTkFrame):
 
         self.update_pagination_ui(total_count, query)
 
-        if self.current_page == max(0, self.total_pages - 1) and self.total_pages > 1:
-            self.after(10, self.reset_scroll_to_top)
-
     @staticmethod
     def calculate_totals(base_query, current_session):
         """

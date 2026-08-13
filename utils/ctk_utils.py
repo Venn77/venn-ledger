@@ -251,4 +251,45 @@ def patch_linux_scrolling(widget_container):
 
     _bind_recursive(widget_container)
 
+def install_canvas_engine_patch():
+    """
+    Engine-level monkeypatch for Tkinter Canvas.
+    Interceptions to scrollregion globally prevent negative-Y overscroll
+    whenever content height is smaller than the physical window viewport.
+    """
+    orig_configure = tk.Canvas.configure
+
+    def patched_configure(self, cnf=None, **kw):
+        options = dict(cnf) if cnf else {}
+        options.update(kw)
+
+        if 'scrollregion' in options:
+            region = options['scrollregion']
+            if region:
+                if isinstance(region, (list, tuple)) and len(region) == 4:
+                    try:
+                        x1, y1, x2, y2 = map(float, region)
+                        canvas_height = self.winfo_height()
+                        if canvas_height > 1 and (y2 - y1) < canvas_height:
+                            y2 = y1 + canvas_height
+                            options['scrollregion'] = (x1, y1, x2, y2)
+                    except (ValueError, TypeError):
+                        pass
+                elif isinstance(region, str) and region.strip():
+                    parts = region.strip().split()
+                    if len(parts) == 4:
+                        try:
+                            x1, y1, x2, y2 = map(float, parts)
+                            canvas_height = self.winfo_height()
+                            if canvas_height > 1 and (y2 - y1) < canvas_height:
+                                y2 = y1 + canvas_height
+                                options['scrollregion'] = f"{x1} {y1} {x2} {y2}"
+                        except ValueError:
+                            pass
+
+        return orig_configure(self, cnf, **options)
+
+    tk.Canvas.configure = patched_configure
+    tk.Canvas.config = patched_configure
+
 

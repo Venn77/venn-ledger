@@ -278,7 +278,17 @@ class TransactionsView(ctk.CTkFrame):
 
         self.grid_component.render_rows(results, self.dec_map)
 
+        # Back to Top Button
+        if self.total_pages > 1:
+            ctk.CTkButton(self.grid_component, text="▲ Back to Top", width=120, height=24,
+                          fg_color="transparent", text_color="gray60", hover_color="gray25",
+                          command=lambda: self.after(20, self.reset_scroll_to_top)
+                          ).pack(pady=(0, 20))
+
         self.update_pagination_ui(total_count, query)
+
+        if self.current_page == max(0, self.total_pages - 1) and self.total_pages > 1:
+            self.after(10, self.reset_scroll_to_top)
 
     @staticmethod
     def calculate_totals(base_query, current_session):
@@ -495,12 +505,6 @@ class TransactionsView(ctk.CTkFrame):
         self.btn_last.pack(side="left", padx=2)
 
         self._nav_built = True
-
-        # Back to Top Button
-        ctk.CTkButton(self.grid_component, text="▲ Back to Top", width=120, height=24,
-                      fg_color="transparent", text_color="gray60", hover_color="gray25",
-                      command=lambda: self.after(20,self.reset_scroll_to_top)
-                      ).pack(pady=(0, 20))
 
     def _schedule_page_render(self):
         """Debounces pagination to prevent DB/Render lag on rapid clicks."""

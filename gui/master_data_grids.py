@@ -49,7 +49,7 @@ class PaginationMixin:
         offset = self.current_page * self.page_size
         return query.offset(offset).limit(self.page_size).all()
 
-    def render_pagination_controls(self):
+    def render_pagination_controls(self, disable_all=False):
         for widget in self.nav_bar.winfo_children():
             widget.destroy()
 
@@ -57,10 +57,10 @@ class PaginationMixin:
             self.nav_bar.pack_forget()
             return
 
-        self.nav_bar.pack(fill="x", pady=5)
+        self.nav_bar.pack(side="bottom", fill="x", pady=5)
 
-        prev_state = "normal" if self.current_page > 0 else "disabled"
-        next_state = "normal" if self.current_page < self.total_pages - 1 else "disabled"
+        prev_state = "disabled" if (disable_all or self.current_page <= 0) else "normal"
+        next_state = "disabled" if (disable_all or self.current_page >= self.total_pages - 1) else "normal"
 
         left_frame = ctk.CTkFrame(self.nav_bar, fg_color="transparent")
         left_frame.pack(side="left", padx=10)
@@ -136,8 +136,8 @@ class AsyncPaginatedGrid(ctk.CTkFrame, PaginationMixin):
             self.after_cancel(self._render_job)
 
         self.scroll.pack_forget()
-        if self.nav_bar is not None:
-            self.nav_bar.pack_forget()
+        # if self.nav_bar is not None:
+        #     self.nav_bar.pack_forget()
         self.loading_frame.pack(fill="both", expand=True)
         self.loading_lbl.configure(text="Fetching data...")
 
@@ -146,8 +146,9 @@ class AsyncPaginatedGrid(ctk.CTkFrame, PaginationMixin):
 
         query = self.get_query()
         self.current_results = self.paginate_query(query)
-        # noinspection PyTypeChecker
         self.page_items = len(self.current_results)
+
+        self.render_pagination_controls(disable_all=True)
 
         if self.page_items > 0:
             self._render_batch(start_idx=0, batch_size=25)
@@ -169,7 +170,7 @@ class AsyncPaginatedGrid(ctk.CTkFrame, PaginationMixin):
     def _finish_loading(self):
         self.loading_frame.pack_forget()
         self.scroll.pack(fill="both", expand=True)
-        self.render_pagination_controls()
+        self.render_pagination_controls(disable_all=False)
         patch_linux_scrolling(self.scroll)
         self.after_load_hook()
 

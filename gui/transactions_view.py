@@ -153,7 +153,7 @@ class TransactionsView(ctk.CTkFrame):
         self.nav_bar.pack(fill="x", pady=5)
 
         self.totals_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.totals_frame.pack(pady=(0, 10), padx=20, side="right")
+        self.totals_frame.pack(pady=(0, 10), padx=20, anchor="e")
 
         self.in_lbl = ctk.CTkLabel(self.totals_frame, text="", font=("JetBrains Mono", 12, "bold"), text_color="#4CD964", anchor="e")
         self.in_lbl.pack(fill="x")
@@ -175,6 +175,14 @@ class TransactionsView(ctk.CTkFrame):
         self.nav_timer = None
         self.type_timer = None
         self.page_timer = None
+        self.unlock_timer = None
+        self._is_loading = False
+        self._nav_built = False
+        self.btn_first = None
+        self.btn_prev = None
+        self.btn_next = None
+        self.btn_last = None
+        self.lbl_page = None
         self.curr_data = self.db_session.query(Currency.code, Currency.decimals).all()
         self.dec_map = {code: decimals for code, decimals in self.curr_data}
 
@@ -203,6 +211,7 @@ class TransactionsView(ctk.CTkFrame):
 
     def load_transactions(self):
         """Fetches a page of transactions and renders them as rows."""
+        self.render_pagination_controls(disable_all=True)
         self.update_idletasks()
 
         query = self.get_unified_transaction_query(self.db_session)
@@ -414,33 +423,50 @@ class TransactionsView(ctk.CTkFrame):
             for lbl in [self.in_lbl, self.out_lbl, self.balance_lbl]:
                 lbl.configure(text="")
 
-        self.render_pagination_controls()
+        if self.unlock_timer is not None:
+            self.after_cancel(self.unlock_timer)
+        self.unlock_timer = self.after(50, lambda: self.render_pagination_controls(disable_all=False))
 
-    def render_pagination_controls(self):
-        """Creates the Navigation buttons bar at the bottom."""
-        for widget in self.nav_bar.winfo_children():
-            widget.destroy()
-
+    def render_pagination_controls(self, disable_all=False):
+        """Creates or updates the Navigation buttons bar at the bottom."""
         if self.total_pages <= 1:
+            self.nav_bar.pack_forget()
             return
 
+        self.nav_bar.pack(before=self.totals_frame, fill="x", pady=5)
         self.nav_bar.grid_columnconfigure((0, 2), weight=1)
         self.nav_bar.grid_columnconfigure(1, weight=0)
+
+        first_state = "disabled" if (disable_all or self.current_page <= 0) else "normal"
+        prev_state = "disabled" if (disable_all or self.current_page <= 0) else "normal"
+        next_state = "disabled" if (disable_all or self.current_page >= self.total_pages - 1) else "normal"
+        last_state = "disabled" if (disable_all or self.current_page >= self.total_pages - 1) else "normal"
+
+        self._is_loading = disable_all
+
+        if getattr(self, '_nav_built', False):
+            self.btn_first.configure(state=first_state)
+            self.btn_prev.configure(state=prev_state)
+            self.btn_next.configure(state=next_state)
+            self.btn_last.configure(state=last_state)
+            self.lbl_page.configure(text=f"of {self.total_pages}")
+            return
+
+        for widget in self.nav_bar.winfo_children():
+            widget.destroy()
 
         # First & Previous Buttons
         left_group = ctk.CTkFrame(self.nav_bar, fg_color="transparent")
         left_group.grid(row=0, column=0, sticky="e", padx=20)
 
-        first_state = "normal" if self.current_page > 0 else "disabled"
-        btn_first = ctk.CTkButton(left_group, text="« First", width=60, state=first_state, fg_color="gray30", command=self.go_to_first_page)
-        btn_first.pack(side="left", padx=2)
+        self.btn_first = ctk.CTkButton(left_group, text="« First", width=60, state=first_state, fg_color="gray30", command=self.go_to_first_page)
+        self.btn_first.pack(side="left", padx=2)
 
-        prev_state = "normal" if self.current_page > 0 else "disabled"
-        btn_prev = ctk.CTkButton(
+        self.btn_prev = ctk.CTkButton(
             left_group, text="‹ Prev", width=70, state=prev_state,
             command=self.prev_page, fg_color="gray30"
         )
-        btn_prev.pack(side="left", padx=2)
+        self.btn_prev.pack(side="left", padx=2)
 
         # Jump to Page & Page Indicator Buttons
         center_group = ctk.CTkFrame(self.nav_bar, fg_color="transparent")
@@ -453,25 +479,24 @@ class TransactionsView(ctk.CTkFrame):
         self.jump_entry.pack(side="left", padx=5)
         self.jump_entry.bind("<Return>", self.jump_to_page)
 
-        lbl_page = ctk.CTkLabel(center_group, text=f"of {self.total_pages}")
-        lbl_page.pack(side="left", padx=2)
+        self.lbl_page = ctk.CTkLabel(center_group, text=f"of {self.total_pages}")
+        self.lbl_page.pack(side="left", padx=2)
 
         # Next & Last Buttons
         right_group = ctk.CTkFrame(self.nav_bar, fg_color="transparent")
         right_group.grid(row=0, column=2, sticky="w", padx=20)
 
-        next_state = "normal" if self.current_page < self.total_pages - 1 else "disabled"
-        btn_next = ctk.CTkButton(right_group, text="Next ›", width=70, state=next_state,
-                      command=self.next_page, fg_color="gray30")
-        btn_next.pack(side="left", padx=2)
+        self.btn_next = ctk.CTkButton(right_group, text="Next ›", width=70, state=next_state, fg_color="gray30",
+                                      command=self.next_page)
+        self.btn_next.pack(side="left", padx=2)
 
-        last_state = "normal" if self.current_page < self.total_pages - 1 else "disabled"
-        btn_last = ctk.CTkButton(right_group, text="Last »", width=60, state=last_state, fg_color="gray30",
-                      command=self.go_to_last_page)
-        btn_last.pack(side="left", padx=2)
+        self.btn_last = ctk.CTkButton(right_group, text="Last »", width=60, state=last_state, fg_color="gray30",
+                                      command=self.go_to_last_page)
+        self.btn_last.pack(side="left", padx=2)
+
+        self._nav_built = True
 
         # Back to Top Button
-        # noinspection PyTypeChecker
         ctk.CTkButton(self.grid_component, text="▲ Back to Top", width=120, height=24,
                       fg_color="transparent", text_color="gray60", hover_color="gray25",
                       command=lambda: self.after(20,self.reset_scroll_to_top)
@@ -497,7 +522,7 @@ class TransactionsView(ctk.CTkFrame):
             if self.jump_entry:
                 self.jump_entry.delete(0, "end")
                 self.jump_entry.insert(0, str(self.current_page + 1))
-
+            self.render_pagination_controls()
             self._schedule_page_render()
 
     def prev_page(self):
@@ -506,22 +531,30 @@ class TransactionsView(ctk.CTkFrame):
             if self.jump_entry:
                 self.jump_entry.delete(0, "end")
                 self.jump_entry.insert(0, str(self.current_page + 1))
-
+            self.render_pagination_controls()
             self._schedule_page_render()
 
     def go_to_first_page(self):
         if self.current_page != 0:
             self.current_page = 0
+            if self.jump_entry:
+                self.jump_entry.delete(0, "end")
+                self.jump_entry.insert(0, "1")
             self.load_transactions()
 
     def go_to_last_page(self):
         last_page = max(0, self.total_pages - 1)
         if self.current_page != last_page:
             self.current_page = last_page
+            if self.jump_entry:
+                self.jump_entry.delete(0, "end")
+                self.jump_entry.insert(0, str(self.current_page + 1))
             self.load_transactions()
             self.reset_scroll_to_top()
 
     def jump_to_page(self, _event=None):
+        if getattr(self, '_is_loading', False):
+            return
         try:
             target = int(self.jump_entry.get()) - 1  # UI is 1-indexed
             if 0 <= target < self.total_pages:

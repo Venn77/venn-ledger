@@ -241,7 +241,9 @@ class DashboardView(ctk.CTkFrame):
 
         canvas = FigureCanvasTkAgg(fig, master=parent_frame)
         canvas.draw()
-        canvas.get_tk_widget().pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        canvas_widget = canvas.get_tk_widget()
+        canvas_widget.configure(bg=self.bg_color, highlightthickness=0, bd=0)
+        canvas_widget.pack(fill="both", expand=True, padx=10, pady=(0, 10))
 
     def _draw_donut(self, parent_frame, labels, values, other_breakdown):
         ctk.CTkLabel(parent_frame, text="Expense Breakdown", font=("JetBrains Mono", 14, "bold")).pack(pady=(10, 0))
@@ -253,7 +255,9 @@ class DashboardView(ctk.CTkFrame):
             ax.axis('off')
             canvas = FigureCanvasTkAgg(fig, master=parent_frame)
             canvas.draw()
-            canvas.get_tk_widget().pack(fill="both", expand=True, padx=10, pady=(0, 10))
+            canvas_widget = canvas.get_tk_widget()
+            canvas_widget.configure(bg=self.bg_color, highlightthickness=0, bd=0)
+            canvas_widget.pack(fill="both", expand=True, padx=10, pady=(0, 10))
             return
 
         base_colors = [
@@ -327,7 +331,9 @@ class DashboardView(ctk.CTkFrame):
 
         canvas.mpl_connect("motion_notify_event", hover)
         canvas.draw()
-        canvas.get_tk_widget().pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        canvas_widget = canvas.get_tk_widget()
+        canvas_widget.configure(bg=self.bg_color, highlightthickness=0, bd=0)
+        canvas_widget.pack(fill="both", expand=True, padx=10, pady=(0, 10))
 
     def _draw_networth(self, parent_frame, labels, net_worths):
         ctk.CTkLabel(parent_frame, text="Net Worth Trend", font=("JetBrains Mono", 14, "bold")).pack(pady=(10, 0))
@@ -366,7 +372,9 @@ class DashboardView(ctk.CTkFrame):
 
         canvas = FigureCanvasTkAgg(fig, master=parent_frame)
         canvas.draw()
-        canvas.get_tk_widget().pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        canvas_widget = canvas.get_tk_widget()
+        canvas_widget.configure(bg=self.bg_color, highlightthickness=0, bd=0)
+        canvas_widget.pack(fill="both", expand=True, padx=10, pady=(0, 10))
 
     def refresh_view(self):
         """Called automatically when switching back to this tab.

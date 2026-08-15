@@ -743,13 +743,11 @@ class PMGrid(AsyncPaginatedGrid):
             collate(Account.name, 'NOCASE')).all()]
         if item.account.name not in act_accounts: act_accounts.append(item.account.name)
 
-        def _update(name, acc_name):
+        def _update(name, _acc_name):
             try:
                 existing = self.db_session.query(PaymentMethod).filter_by(name=name).first()
                 if existing and existing.id != item.id: return False, "Name in use."
-                acc = self.db_session.query(Account).filter_by(name=acc_name).first()
                 item.name = name
-                item.account_id = acc.id
                 self.db_session.commit()
                 self.load_data()
                 return True, ""
@@ -760,4 +758,4 @@ class PMGrid(AsyncPaginatedGrid):
                 self.db_session.rollback()
                 return False, f"Database error: {str(e)}"
 
-        PMDialog(self, act_accounts, initial_name=item.name, initial_acc=item.account.name, on_submit=_update)
+        PMDialog(self, act_accounts, initial_name=item.name, initial_acc=item.account.name, is_edit=True, on_submit=_update)

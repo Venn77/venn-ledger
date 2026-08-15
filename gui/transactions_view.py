@@ -456,7 +456,14 @@ class TransactionsView(ctk.CTkFrame):
             self.btn_prev.configure(state=prev_state)
             self.btn_next.configure(state=next_state)
             self.btn_last.configure(state=last_state)
-            self.lbl_page.configure(text=f"of {self.total_pages}")
+            if not disable_all:
+                self.lbl_page.configure(text=f"of {self.total_pages}")
+
+                if self.jump_entry is not None:
+                    target_page = str(self.current_page + 1)
+                    if self.jump_entry.get() != target_page:
+                        self.jump_entry.delete(0, "end")
+                        self.jump_entry.insert(0, target_page)
             return
 
         for widget in self.nav_bar.winfo_children():
@@ -678,9 +685,7 @@ class TransactionsView(ctk.CTkFrame):
             self.time_nav.pack(side="left", padx=20, anchor="n")
 
             self.active_date_filter = selection
-            self.current_page = 0
-            self.load_transactions()
-            self.reset_scroll_to_top()
+            self._schedule_nav_load()
         else:
             self.time_nav.pack_forget()
             if selection == "Custom...":
@@ -688,9 +693,7 @@ class TransactionsView(ctk.CTkFrame):
             else:
                 self.custom_date_frame.pack_forget()
                 self.active_date_filter = selection
-                self.current_page = 0
-                self.load_transactions()
-                self.reset_scroll_to_top()
+                self._schedule_nav_load()
 
     def _schedule_nav_load(self):
         """Debounces DB calls to allow rapid clicking."""

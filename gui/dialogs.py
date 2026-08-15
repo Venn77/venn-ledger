@@ -563,7 +563,7 @@ class AccountDialog(ctk.CTkToplevel):
                 self.err_lbl.configure(text=msg)
 
 class PMDialog(ctk.CTkToplevel):
-    def __init__(self, parent, active_accounts, initial_name="", initial_acc="", on_submit=None):
+    def __init__(self, parent, active_accounts, initial_name="", initial_acc="", is_edit=False, on_submit=None):
         super().__init__(parent)
         self.withdraw()
         self.title("Payment Method")
@@ -585,6 +585,8 @@ class PMDialog(ctk.CTkToplevel):
         ctk.CTkLabel(self, text="Linked Account:", font=("JetBrains Mono", 11, "bold")).pack()
         self.acc_combo = ctk.CTkComboBox(self, values=active_accounts, width=260)
         if initial_acc: self.acc_combo.set(initial_acc)
+        if is_edit:
+            self.acc_combo.configure(state="disabled")
         self.acc_combo.pack(pady=(2, 10))
 
         self.err_lbl = ctk.CTkLabel(self, text="", text_color="#FF6B6B", font=("JetBrains Mono", 10), height=15)

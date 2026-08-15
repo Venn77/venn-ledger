@@ -810,19 +810,21 @@ class TransactionRow(ctk.CTkFrame):
             self._hover_timer = None
         super().destroy()
 
-# Monkey Patch: turns regular dropdowns into smart ones!
+# Monkey Patch: turns regular dropdowns into smart ones! OptionMenu now steals focus on click and supports keyboard interactions!
 def _enable_smart_dropdown(cls):
     """Dynamically upgrades any CTk dropdown class to use SearchableListDialog when its contents exceed 20 items."""
     original_clicked = cls._clicked
+    original_init = cls.__init__
 
     def _smart_clicked(self: ctk.CTkComboBox | ctk.CTkOptionMenu, event=None):
         if self._state == "disabled":
             return
 
+        if self.winfo_toplevel():
+            self.winfo_toplevel().focus_set()
+
         values = self._values or []
         if len(values) > 20:
-            from gui.dialogs import SearchableListDialog
-
             dialog = SearchableListDialog(
                 self,
                 "Select Option",
@@ -841,7 +843,23 @@ def _enable_smart_dropdown(cls):
             bound_method = original_clicked.__get__(self, cls)
             bound_method(event)
 
+    def _smart_init(self, *args, **kwargs):
+        original_init(self, *args, **kwargs)
+
+        def _open_menu(_event):
+            if self._state != "disabled":
+                self._clicked()
+            return "break"
+
+        target = self._entry if hasattr(self, '_entry') else self
+
+        target.bind("<Down>", _open_menu, add="+")
+        if not hasattr(self, '_entry'):
+            target.bind("<space>", _open_menu, add="+")
+            target.bind("<Return>", _open_menu, add="+")
+
     cls._clicked = _smart_clicked
+    cls.__init__ = _smart_init
 
 _enable_smart_dropdown(ctk.CTkComboBox)
 _enable_smart_dropdown(ctk.CTkOptionMenu)

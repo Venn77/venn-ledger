@@ -810,6 +810,103 @@ class TransactionRow(ctk.CTkFrame):
             self._hover_timer = None
         super().destroy()
 
+class DynamicEllipsisLabel(ctk.CTkFrame):
+    """A custom Tkinter widget that safely auto-truncates text and dynamically manages its ToolTip."""
+    def __init__(self, master, text, width, font, text_color="white", height=24, anchor="w", **kwargs):
+        super().__init__(master, fg_color="transparent", width=width, height=height, **kwargs)
+        self.pack_propagate(False)
+
+        self._full_text = str(text)
+        self._ellipsis_timer = None
+        self._font_metric = self._get_font_metric(font)
+
+        self.label = ctk.CTkLabel(self, text=self._full_text, font=font, text_color=text_color, anchor=anchor)
+        if anchor in ["center", "c"]:
+            self.label.place(relx=0.5, rely=0.5, relwidth=1.0, anchor="center")
+        else:
+            self.label.place(relx=0, rely=0.5, relwidth=1.0, anchor="w")
+
+        self.tooltip = ToolTip(self.label, self._full_text)
+
+        self.bind("<Configure>", self._schedule_resize, add="+")
+        self.bind("<Destroy>", self._cleanup, add="+")
+        self._schedule_resize(50)
+
+    @staticmethod
+    def _get_font_metric(font_config):
+        """Safely parses any valid CTk font format into a measurable CTkFont object."""
+        font_family, font_size, font_weight = "JetBrains Mono", 11, "normal"
+
+        if isinstance(font_config, tuple):
+            if len(font_config) >= 1:
+                font_family = font_config[0]
+            if len(font_config) >= 2:
+                font_size = font_config[1]
+            if len(font_config) >= 3:
+                font_weight = font_config[2]
+        elif isinstance(font_config, ctk.CTkFont):
+            font_family = font_config.cget("family")
+            font_size = font_config.cget("size")
+            font_weight = font_config.cget("weight")
+        elif isinstance(font_config, str):
+            font_family = font_config
+
+        return ctk.CTkFont(family=font_family, size=font_size, weight=font_weight)
+
+    def _cleanup(self, _event=None):
+        """Destroys the timer and explicitly hides ToolTips to prevent memory ghosting."""
+        if self._ellipsis_timer is not None:
+            self.after_cancel(self._ellipsis_timer)
+            self._ellipsis_timer = None
+
+        if hasattr(self, "tooltip") and self.tooltip:
+            self.tooltip.hide_tip()
+
+    def _schedule_resize(self, event_or_delay=50):
+        self._cleanup()
+        delay = event_or_delay if isinstance(event_or_delay, int) else 50
+        if self.winfo_exists():
+            self._ellipsis_timer = self.after(delay, self._resize_text)
+
+    def _resize_text(self):
+        if not self.winfo_exists():
+            return
+
+        frame_w = self.winfo_width()
+        if frame_w < 10:
+            self._schedule_resize(50)
+            return
+
+        if not self._full_text:
+            self.label.configure(text="")
+            self.tooltip.text = ""
+            return
+
+        safe_width = max(10, frame_w - 5)
+        full_width = self._font_metric.measure(self._full_text)
+
+        if full_width <= safe_width:
+            self.label.configure(text=self._full_text)
+            self.tooltip.text = ""
+        else:
+            ellipsis_w = self._font_metric.measure("...")
+            target_w = safe_width - ellipsis_w
+
+            avg_char_w = full_width / len(self._full_text)
+            guess_len = int(target_w / avg_char_w) if avg_char_w > 0 else 0
+            temp_text = self._full_text[:max(1, guess_len + 3)]
+
+            while self._font_metric.measure(temp_text) > target_w and len(temp_text) > 0:
+                temp_text = temp_text[:-1]
+
+            self.label.configure(text=temp_text + "...")
+            self.tooltip.text = self._full_text
+
+    def set_text(self, new_text):
+        """Dynamically update the text and tooltip, triggering an auto-resize."""
+        self._full_text = str(new_text)
+        self._schedule_resize(10)
+
 # Monkey Patch: turns regular dropdowns into smart ones! OptionMenu now steals focus on click and supports keyboard interactions!
 def _enable_smart_dropdown(cls):
     """Dynamically upgrades any CTk dropdown class to use SearchableListDialog when its contents exceed 20 items."""

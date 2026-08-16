@@ -377,9 +377,18 @@ class FXDialog(ctk.CTkToplevel):
         self.rate_entry = ctk.CTkEntry(self, width=240, placeholder_text="e.g. 1.2500")
         self.rate_entry.pack(pady=(2, 0))
 
-        self.preview_lbl = ctk.CTkLabel(self, text="Enter a rate to see preview...", text_color="gray50",
-                                        font=("JetBrains Mono", 10))
-        self.preview_lbl.pack(pady=(0, 10))
+        from gui.widgets import DynamicEllipsisLabel
+
+        self.preview_lbl_1 = DynamicEllipsisLabel(
+            self, text="Enter a rate to see preview...", width=280, font=("JetBrains Mono", 10), text_color="gray50",
+            anchor="center"
+        )
+        self.preview_lbl_1.pack(pady=(10, 0))
+
+        self.preview_lbl_2 = DynamicEllipsisLabel(
+            self, text="", width=280, font=("JetBrains Mono", 10), text_color="gray50", anchor="center"
+        )
+        self.preview_lbl_2.pack(pady=(0, 10))
 
         self.rate_entry.bind("<KeyRelease>", self._update_preview)
 
@@ -417,7 +426,9 @@ class FXDialog(ctk.CTkToplevel):
             rate = float(raw_rate)
             if rate <= 0: raise ValueError
         except ValueError:
-            self.preview_lbl.configure(text="Enter a valid rate to see preview...", text_color="gray50")
+            self.preview_lbl_1.set_text("Enter a valid rate to see preview...")
+            self.preview_lbl_1.label.configure(text_color="gray50")
+            self.preview_lbl_2.set_text("")
             return
 
         method = self.currency_data[code]["method"]
@@ -425,18 +436,19 @@ class FXDialog(ctk.CTkToplevel):
         if method == "multiply":
             result = 100.0 * rate
             math_sym = "×"
-            msg = f"\n1 {code} = {rate:,.4f} {self.base_code}\n"
+            line1 = f"1 {code} = {rate:,.4f} {self.base_code}"
         else:
             result = 100.0 / rate
             math_sym = "÷"
-            msg = f"\n1 {self.base_code} = {rate:,.4f} {code}\n"
+            line1 = f"1 {self.base_code} = {rate:,.4f} {code}"
 
-        msg += f"Math: 100 {code} {math_sym} {rate} = {result:,.{self.base_decimals}f} {self.base_code}"
+        line2 = f"Math: 100 {code} {math_sym} {rate} = {result:,.{self.base_decimals}f} {self.base_code}"
 
-        self.preview_lbl.configure(
-            text=msg,
-            text_color="#5AC8FA"
-        )
+        self.preview_lbl_1.set_text(line1)
+        self.preview_lbl_1.label.configure(text_color="#5AC8FA")
+
+        self.preview_lbl_2.set_text(line2)
+        self.preview_lbl_2.label.configure(text_color="#5AC8FA")
 
     def submit(self):
         code = self.code_var.get()

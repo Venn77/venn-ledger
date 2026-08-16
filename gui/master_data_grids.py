@@ -8,7 +8,7 @@ from gui.dialogs import (
     SimpleDataDialog, CurrencyDialog, FXDialog,
     AccountDialog, PMDialog, show_popup
 )
-from gui.widgets import ToolTip
+from gui.widgets import DynamicEllipsisLabel
 from utils.icon_manager import set_app_window_icon
 from utils.ctk_utils import calculate_dialog_geometry, create_ellipsis_label, patch_linux_scrolling
 
@@ -210,13 +210,13 @@ class SimpleMasterDataGrid(AsyncPaginatedGrid):
         row.pack(fill="x", pady=2, padx=2)
 
         name_frame, name_lbl = create_ellipsis_label(row, item.name, 150, ("JetBrains Mono", 12, "bold"))
-        ToolTip(name_lbl, item.name)
+        # ToolTip(name_lbl, item.name)
         name_frame.pack(side="left", padx=10, pady=8)
 
         if self.has_desc and hasattr(item, 'description'):
             desc = item.description or ""
             desc_frame, desc_lbl = create_ellipsis_label(row, desc, 150, ("JetBrains Mono", 11), "gray60")
-            ToolTip(desc_lbl, desc)
+            # ToolTip(desc_lbl, desc)
             desc_frame.pack(side="left", padx=10)
 
         btn_frame = ctk.CTkFrame(row, fg_color="transparent")
@@ -325,7 +325,7 @@ class CurrencyGrid(AsyncPaginatedGrid):
         ctk.CTkLabel(row, text=item.code, width=40, font=("JetBrains Mono", 12, "bold"), text_color="#5AC8FA").pack(
             side="left", padx=(10, 5), pady=8)
         name_frame, name_lbl = create_ellipsis_label(row, item.name, 150, ("JetBrains Mono", 11))
-        ToolTip(name_lbl, item.name)
+        # ToolTip(name_lbl, item.name)
         name_frame.pack(side="left", padx=5)
 
         if item.is_base:
@@ -449,7 +449,7 @@ class ExchangeRateGrid(AsyncPaginatedGrid):
         popup = ctk.CTkToplevel(self)
         popup.withdraw()
         popup.title("Confirm")
-        width = 250
+        width = 280
         height = 150
         popup.geometry(f"{width}x{height}")
         set_app_window_icon(popup)
@@ -458,7 +458,14 @@ class ExchangeRateGrid(AsyncPaginatedGrid):
         popup.geometry(calculate_dialog_geometry(self, width, height))
 
         ctk.CTkLabel(popup, text="Delete this exchange rate?", font=("JetBrains Mono", 12)).pack(pady=(20, 5))
-        ctk.CTkLabel(popup, text=context_text, font=("JetBrains Mono", 11), text_color="orange").pack(pady=(0, 15))
+
+        if rate:
+            DynamicEllipsisLabel(
+                popup, text=context_text, width=250, font=("JetBrains Mono", 11, "bold"), text_color="orange",
+                anchor="center"
+            ).pack(pady=(0, 15))
+        else:
+            ctk.CTkLabel(popup, text="", height=24).pack(pady=(0, 15))
 
         btn_frame = ctk.CTkFrame(popup, fg_color="transparent")
         btn_frame.pack()
@@ -545,12 +552,12 @@ class AccountGrid(AsyncPaginatedGrid):
         row.pack(fill="x", pady=2, padx=2)
 
         name_frame, name_lbl = create_ellipsis_label(row, item.name, 120, ("JetBrains Mono", 12, "bold"))
-        ToolTip(name_lbl, item.name)
+        # ToolTip(name_lbl, item.name)
         name_frame.pack(side="left", padx=10, pady=8)
         balance_text = f"{item.balance:,.{item.currency.decimals}f} {item.currency_code}"
         balance_frame, balance_lbl = create_ellipsis_label(row, balance_text, 100, ("JetBrains Mono", 11, "bold"),
                                                            "#5AC8FA")
-        ToolTip(balance_lbl, balance_text)
+        # ToolTip(balance_lbl, balance_text)
         balance_frame.pack(side="left", padx=5)
 
         btn_frame = ctk.CTkFrame(row, fg_color="transparent")
@@ -572,14 +579,31 @@ class AccountGrid(AsyncPaginatedGrid):
             popup.withdraw()
             popup.title("Warning")
             p_width = 350
-            p_height = 180
+            p_height = 220
             popup.geometry(f"{p_width}x{p_height}")
             set_app_window_icon(popup)
             popup.attributes("-topmost", True)
             popup.geometry(calculate_dialog_geometry(self, p_width, p_height))
 
-            msg = f"Account '{acc.name}' has a balance of {acc.balance:,.{acc.currency.decimals}f}.\n\nDeactivating it hides it from menus and\ndeactivates its Payment Methods, but the\nbalance will STILL count toward Net Worth.\n\nProceed?"
-            ctk.CTkLabel(popup, text=msg, font=("JetBrains Mono", 11)).pack(pady=15)
+            ctk.CTkLabel(popup, text="You are about to deactivate:", font=("JetBrains Mono", 11)).pack(pady=(15, 5))
+
+            acc_name = f"Account: {acc.name}"
+            DynamicEllipsisLabel(
+                popup, text=acc_name, width=310, font=("JetBrains Mono", 12, "bold"), text_color="#5AC8FA",
+                anchor="center"
+            ).pack(pady=2)
+
+            bal_str = f"Balance: {acc.balance:,.{acc.currency.decimals}f} {acc.currency_code}"
+            DynamicEllipsisLabel(
+                popup, text=bal_str, width=310, font=("JetBrains Mono", 12, "bold"), text_color="#EBCB8B",
+                anchor="center"
+            ).pack(pady=(2, 10))
+
+            ctk.CTkLabel(
+                popup,
+                text="This hides it from menus and deactivates\nits Payment Methods. The balance will\nSTILL count toward Net Worth. Proceed?",
+                font=("JetBrains Mono", 11)
+            ).pack(pady=(0, 15))
 
             def _confirm():
                 self._execute_toggle(acc)
@@ -682,13 +706,13 @@ class PMGrid(AsyncPaginatedGrid):
         row.pack(fill="x", pady=2, padx=2)
 
         name_frame, name_lbl = create_ellipsis_label(row, item.name, 120, ("JetBrains Mono", 12, "bold"))
-        ToolTip(name_lbl, item.name)
+        # ToolTip(name_lbl, item.name)
         name_frame.pack(side="left", padx=10, pady=8)
 
         acc_color = "gray60" if not item.account.active_bool else "#5AC8FA"
         acc_text = f"→ {item.account.name}"
         acc_frame, acc_lbl = create_ellipsis_label(row, acc_text, 140, ("JetBrains Mono", 11), acc_color)
-        ToolTip(acc_lbl, acc_text)
+        # ToolTip(acc_lbl, acc_text)
         acc_frame.pack(side="left", padx=5)
 
         btn_frame = ctk.CTkFrame(row, fg_color="transparent")

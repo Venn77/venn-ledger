@@ -5,7 +5,7 @@ from database.models import (
     Currency, Project, Category, Vendor,
     PaymentMethod, Account, Stream, Payer
 )
-from gui.widgets import SearchableComboBox, ToolTip
+from gui.widgets import SearchableComboBox, ToolTip, DynamicEllipsisLabel
 from gui.dialogs import open_calendar, show_popup
 from utils.io_utils import format_input_float, get_relative_datetime_str
 from utils.icon_manager import set_app_window_icon
@@ -99,7 +99,9 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         # noinspection PyProtectedMember
         self.project_combo._entry.bind("<KeyRelease>", self.schedule_validation, add="+")
 
-        self.error_label = ctk.CTkLabel(self, text="", text_color="orange", font=("JetBrains Mono", 12))
+        self.error_label = DynamicEllipsisLabel(
+            self, text="", width=430, font=("JetBrains Mono", 12), text_color="orange", anchor="center"
+        )
         self.btn_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.clear_btn = ctk.CTkButton(self.btn_frame, text="Clear All", fg_color="gray30", command=self.clear_all)
         self.save_btn_ring = ctk.CTkFrame(self.btn_frame, fg_color="transparent", corner_radius=6)
@@ -442,7 +444,8 @@ class BaseTransactionWindow(ctk.CTkToplevel):
 
     def validate_form(self, *_):
         """Checks if all required fields are filled to enable the Save button."""
-        self.error_label.configure(text="", text_color="orange")
+        self.error_label.set_text("")
+        self.error_label.label.configure(text_color="orange")
         self.save_btn.configure(state="normal", fg_color="green", text_color="white")
 
         amt_val = self.amount_entry.get()
@@ -456,33 +459,35 @@ class BaseTransactionWindow(ctk.CTkToplevel):
         if not (amt_ok and date_ok and cur_ok and fx_ok):
             self.save_btn.configure(state="disabled", fg_color="gray30", text_color="white")
             if not amt_ok:
-                self.error_label.configure(text="⚠ Check Amount (must be a number)")
+                self.error_label.set_text("⚠ Check Amount (must be a number)")
             elif not date_ok:
-                self.error_label.configure(text="⚠ Check Date format (YYYY-MM-DD HH:MM:SS)")
+                self.error_label.set_text("⚠ Check Date format (YYYY-MM-DD HH:MM:SS)")
             elif not fx_ok:
-                self.error_label.configure(text="⚠ Check Exchange Rate (must be a number)")
+                self.error_label.set_text("⚠ Check Exchange Rate (must be a number)")
             elif not cur_ok:
-                self.error_label.configure(text="⚠ Select a valid Currency")
+                self.error_label.set_text("⚠ Select a valid Currency")
             return
 
         proj_val = self.project_combo.get().strip()
         if proj_val.lower() in ["all projects", "no project"]:
             self.save_btn.configure(state="disabled", fg_color="gray30", text_color="white")
-            self.error_label.configure(text=f"⚠ '{proj_val}' is a reserved system name")
+            self.error_label.set_text(f"⚠ '{proj_val}' is a reserved system name")
             return
 
         spec_ok, spec_err = self.validate_specific_fields()
         if not spec_ok:
             self.save_btn.configure(state="disabled", fg_color="gray30", text_color="white")
-            self.error_label.configure(text=spec_err)
+            self.error_label.set_text(spec_err)
             return
 
         warn_msg, is_duplicate = self.get_warnings()
         if is_duplicate:
             self.save_btn.configure(fg_color="#EBCB8B", text_color="black")
-            self.error_label.configure(text=warn_msg, text_color="orange")
+            self.error_label.set_text(warn_msg)
+            self.error_label.label.configure(text_color="orange")
         elif warn_msg:
-            self.error_label.configure(text=warn_msg, text_color="#EBCB8B")
+            self.error_label.set_text(warn_msg)
+            self.error_label.label.configure(text_color="#EBCB8B")
 
     def submit_data(self):
         """Invokes the finance manager to submit to DB."""
@@ -503,12 +508,13 @@ class BaseTransactionWindow(ctk.CTkToplevel):
             self.execute_db_submission(base_data)
 
             self.save_btn.configure(text="✔ Added!", fg_color="darkgreen", state="disabled")
-            self.error_label.configure(text="Saved successfully", text_color="green")
-            # noinspection PyTypeChecker
+            self.error_label.set_text("Saved successfully")
+            self.error_label.label.configure(text_color="green")
             self.after(1000, self.finalize_and_refresh)
 
         except Exception as e:
-            self.error_label.configure(text=f"⚠ Database Error: {str(e)}", text_color="red")
+            self.error_label.set_text(f"⚠ Database Error: {str(e)}")
+            self.error_label.label.configure(text_color="red")
             # print(f"Submission Error: {e}")
 
     def finalize_and_refresh(self):

@@ -138,8 +138,6 @@ class TransactionManager:
         try:
             if not expense_id: self.db_session.add(new_expense)
             self.db_session.commit()
-            import threading
-            print(f"[DB-WRITE] 💾 Expense saved successfully from Thread: {threading.get_ident()}")
         except Exception as e:
             self.db_session.rollback()
             raise e

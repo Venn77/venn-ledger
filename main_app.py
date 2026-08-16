@@ -18,6 +18,7 @@ from gui.settings_view import SettingsView
 from gui.ai_view import AIImportView
 from gui.dashboard_view import DashboardView
 from gui.wizard import FirstRunWizard
+from gui.widgets import DynamicEllipsisLabel
 
 
 if IS_COMPILED:
@@ -57,7 +58,7 @@ class FinanceApp(ctk.CTk):
         app_w = min(1440, logical_screen_w)
         app_h = min(700, logical_screen_h)
 
-        min_w = min(1400, logical_screen_w)
+        min_w = min(1415, logical_screen_w)
         min_h = min(650, logical_screen_h)
 
         self.geometry(f"{app_w}x{app_h}")
@@ -538,7 +539,15 @@ class FinanceApp(ctk.CTk):
 
         ctk.CTkLabel(popup, text="Are you sure you want to delete\nthis transaction?",
                      font=("JetBrains Mono", 12)).pack(pady=(20, 5))
-        ctk.CTkLabel(popup, text=context_text, font=("JetBrains Mono", 11), text_color="orange").pack(pady=(0, 15))
+
+        if context_text:
+            DynamicEllipsisLabel(
+                popup, text=context_text, width=310, font=("JetBrains Mono", 11, "bold"), text_color="orange",
+                anchor="center"
+            ).pack(pady=(0, 15))
+        else:
+            ctk.CTkLabel(popup, text="", height=24).pack(pady=(0, 15))
+
         btn_frame = ctk.CTkFrame(popup, fg_color="transparent")
         btn_frame.pack(pady=5)
 

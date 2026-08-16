@@ -3,20 +3,28 @@ import customtkinter as ctk
 import tkinter as tk
 from typing import Optional
 
-
-def create_ellipsis_label(container, text, width, font, color="white", height=24):
+# Legacy utility function left here while testing the new wrapper below.
+# def create_ellipsis_label(container, text, width, font, color="white", height=24):
+#     """
+#     Create a bounded frame with dynamic text ellipsis.
+#     'container' is the parent widget holding the fixed-width frame.
+#     """
+#     frame = ctk.CTkFrame(container, fg_color="transparent", width=width, height=height)
+#     frame.pack_propagate(False)
+#
+#     lbl = ctk.CTkLabel(frame, text=text, anchor="w", font=font, text_color=color)
+#     lbl.place(relx=0, rely=0.5, relwidth=1.0, anchor="w")
+#
+#     apply_dynamic_ellipsis(frame, lbl, text)
+#     return frame, lbl
+def create_ellipsis_label(container, text, width, font, color="white", height=24, anchor="w"):
     """
-    Create a bounded frame with dynamic text ellipsis.
-    'container' is the parent widget holding the fixed-width frame.
+    Backwards compatibility wrapper for older grids.
+    Returns (frame_widget, internal_label).
     """
-    frame = ctk.CTkFrame(container, fg_color="transparent", width=width, height=height)
-    frame.pack_propagate(False)
-
-    lbl = ctk.CTkLabel(frame, text=text, anchor="w", font=font, text_color=color)
-    lbl.place(relx=0, rely=0.5, relwidth=1.0, anchor="w")
-
-    apply_dynamic_ellipsis(frame, lbl, text)
-    return frame, lbl
+    from gui.widgets import DynamicEllipsisLabel
+    widget = DynamicEllipsisLabel(container, text, width, font, color, height, anchor)
+    return widget, widget.label
 
 def apply_dynamic_ellipsis(container_frame, label_widget, full_text):
     """

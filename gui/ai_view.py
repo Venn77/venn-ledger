@@ -240,23 +240,28 @@ class AIImportView(ctk.CTkFrame):
         elif IS_STEAMOS:
             msg = (
                 "Venn Ledger uses Ollama to process data locally and privately.\n\n"
-                "Because SteamOS is read-only, open Konsole and run these steps just once:\n\n"
-                "1. mkdir -p ~/.local && curl -L https://ollama.com/download/ollama-linux-amd64.tar.zst | tar -x --zstd -C ~/.local\n\n"
-                "2. In Tab 1 run: OLLAMA_IGPU_ENABLE=1 ~/.local/bin/ollama serve\n\n"
-                "3. In Tab 2 run: ~/.local/bin/ollama pull mistral:7b\n\n"
+                "Because SteamOS is read-only, open Konsole and run these steps just once.\n\n"
+                "Step 1:\n\n"
+                "mkdir -p ~/.local && curl -L https://ollama.com/download/ollama-linux-amd64.tar.zst | tar -x --zstd -C ~/.local\n\n"
+                "Step 2 - In Tab 1 run:\n\n"
+                "OLLAMA_IGPU_ENABLE=1 ~/.local/bin/ollama serve\n\n"
+                "Step 3 - Open a new Tab and run:\n\n"
+                "~/.local/bin/ollama pull mistral:7b\n\n"
                 "Once downloaded, Venn Ledger will automatically manage the engine!"
             )
-            popup_height = 380
-            popup_width = 580
-            wrap_len = 530
+            popup_height = 410
+            popup_width = 600
+            wrap_len = 550
 
         else:
             # Standard Linux (Ubuntu, Mint, Fedora, Arch, etc.)
             msg = (
                 "Venn Ledger uses Ollama to process data locally and privately.\n\n"
                 "To set this up, open your Terminal and run:\n\n"
-                "1. curl -fsSL https://ollama.com/install.sh | sh\n\n"
-                "2. ollama pull mistral:7b\n\n"
+                "Step 1:\n\n"
+                "curl -fsSL https://ollama.com/install.sh | sh\n\n"
+                "Step 2:\n\n"
+                "ollama pull mistral:7b\n\n"
                 "Once downloaded, Venn Ledger will automatically manage the engine!"
             )
             popup_height = 350

@@ -262,6 +262,8 @@ class SearchableComboBox(ctk.CTkComboBox):
         if self._state == "disabled":
             return
 
+        self._entry.focus_set()
+
         if self.get() == self.placeholder:
             self.set("")
             self.configure(text_color="white")

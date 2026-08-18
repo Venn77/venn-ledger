@@ -469,7 +469,7 @@ class BaseTransactionWindow(ctk.CTkToplevel):
             return
 
         proj_val = self.project_combo.get().strip()
-        if proj_val.lower() in ["all projects", "no project"]:
+        if proj_val.lower() in ["all projects", "no project", "none"]:
             self.save_btn.configure(state="disabled", fg_color="gray30", text_color="white")
             self.error_label.set_text(f"⚠ '{proj_val}' is a reserved system name")
             return

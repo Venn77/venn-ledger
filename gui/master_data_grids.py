@@ -246,7 +246,7 @@ class SimpleMasterDataGrid(AsyncPaginatedGrid):
     def add_new(self):
         def _save(new_name, new_desc):
             try:
-                if self.model.__name__ == "Project" and new_name.strip().lower() in ["all projects", "no project"]:
+                if self.model.__name__ == "Project" and new_name.strip().lower() in ["all projects", "no project", "none"]:
                     return False, "This is a reserved system name."
 
                 existing_item = self.db_session.query(self.model).filter_by(name=new_name).first()

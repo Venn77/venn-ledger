@@ -1,4 +1,5 @@
 import sqlite3
+from typing import Any, Dict, List, Optional, cast
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 from config import DB_PATH
@@ -14,16 +15,11 @@ def get_read_only_engine() -> Engine:
 
     return create_engine("sqlite://", creator=creator, echo=False)
 
-def execute_ro_query(query: str) -> list[dict]:
-    """
-    Executes a raw SQL string against the read-only engine safely.
-    Returns results as a list of dictionaries.
-    """
+def execute_ro_query(query: str, params: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+    """Executes a parameterized SQL query safely against the read-only engine."""
     engine = get_read_only_engine()
 
     with engine.connect() as conn:
-        result = conn.execute(text(query))
-        # noinspection PyProtectedMember
-        return [dict(row._mapping) for row in result]
-
-
+        result = conn.execute(text(query), params or {})
+        rows = [dict(row) for row in result.mappings()]
+        return cast(List[Dict[str, Any]], rows)

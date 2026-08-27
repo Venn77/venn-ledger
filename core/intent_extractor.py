@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional
 import ollama
 
-from core.prompts.router_prompts import (
+from core.prompts.extractor_prompts import (
     AGENT_1_SYSTEM_PROMPT,
     get_agent_1_schema,
 )

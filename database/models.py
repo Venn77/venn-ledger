@@ -73,7 +73,7 @@ class Category(Base):
     __tablename__ = 'categories'
     id = Column(Integer, primary_key=True)
     name = Column(String(50), unique=True, nullable=False,
-                  comment="e.g., 420, Rent, Gifts, Groceries, Transportation, Vacation, Subscription, Refreshment, or Medical")
+                  comment="e.g., Groceries, Housing, Transport, Utilities, Dining Out, or Entertainment")
     active_bool = Column(Boolean, default=True, comment="If the category is active (so it is selectable in-app)")
     # Relationships
     expenses = relationship("Expense", back_populates="category")
@@ -85,7 +85,7 @@ class Stream(Base):
     __tablename__ = 'streams'
     id = Column(Integer, primary_key=True)
     name = Column(String(50), unique=True, nullable=False,
-                  comment="e.g., Salary, Reimbursement or Unemployment")
+                  comment="e.g., Salary, Freelance or Refunds")
     active_bool = Column(Boolean, default=True, comment="If the category is active (so it is selectable in-app)")
     # Relationships
     gains = relationship("Gain", back_populates="stream")
@@ -96,7 +96,7 @@ class Stream(Base):
 class Vendor(Base):
     __tablename__ = 'vendors'
     id = Column(Integer, primary_key=True)
-    name = Column(String(100), unique=True, nullable=False, comment="e.g., Mercadona, Pepephone, etc.")
+    name = Column(String(100), unique=True, nullable=False, comment="e.g., Carrefour, Orange, etc.")
     active_bool = Column(Boolean, default=True, comment="If the vendor is active (so it is selectable in-app)")
     # Relationships
     expenses = relationship("Expense", back_populates="vendor")
@@ -107,7 +107,7 @@ class Vendor(Base):
 class Payer(Base):
     __tablename__ = 'payers'
     id = Column(Integer, primary_key=True)
-    name = Column(String(100), unique=True, nullable=False, comment="e.g., DOMO, SEPE, Amazon, etc.")
+    name = Column(String(100), unique=True, nullable=False, comment="e.g., ACME Corp, Contoso, Amazon, etc.")
     active_bool = Column(Boolean, default=True, comment="If the payer is active (so it is selectable in-app)")
     # Relationships
     gains = relationship("Gain", back_populates="payer")
@@ -139,7 +139,7 @@ class PaymentMethod(Base):
     account_id = Column(Integer, ForeignKey('accounts.id'), nullable=False)
     id = Column(Integer, primary_key=True)
     name = Column(String(50), unique=True, nullable=False,
-                  comment="The payment method, e.g., LaLiga, Santander Debit, Wise, Revolut, or MercadoPago")
+                  comment="The payment method, e.g., Cash, Debit Card, or Credit Card")
     active_bool = Column(Boolean, default=True, comment="If the payment method is active (so it is selectable in-app)")
     # Relationships
     expenses = relationship("Expense", back_populates="payment_method")
